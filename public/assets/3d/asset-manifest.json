@@ -1,0 +1,114 @@
+{
+  "schemaVersion": 1,
+  "generator": "scripts/build-3d-assets.mjs",
+  "design": {
+    "name": "Festival Trail Bike",
+    "origin": "Original project-authored procedural geometry and texture; no source model or source image"
+  },
+  "compression": {
+    "geometry": "EXT_meshopt_compression (required, high/filter mode)",
+    "quantization": "KHR_mesh_quantization (required)",
+    "uncompressedGlbBytes": 22076,
+    "compressedGlbBytes": 15172,
+    "glbReductionPercent": 31.3,
+    "texture": "KTX2 ETC1S with BasisLZ supercompression, sRGB transfer, and 8 mip levels",
+    "textureDimensions": [
+      128,
+      128
+    ],
+    "gltfTextureExtension": "KHR_texture_basisu (required)"
+  },
+  "dependencies": [
+    {
+      "package": "@gltf-transform/core",
+      "version": "4.4.1",
+      "license": "MIT",
+      "use": "GLB authoring"
+    },
+    {
+      "package": "@gltf-transform/extensions",
+      "version": "4.4.1",
+      "license": "MIT",
+      "use": "glTF extension I/O"
+    },
+    {
+      "package": "@gltf-transform/functions",
+      "version": "4.4.1",
+      "license": "MIT",
+      "use": "Meshopt transform"
+    },
+    {
+      "package": "ktx2-encoder",
+      "version": "0.5.3",
+      "license": "MIT",
+      "use": "Build-time Basis encoder wrapper"
+    },
+    {
+      "component": "Basis Universal encoder WASM",
+      "source": "ktx2-encoder@0.5.3",
+      "license": "Apache-2.0",
+      "use": "Build-time ETC1S encoding"
+    },
+    {
+      "package": "meshoptimizer",
+      "version": "1.2.0",
+      "license": "MIT",
+      "use": "Build-time geometry encoder"
+    },
+    {
+      "package": "gltf-validator",
+      "version": "2.0.0-dev.3.10",
+      "license": "Apache-2.0",
+      "use": "Build-time verification"
+    },
+    {
+      "package": "three",
+      "version": "0.185.1",
+      "license": "MIT",
+      "use": "Primitive geometry generation and runtime loaders"
+    },
+    {
+      "component": "Basis Universal transcoder",
+      "source": "three@0.185.1/examples/jsm/libs/basis",
+      "license": "Apache-2.0",
+      "use": "Runtime KTX2 transcoding"
+    }
+  ],
+  "files": [
+    {
+      "path": "public/assets/3d/festival-trail-bike.glb",
+      "bytes": 15172,
+      "sha256": "a748123dff38f90dbd29c476244cbffe8fe93d7c8a20de909e6c040af52d2123"
+    },
+    {
+      "path": "public/assets/3d/festival-bike-albedo.ktx2",
+      "bytes": 2236,
+      "sha256": "a86588924b53fd51915d505d0ba23e343ac3e84a5139c687845a49f8ad8a1ba2"
+    },
+    {
+      "path": "public/assets/transcoders/basis/basis_transcoder.js",
+      "bytes": 57529,
+      "sha256": "8478b5b6d6b74e7d3082b89f6417321d8d1dc0307f2b30d4484bb11b441696a1"
+    },
+    {
+      "path": "public/assets/transcoders/basis/basis_transcoder.wasm",
+      "bytes": 527333,
+      "sha256": "6cf17dc889352c42e9acf8897107978d127005fe3386c36a0e3845e27967630a"
+    },
+    {
+      "path": "public/assets/transcoders/basis/README.md",
+      "bytes": 1388,
+      "sha256": "a578df416c1e0852e9c36a1cf91b4d28d91a251294f87ce610a3bc7ca4df15e0"
+    },
+    {
+      "path": "public/assets/transcoders/basis/LICENSE.txt",
+      "bytes": 9197,
+      "sha256": "a7d00bfd54525bc694b6e32f64c7ebcf5e6b7ae3657be5cc12767bce74654a47"
+    },
+    {
+      "path": "public/assets/transcoders/basis/NOTICE.txt",
+      "bytes": 917,
+      "sha256": "42beeb6710c933778e30f62886e0790ebba120debbb0545ab46c7292d3e5a061"
+    }
+  ]
+}

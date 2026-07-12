@@ -1,0 +1,17 @@
+{
+  "name": "Rivet Ridge Rally",
+  "short_name": "Rivet Ridge",
+  "description": "An original 3D arcade motocross festival game.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#061c32",
+  "theme_color": "#061c32",
+  "icons": [
+    {
+      "src": "/assets/icons/app-icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

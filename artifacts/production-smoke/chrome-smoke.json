@@ -1,0 +1,40 @@
+{
+  "schemaVersion": 1,
+  "kind": "production-smoke",
+  "createdAt": "2026-07-12T22:23:34.075Z",
+  "baseURL": "http://127.0.0.1:4173",
+  "browser": {
+    "name": "Google Chrome",
+    "version": "150.0.7871.115",
+    "headless": true
+  },
+  "runtime": {
+    "title": "Rivet Ridge Rally",
+    "qaApiPresent": false,
+    "versionPresent": true
+  },
+  "steps": [
+    "boot-and-version",
+    "race-start-and-restart",
+    "editor-open",
+    "offline-service-worker-reload"
+  ],
+  "serviceWorkerControlled": true,
+  "offlineReloadPassed": true,
+  "network": {
+    "failedRequests": [],
+    "httpErrors": []
+  },
+  "console": {
+    "all": [],
+    "knownDiagnostics": [],
+    "unexpected": []
+  },
+  "screenshots": [
+    "chrome-race.png",
+    "chrome-editor.png",
+    "chrome-offline-title.png"
+  ],
+  "smokeError": null,
+  "status": "PASS"
+}

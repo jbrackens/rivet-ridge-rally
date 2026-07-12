@@ -1,0 +1,1321 @@
+{
+  "schemaVersion": 1,
+  "kind": "performance-measurement",
+  "createdAt": "2026-07-12T20:24:23.214Z",
+  "baseURL": "http://127.0.0.1:4373",
+  "browser": {
+    "name": "chromium",
+    "version": "149.0.7827.55",
+    "headless": false
+  },
+  "host": {
+    "node": "v26.4.0",
+    "platform": "darwin",
+    "architecture": "arm64"
+  },
+  "configuration": {
+    "sampleSeconds": 5,
+    "qaModeRequired": true
+  },
+  "builtAssets": {
+    "directory": "dist",
+    "fileCount": 21,
+    "totalBytes": 4678172,
+    "totalGzipBytes": 3025236,
+    "files": [
+      {
+        "path": "THIRD_PARTY_NOTICES.txt",
+        "bytes": 38475,
+        "gzipBytes": 6881
+      },
+      {
+        "path": "assets/3d/asset-manifest.json",
+        "bytes": 3369,
+        "gzipBytes": 1212
+      },
+      {
+        "path": "assets/3d/festival-bike-albedo.ktx2",
+        "bytes": 2236,
+        "gzipBytes": 1935
+      },
+      {
+        "path": "assets/3d/festival-trail-bike.glb",
+        "bytes": 15172,
+        "gzipBytes": 5667
+      },
+      {
+        "path": "assets/GameView-lkxeCeEJ.js",
+        "bytes": 211446,
+        "gzipBytes": 70542
+      },
+      {
+        "path": "assets/TrackEditorScreen-DiZ8rPwI.js",
+        "bytes": 36634,
+        "gzipBytes": 12058
+      },
+      {
+        "path": "assets/art/title-background.png",
+        "bytes": 2129759,
+        "gzipBytes": 2115848
+      },
+      {
+        "path": "assets/basis_transcoder-VXdx5NbI.wasm",
+        "bytes": 527333,
+        "gzipBytes": 244553
+      },
+      {
+        "path": "assets/basis_transcoder-o4Hde_L7.js",
+        "bytes": 57529,
+        "gzipBytes": 15063
+      },
+      {
+        "path": "assets/icons/app-icon.svg",
+        "bytes": 477,
+        "gzipBytes": 318
+      },
+      {
+        "path": "assets/index-BMVY1emd.js",
+        "bytes": 413821,
+        "gzipBytes": 125601
+      },
+      {
+        "path": "assets/index-BsX4JgSA.css",
+        "bytes": 46626,
+        "gzipBytes": 11398
+      },
+      {
+        "path": "assets/three.module-CYIrST_y.js",
+        "bytes": 594445,
+        "gzipBytes": 148047
+      },
+      {
+        "path": "assets/transcoders/basis/LICENSE.txt",
+        "bytes": 9197,
+        "gzipBytes": 3331
+      },
+      {
+        "path": "assets/transcoders/basis/NOTICE.txt",
+        "bytes": 917,
+        "gzipBytes": 514
+      },
+      {
+        "path": "assets/transcoders/basis/README.md",
+        "bytes": 1388,
+        "gzipBytes": 702
+      },
+      {
+        "path": "assets/transcoders/basis/basis_transcoder.js",
+        "bytes": 57529,
+        "gzipBytes": 15063
+      },
+      {
+        "path": "assets/transcoders/basis/basis_transcoder.wasm",
+        "bytes": 527333,
+        "gzipBytes": 244553
+      },
+      {
+        "path": "index.html",
+        "bytes": 1176,
+        "gzipBytes": 569
+      },
+      {
+        "path": "manifest.webmanifest",
+        "bytes": 398,
+        "gzipBytes": 253
+      },
+      {
+        "path": "sw.js",
+        "bytes": 2912,
+        "gzipBytes": 1128
+      }
+    ]
+  },
+  "profiles": [
+    {
+      "name": "desktop-1920x1080",
+      "viewport": {
+        "width": 1920,
+        "height": 1080
+      },
+      "deviceScaleFactor": 1,
+      "navigation": {
+        "status": 200,
+        "shellReadyMs": 1053.56,
+        "timing": {
+          "durationMs": 104.3,
+          "domInteractiveMs": 46.4,
+          "domContentLoadedMs": 103.1,
+          "loadEventMs": 104.3,
+          "responseEndMs": 3.4,
+          "transferSizeBytes": 869,
+          "encodedBodyBytes": 569,
+          "decodedBodyBytes": 1176
+        }
+      },
+      "firstRaceLoadMs": 137.42,
+      "restartMs": 238.33,
+      "editor": {
+        "openMs": 848.26,
+        "testPlayMs": 170.09,
+        "testRideControlVisible": true,
+        "testRideInvocation": "visible-control"
+      },
+      "rendering": {
+        "durationMs": 5000,
+        "sampleCount": 13,
+        "fps": {
+          "samples": 13,
+          "min": 57,
+          "mean": 59.31,
+          "p95": 60,
+          "max": 60
+        },
+        "frameTimeMs": {
+          "samples": 13,
+          "min": 2.11,
+          "mean": 2.85,
+          "p95": 4.59,
+          "max": 4.59
+        },
+        "drawCalls": {
+          "samples": 13,
+          "min": 317,
+          "mean": 345.23,
+          "p95": 367,
+          "max": 367
+        },
+        "samples": [
+          {
+            "elapsedMs": 2.25,
+            "fps": 57,
+            "frameTimeMs": 4.59,
+            "drawCalls": 367,
+            "droppedSimulationMs": 0
+          },
+          {
+            "elapsedMs": 405.34,
+            "fps": 57,
+            "frameTimeMs": 4.59,
+            "drawCalls": 367,
+            "droppedSimulationMs": 0
+          },
+          {
+            "elapsedMs": 808.39,
+            "fps": 57,
+            "frameTimeMs": 4.59,
+            "drawCalls": 366,
+            "droppedSimulationMs": 0
+          },
+          {
+            "elapsedMs": 1210.54,
+            "fps": 60,
+            "frameTimeMs": 2.39,
+            "drawCalls": 365,
+            "droppedSimulationMs": 0
+          },
+          {
+            "elapsedMs": 1615.49,
+            "fps": 60,
+            "frameTimeMs": 2.39,
+            "drawCalls": 343,
+            "droppedSimulationMs": 0
+          },
+          {
+            "elapsedMs": 2018.29,
+            "fps": 60,
+            "frameTimeMs": 2.34,
+            "drawCalls": 347,
+            "droppedSimulationMs": 0
+          },
+          {
+            "elapsedMs": 2420.4,
+            "fps": 60,
+            "frameTimeMs": 2.34,
+            "drawCalls": 359,
+            "droppedSimulationMs": 0
+          },
+          {
+            "elapsedMs": 2822.34,
+            "fps": 60,
+            "frameTimeMs": 2.34,
+            "drawCalls": 349,
+            "droppedSimulationMs": 0
+          },
+          {
+            "elapsedMs": 3224.42,
+            "fps": 60,
+            "frameTimeMs": 2.11,
+            "drawCalls": 333,
+            "droppedSimulationMs": 0
+          },
+          {
+            "elapsedMs": 3627.08,
+            "fps": 60,
+            "frameTimeMs": 2.11,
+            "drawCalls": 333,
+            "droppedSimulationMs": 0
+          },
+          {
+            "elapsedMs": 4028.79,
+            "fps": 60,
+            "frameTimeMs": 2.42,
+            "drawCalls": 323,
+            "droppedSimulationMs": 0
+          },
+          {
+            "elapsedMs": 4440.8,
+            "fps": 60,
+            "frameTimeMs": 2.42,
+            "drawCalls": 317,
+            "droppedSimulationMs": 0
+          },
+          {
+            "elapsedMs": 4843.56,
+            "fps": 60,
+            "frameTimeMs": 2.42,
+            "drawCalls": 319,
+            "droppedSimulationMs": 0
+          }
+        ]
+      },
+      "stress": {
+        "durationMs": 5000,
+        "sampleCount": 13,
+        "fps": {
+          "samples": 13,
+          "min": 57,
+          "mean": 59.31,
+          "p95": 60,
+          "max": 60
+        },
+        "frameTimeMs": {
+          "samples": 13,
+          "min": 2.83,
+          "mean": 3.29,
+          "p95": 4.49,
+          "max": 4.49
+        },
+        "drawCalls": {
+          "samples": 13,
+          "min": 496,
+          "mean": 530.15,
+          "p95": 559,
+          "max": 559
+        },
+        "samples": [
+          {
+            "elapsedMs": 1.15,
+            "fps": 57,
+            "frameTimeMs": 4.49,
+            "drawCalls": 545,
+            "droppedSimulationMs": 0
+          },
+          {
+            "elapsedMs": 403.79,
+            "fps": 57,
+            "frameTimeMs": 4.49,
+            "drawCalls": 539,
+            "droppedSimulationMs": 0
+          },
+          {
+            "elapsedMs": 806.42,
+            "fps": 57,
+            "frameTimeMs": 4.49,
+            "drawCalls": 550,
+            "droppedSimulationMs": 0
+          },
+          {
+            "elapsedMs": 1208.83,
+            "fps": 60,
+            "frameTimeMs": 2.84,
+            "drawCalls": 559,
+            "droppedSimulationMs": 0
+          },
+          {
+            "elapsedMs": 1611.41,
+            "fps": 60,
+            "frameTimeMs": 2.84,
+            "drawCalls": 559,
+            "droppedSimulationMs": 0
+          },
+          {
+            "elapsedMs": 2013.67,
+            "fps": 60,
+            "frameTimeMs": 3.04,
+            "drawCalls": 552,
+            "droppedSimulationMs": 0
+          },
+          {
+            "elapsedMs": 2416.86,
+            "fps": 60,
+            "frameTimeMs": 3.04,
+            "drawCalls": 526,
+            "droppedSimulationMs": 0
+          },
+          {
+            "elapsedMs": 2819.53,
+            "fps": 60,
+            "frameTimeMs": 3.04,
+            "drawCalls": 539,
+            "droppedSimulationMs": 0
+          },
+          {
+            "elapsedMs": 3222.28,
+            "fps": 60,
+            "frameTimeMs": 2.83,
+            "drawCalls": 524,
+            "droppedSimulationMs": 0
+          },
+          {
+            "elapsedMs": 3625.03,
+            "fps": 60,
+            "frameTimeMs": 2.83,
+            "drawCalls": 505,
+            "droppedSimulationMs": 0
+          },
+          {
+            "elapsedMs": 4027.02,
+            "fps": 60,
+            "frameTimeMs": 2.96,
+            "drawCalls": 500,
+            "droppedSimulationMs": 0
+          },
+          {
+            "elapsedMs": 4429.07,
+            "fps": 60,
+            "frameTimeMs": 2.96,
+            "drawCalls": 496,
+            "droppedSimulationMs": 0
+          },
+          {
+            "elapsedMs": 4833.73,
+            "fps": 60,
+            "frameTimeMs": 2.96,
+            "drawCalls": 498,
+            "droppedSimulationMs": 0
+          }
+        ]
+      },
+      "heaps": [
+        {
+          "stage": "shell",
+          "available": true,
+          "usedBytes": 16185072,
+          "totalBytes": 21889024
+        },
+        {
+          "stage": "first-race-ready",
+          "available": true,
+          "usedBytes": 24328072,
+          "totalBytes": 32112640
+        },
+        {
+          "stage": "after-render-sample",
+          "available": true,
+          "usedBytes": 23947332,
+          "totalBytes": 48365568
+        },
+        {
+          "stage": "after-restart",
+          "available": true,
+          "usedBytes": 25984800,
+          "totalBytes": 55181312
+        },
+        {
+          "stage": "rival-ai-jump-crash-stress",
+          "available": true,
+          "usedBytes": 27503676,
+          "totalBytes": 80084992
+        },
+        {
+          "stage": "editor-test-play",
+          "available": true,
+          "usedBytes": 12119084,
+          "totalBytes": 72482816
+        }
+      ],
+      "network": {
+        "shell": {
+          "requestCount": 11,
+          "transferSizeBytes": 371114,
+          "encodedBodyBytes": 3099584,
+          "decodedBodyBytes": 4033719,
+          "resources": [
+            {
+              "path": "/assets/index-BMVY1emd.js",
+              "initiatorType": "script",
+              "durationMs": 22.2,
+              "transferSizeBytes": 126211,
+              "encodedBodyBytes": 125911,
+              "decodedBodyBytes": 413821
+            },
+            {
+              "path": "/assets/index-BsX4JgSA.css",
+              "initiatorType": "link",
+              "durationMs": 5.1,
+              "transferSizeBytes": 11789,
+              "encodedBodyBytes": 11489,
+              "decodedBodyBytes": 46626
+            },
+            {
+              "path": "/assets/icons/app-icon.svg",
+              "initiatorType": "other",
+              "durationMs": 2.1,
+              "transferSizeBytes": 777,
+              "encodedBodyBytes": 477,
+              "decodedBodyBytes": 477
+            },
+            {
+              "path": "/assets/GameView-lkxeCeEJ.js",
+              "initiatorType": "script",
+              "durationMs": 8.3,
+              "transferSizeBytes": 70999,
+              "encodedBodyBytes": 70699,
+              "decodedBodyBytes": 211446
+            },
+            {
+              "path": "/assets/three.module-CYIrST_y.js",
+              "initiatorType": "script",
+              "durationMs": 20,
+              "transferSizeBytes": 148965,
+              "encodedBodyBytes": 148665,
+              "decodedBodyBytes": 594445
+            },
+            {
+              "path": "/assets/TrackEditorScreen-DiZ8rPwI.js",
+              "initiatorType": "script",
+              "durationMs": 2.9,
+              "transferSizeBytes": 12373,
+              "encodedBodyBytes": 12073,
+              "decodedBodyBytes": 36634
+            },
+            {
+              "path": "/assets/3d/festival-trail-bike.glb",
+              "initiatorType": "fetch",
+              "durationMs": 2.1,
+              "transferSizeBytes": 0,
+              "encodedBodyBytes": 15172,
+              "decodedBodyBytes": 15172
+            },
+            {
+              "path": "/assets/transcoders/basis/basis_transcoder.js",
+              "initiatorType": "fetch",
+              "durationMs": 0.9,
+              "transferSizeBytes": 0,
+              "encodedBodyBytes": 57529,
+              "decodedBodyBytes": 57529
+            },
+            {
+              "path": "/assets/transcoders/basis/basis_transcoder.wasm",
+              "initiatorType": "fetch",
+              "durationMs": 1,
+              "transferSizeBytes": 0,
+              "encodedBodyBytes": 527333,
+              "decodedBodyBytes": 527333
+            },
+            {
+              "path": "/assets/art/title-background.png",
+              "initiatorType": "css",
+              "durationMs": 35.8,
+              "transferSizeBytes": 0,
+              "encodedBodyBytes": 2129759,
+              "decodedBodyBytes": 2129759
+            },
+            {
+              "path": "/assets/icons/app-icon.svg",
+              "initiatorType": "other",
+              "durationMs": 0.6,
+              "transferSizeBytes": 0,
+              "encodedBodyBytes": 477,
+              "decodedBodyBytes": 477
+            }
+          ]
+        },
+        "completeFlow": {
+          "requestCount": 23,
+          "transferSizeBytes": 371114,
+          "encodedBodyBytes": 5499720,
+          "decodedBodyBytes": 6433855,
+          "resources": [
+            {
+              "path": "/assets/index-BMVY1emd.js",
+              "initiatorType": "script",
+              "durationMs": 22.2,
+              "transferSizeBytes": 126211,
+              "encodedBodyBytes": 125911,
+              "decodedBodyBytes": 413821
+            },
+            {
+              "path": "/assets/index-BsX4JgSA.css",
+              "initiatorType": "link",
+              "durationMs": 5.1,
+              "transferSizeBytes": 11789,
+              "encodedBodyBytes": 11489,
+              "decodedBodyBytes": 46626
+            },
+            {
+              "path": "/assets/icons/app-icon.svg",
+              "initiatorType": "other",
+              "durationMs": 2.1,
+              "transferSizeBytes": 777,
+              "encodedBodyBytes": 477,
+              "decodedBodyBytes": 477
+            },
+            {
+              "path": "/assets/GameView-lkxeCeEJ.js",
+              "initiatorType": "script",
+              "durationMs": 8.3,
+              "transferSizeBytes": 70999,
+              "encodedBodyBytes": 70699,
+              "decodedBodyBytes": 211446
+            },
+            {
+              "path": "/assets/three.module-CYIrST_y.js",
+              "initiatorType": "script",
+              "durationMs": 20,
+              "transferSizeBytes": 148965,
+              "encodedBodyBytes": 148665,
+              "decodedBodyBytes": 594445
+            },
+            {
+              "path": "/assets/TrackEditorScreen-DiZ8rPwI.js",
+              "initiatorType": "script",
+              "durationMs": 2.9,
+              "transferSizeBytes": 12373,
+              "encodedBodyBytes": 12073,
+              "decodedBodyBytes": 36634
+            },
+            {
+              "path": "/assets/3d/festival-trail-bike.glb",
+              "initiatorType": "fetch",
+              "durationMs": 2.1,
+              "transferSizeBytes": 0,
+              "encodedBodyBytes": 15172,
+              "decodedBodyBytes": 15172
+            },
+            {
+              "path": "/assets/transcoders/basis/basis_transcoder.js",
+              "initiatorType": "fetch",
+              "durationMs": 0.9,
+              "transferSizeBytes": 0,
+              "encodedBodyBytes": 57529,
+              "decodedBodyBytes": 57529
+            },
+            {
+              "path": "/assets/transcoders/basis/basis_transcoder.wasm",
+              "initiatorType": "fetch",
+              "durationMs": 1,
+              "transferSizeBytes": 0,
+              "encodedBodyBytes": 527333,
+              "decodedBodyBytes": 527333
+            },
+            {
+              "path": "/assets/art/title-background.png",
+              "initiatorType": "css",
+              "durationMs": 35.8,
+              "transferSizeBytes": 0,
+              "encodedBodyBytes": 2129759,
+              "decodedBodyBytes": 2129759
+            },
+            {
+              "path": "/assets/icons/app-icon.svg",
+              "initiatorType": "other",
+              "durationMs": 0.6,
+              "transferSizeBytes": 0,
+              "encodedBodyBytes": 477,
+              "decodedBodyBytes": 477
+            },
+            {
+              "path": "/assets/3d/festival-trail-bike.glb",
+              "initiatorType": "fetch",
+              "durationMs": 3.2,
+              "transferSizeBytes": 0,
+              "encodedBodyBytes": 15172,
+              "decodedBodyBytes": 15172
+            },
+            {
+              "path": "/assets/transcoders/basis/basis_transcoder.js",
+              "initiatorType": "fetch",
+              "durationMs": 0.8,
+              "transferSizeBytes": 0,
+              "encodedBodyBytes": 57529,
+              "decodedBodyBytes": 57529
+            },
+            {
+              "path": "/assets/transcoders/basis/basis_transcoder.wasm",
+              "initiatorType": "fetch",
+              "durationMs": 0.8,
+              "transferSizeBytes": 0,
+              "encodedBodyBytes": 527333,
+              "decodedBodyBytes": 527333
+            },
+            {
+              "path": "/assets/3d/festival-trail-bike.glb",
+              "initiatorType": "fetch",
+              "durationMs": 3.3,
+              "transferSizeBytes": 0,
+              "encodedBodyBytes": 15172,
+              "decodedBodyBytes": 15172
+            },
+            {
+              "path": "/assets/transcoders/basis/basis_transcoder.js",
+              "initiatorType": "fetch",
+              "durationMs": 4.6,
+              "transferSizeBytes": 0,
+              "encodedBodyBytes": 57529,
+              "decodedBodyBytes": 57529
+            },
+            {
+              "path": "/assets/transcoders/basis/basis_transcoder.wasm",
+              "initiatorType": "fetch",
+              "durationMs": 4.7,
+              "transferSizeBytes": 0,
+              "encodedBodyBytes": 527333,
+              "decodedBodyBytes": 527333
+            },
+            {
+              "path": "/assets/3d/festival-trail-bike.glb",
+              "initiatorType": "fetch",
+              "durationMs": 1.8,
+              "transferSizeBytes": 0,
+              "encodedBodyBytes": 15172,
+              "decodedBodyBytes": 15172
+            },
+            {
+              "path": "/assets/transcoders/basis/basis_transcoder.js",
+              "initiatorType": "fetch",
+              "durationMs": 0.9,
+              "transferSizeBytes": 0,
+              "encodedBodyBytes": 57529,
+              "decodedBodyBytes": 57529
+            },
+            {
+              "path": "/assets/transcoders/basis/basis_transcoder.wasm",
+              "initiatorType": "fetch",
+              "durationMs": 0.8,
+              "transferSizeBytes": 0,
+              "encodedBodyBytes": 527333,
+              "decodedBodyBytes": 527333
+            },
+            {
+              "path": "/assets/3d/festival-trail-bike.glb",
+              "initiatorType": "fetch",
+              "durationMs": 0.8,
+              "transferSizeBytes": 0,
+              "encodedBodyBytes": 15172,
+              "decodedBodyBytes": 15172
+            },
+            {
+              "path": "/assets/transcoders/basis/basis_transcoder.js",
+              "initiatorType": "fetch",
+              "durationMs": 1.2,
+              "transferSizeBytes": 0,
+              "encodedBodyBytes": 57529,
+              "decodedBodyBytes": 57529
+            },
+            {
+              "path": "/assets/transcoders/basis/basis_transcoder.wasm",
+              "initiatorType": "fetch",
+              "durationMs": 1.1,
+              "transferSizeBytes": 0,
+              "encodedBodyBytes": 527333,
+              "decodedBodyBytes": 527333
+            }
+          ]
+        }
+      },
+      "consoleMessages": [],
+      "screenshot": "artifacts/performance/headed-screenshots/desktop-1920x1080.png"
+    },
+    {
+      "name": "mobile-390x844",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "deviceScaleFactor": 2,
+      "navigation": {
+        "status": 200,
+        "shellReadyMs": 751.06,
+        "timing": {
+          "durationMs": 76.1,
+          "domInteractiveMs": 40,
+          "domContentLoadedMs": 75.9,
+          "loadEventMs": 76.1,
+          "responseEndMs": 2,
+          "transferSizeBytes": 869,
+          "encodedBodyBytes": 569,
+          "decodedBodyBytes": 1176
+        }
+      },
+      "firstRaceLoadMs": 129.16,
+      "restartMs": 163.23,
+      "editor": {
+        "openMs": 838.15,
+        "testPlayMs": 181.1,
+        "testRideControlVisible": true,
+        "testRideInvocation": "visible-control"
+      },
+      "rendering": {
+        "durationMs": 5000,
+        "sampleCount": 12,
+        "fps": {
+          "samples": 12,
+          "min": 55,
+          "mean": 58.5,
+          "p95": 60,
+          "max": 60
+        },
+        "frameTimeMs": {
+          "samples": 12,
+          "min": 1.22,
+          "mean": 1.76,
+          "p95": 2.84,
+          "max": 2.84
+        },
+        "drawCalls": {
+          "samples": 12,
+          "min": 173,
+          "mean": 199.17,
+          "p95": 232,
+          "max": 232
+        },
+        "samples": [
+          {
+            "elapsedMs": 1.33,
+            "fps": 58,
+            "frameTimeMs": 2.84,
+            "drawCalls": 232,
+            "droppedSimulationMs": 0
+          },
+          {
+            "elapsedMs": 402.98,
+            "fps": 58,
+            "frameTimeMs": 2.84,
+            "drawCalls": 229,
+            "droppedSimulationMs": 0
+          },
+          {
+            "elapsedMs": 806.2,
+            "fps": 58,
+            "frameTimeMs": 2.84,
+            "drawCalls": 222,
+            "droppedSimulationMs": 0
+          },
+          {
+            "elapsedMs": 1209.59,
+            "fps": 60,
+            "frameTimeMs": 1.54,
+            "drawCalls": 213,
+            "droppedSimulationMs": 0
+          },
+          {
+            "elapsedMs": 1612.15,
+            "fps": 60,
+            "frameTimeMs": 1.54,
+            "drawCalls": 197,
+            "droppedSimulationMs": 0
+          },
+          {
+            "elapsedMs": 2015.61,
+            "fps": 60,
+            "frameTimeMs": 1.54,
+            "drawCalls": 193,
+            "droppedSimulationMs": 0
+          },
+          {
+            "elapsedMs": 2418.14,
+            "fps": 60,
+            "frameTimeMs": 1.46,
+            "drawCalls": 191,
+            "droppedSimulationMs": 0
+          },
+          {
+            "elapsedMs": 3006.74,
+            "fps": 60,
+            "frameTimeMs": 1.46,
+            "drawCalls": 189,
+            "droppedSimulationMs": 0
+          },
+          {
+            "elapsedMs": 3409.49,
+            "fps": 55,
+            "frameTimeMs": 1.28,
+            "drawCalls": 189,
+            "droppedSimulationMs": 33
+          },
+          {
+            "elapsedMs": 3812,
+            "fps": 55,
+            "frameTimeMs": 1.28,
+            "drawCalls": 185,
+            "droppedSimulationMs": 33
+          },
+          {
+            "elapsedMs": 4215.05,
+            "fps": 59,
+            "frameTimeMs": 1.22,
+            "drawCalls": 177,
+            "droppedSimulationMs": 33
+          },
+          {
+            "elapsedMs": 4617.78,
+            "fps": 59,
+            "frameTimeMs": 1.22,
+            "drawCalls": 173,
+            "droppedSimulationMs": 33
+          }
+        ]
+      },
+      "stress": {
+        "durationMs": 5000,
+        "sampleCount": 13,
+        "fps": {
+          "samples": 13,
+          "min": 58,
+          "mean": 59.54,
+          "p95": 60,
+          "max": 60
+        },
+        "frameTimeMs": {
+          "samples": 13,
+          "min": 1.67,
+          "mean": 2.15,
+          "p95": 3.15,
+          "max": 3.15
+        },
+        "drawCalls": {
+          "samples": 13,
+          "min": 193,
+          "mean": 242.77,
+          "p95": 309,
+          "max": 309
+        },
+        "samples": [
+          {
+            "elapsedMs": 1.12,
+            "fps": 58,
+            "frameTimeMs": 3.15,
+            "drawCalls": 309,
+            "droppedSimulationMs": 0
+          },
+          {
+            "elapsedMs": 403.71,
+            "fps": 58,
+            "frameTimeMs": 3.15,
+            "drawCalls": 300,
+            "droppedSimulationMs": 0
+          },
+          {
+            "elapsedMs": 805.39,
+            "fps": 58,
+            "frameTimeMs": 3.15,
+            "drawCalls": 290,
+            "droppedSimulationMs": 0
+          },
+          {
+            "elapsedMs": 1207.58,
+            "fps": 60,
+            "frameTimeMs": 1.67,
+            "drawCalls": 256,
+            "droppedSimulationMs": 0
+          },
+          {
+            "elapsedMs": 1609.98,
+            "fps": 60,
+            "frameTimeMs": 1.67,
+            "drawCalls": 249,
+            "droppedSimulationMs": 0
+          },
+          {
+            "elapsedMs": 2013.08,
+            "fps": 60,
+            "frameTimeMs": 1.67,
+            "drawCalls": 237,
+            "droppedSimulationMs": 0
+          },
+          {
+            "elapsedMs": 2416.37,
+            "fps": 60,
+            "frameTimeMs": 1.95,
+            "drawCalls": 232,
+            "droppedSimulationMs": 0
+          },
+          {
+            "elapsedMs": 2818.65,
+            "fps": 60,
+            "frameTimeMs": 1.95,
+            "drawCalls": 227,
+            "droppedSimulationMs": 0
+          },
+          {
+            "elapsedMs": 3221.34,
+            "fps": 60,
+            "frameTimeMs": 2.02,
+            "drawCalls": 218,
+            "droppedSimulationMs": 0
+          },
+          {
+            "elapsedMs": 3624.45,
+            "fps": 60,
+            "frameTimeMs": 2.02,
+            "drawCalls": 218,
+            "droppedSimulationMs": 0
+          },
+          {
+            "elapsedMs": 4027.08,
+            "fps": 60,
+            "frameTimeMs": 2.02,
+            "drawCalls": 219,
+            "droppedSimulationMs": 0
+          },
+          {
+            "elapsedMs": 4429.28,
+            "fps": 60,
+            "frameTimeMs": 1.74,
+            "drawCalls": 208,
+            "droppedSimulationMs": 0
+          },
+          {
+            "elapsedMs": 4833.5,
+            "fps": 60,
+            "frameTimeMs": 1.74,
+            "drawCalls": 193,
+            "droppedSimulationMs": 0
+          }
+        ]
+      },
+      "heaps": [
+        {
+          "stage": "shell",
+          "available": true,
+          "usedBytes": 11962548,
+          "totalBytes": 18219008
+        },
+        {
+          "stage": "first-race-ready",
+          "available": true,
+          "usedBytes": 17330644,
+          "totalBytes": 27918336
+        },
+        {
+          "stage": "after-render-sample",
+          "available": true,
+          "usedBytes": 16262756,
+          "totalBytes": 32636928
+        },
+        {
+          "stage": "after-restart",
+          "available": true,
+          "usedBytes": 12612864,
+          "totalBytes": 31588352
+        },
+        {
+          "stage": "rival-ai-jump-crash-stress",
+          "available": true,
+          "usedBytes": 19199992,
+          "totalBytes": 48889856
+        },
+        {
+          "stage": "editor-test-play",
+          "available": true,
+          "usedBytes": 11350168,
+          "totalBytes": 51511296
+        }
+      ],
+      "network": {
+        "shell": {
+          "requestCount": 11,
+          "transferSizeBytes": 370637,
+          "encodedBodyBytes": 3099584,
+          "decodedBodyBytes": 4033719,
+          "resources": [
+            {
+              "path": "/assets/index-BMVY1emd.js",
+              "initiatorType": "script",
+              "durationMs": 14.9,
+              "transferSizeBytes": 126211,
+              "encodedBodyBytes": 125911,
+              "decodedBodyBytes": 413821
+            },
+            {
+              "path": "/assets/index-BsX4JgSA.css",
+              "initiatorType": "link",
+              "durationMs": 3,
+              "transferSizeBytes": 11789,
+              "encodedBodyBytes": 11489,
+              "decodedBodyBytes": 46626
+            },
+            {
+              "path": "/assets/icons/app-icon.svg",
+              "initiatorType": "other",
+              "durationMs": 2.3,
+              "transferSizeBytes": 300,
+              "encodedBodyBytes": 477,
+              "decodedBodyBytes": 477
+            },
+            {
+              "path": "/assets/GameView-lkxeCeEJ.js",
+              "initiatorType": "script",
+              "durationMs": 8.4,
+              "transferSizeBytes": 70999,
+              "encodedBodyBytes": 70699,
+              "decodedBodyBytes": 211446
+            },
+            {
+              "path": "/assets/three.module-CYIrST_y.js",
+              "initiatorType": "script",
+              "durationMs": 19.1,
+              "transferSizeBytes": 148965,
+              "encodedBodyBytes": 148665,
+              "decodedBodyBytes": 594445
+            },
+            {
+              "path": "/assets/TrackEditorScreen-DiZ8rPwI.js",
+              "initiatorType": "script",
+              "durationMs": 2.4,
+              "transferSizeBytes": 12373,
+              "encodedBodyBytes": 12073,
+              "decodedBodyBytes": 36634
+            },
+            {
+              "path": "/assets/3d/festival-trail-bike.glb",
+              "initiatorType": "fetch",
+              "durationMs": 1,
+              "transferSizeBytes": 0,
+              "encodedBodyBytes": 15172,
+              "decodedBodyBytes": 15172
+            },
+            {
+              "path": "/assets/transcoders/basis/basis_transcoder.js",
+              "initiatorType": "fetch",
+              "durationMs": 0.8,
+              "transferSizeBytes": 0,
+              "encodedBodyBytes": 57529,
+              "decodedBodyBytes": 57529
+            },
+            {
+              "path": "/assets/transcoders/basis/basis_transcoder.wasm",
+              "initiatorType": "fetch",
+              "durationMs": 0.8,
+              "transferSizeBytes": 0,
+              "encodedBodyBytes": 527333,
+              "decodedBodyBytes": 527333
+            },
+            {
+              "path": "/assets/art/title-background.png",
+              "initiatorType": "css",
+              "durationMs": 36.7,
+              "transferSizeBytes": 0,
+              "encodedBodyBytes": 2129759,
+              "decodedBodyBytes": 2129759
+            },
+            {
+              "path": "/assets/icons/app-icon.svg",
+              "initiatorType": "other",
+              "durationMs": 1.1,
+              "transferSizeBytes": 0,
+              "encodedBodyBytes": 477,
+              "decodedBodyBytes": 477
+            }
+          ]
+        },
+        "completeFlow": {
+          "requestCount": 23,
+          "transferSizeBytes": 370637,
+          "encodedBodyBytes": 5499720,
+          "decodedBodyBytes": 6433855,
+          "resources": [
+            {
+              "path": "/assets/index-BMVY1emd.js",
+              "initiatorType": "script",
+              "durationMs": 14.9,
+              "transferSizeBytes": 126211,
+              "encodedBodyBytes": 125911,
+              "decodedBodyBytes": 413821
+            },
+            {
+              "path": "/assets/index-BsX4JgSA.css",
+              "initiatorType": "link",
+              "durationMs": 3,
+              "transferSizeBytes": 11789,
+              "encodedBodyBytes": 11489,
+              "decodedBodyBytes": 46626
+            },
+            {
+              "path": "/assets/icons/app-icon.svg",
+              "initiatorType": "other",
+              "durationMs": 2.3,
+              "transferSizeBytes": 300,
+              "encodedBodyBytes": 477,
+              "decodedBodyBytes": 477
+            },
+            {
+              "path": "/assets/GameView-lkxeCeEJ.js",
+              "initiatorType": "script",
+              "durationMs": 8.4,
+              "transferSizeBytes": 70999,
+              "encodedBodyBytes": 70699,
+              "decodedBodyBytes": 211446
+            },
+            {
+              "path": "/assets/three.module-CYIrST_y.js",
+              "initiatorType": "script",
+              "durationMs": 19.1,
+              "transferSizeBytes": 148965,
+              "encodedBodyBytes": 148665,
+              "decodedBodyBytes": 594445
+            },
+            {
+              "path": "/assets/TrackEditorScreen-DiZ8rPwI.js",
+              "initiatorType": "script",
+              "durationMs": 2.4,
+              "transferSizeBytes": 12373,
+              "encodedBodyBytes": 12073,
+              "decodedBodyBytes": 36634
+            },
+            {
+              "path": "/assets/3d/festival-trail-bike.glb",
+              "initiatorType": "fetch",
+              "durationMs": 1,
+              "transferSizeBytes": 0,
+              "encodedBodyBytes": 15172,
+              "decodedBodyBytes": 15172
+            },
+            {
+              "path": "/assets/transcoders/basis/basis_transcoder.js",
+              "initiatorType": "fetch",
+              "durationMs": 0.8,
+              "transferSizeBytes": 0,
+              "encodedBodyBytes": 57529,
+              "decodedBodyBytes": 57529
+            },
+            {
+              "path": "/assets/transcoders/basis/basis_transcoder.wasm",
+              "initiatorType": "fetch",
+              "durationMs": 0.8,
+              "transferSizeBytes": 0,
+              "encodedBodyBytes": 527333,
+              "decodedBodyBytes": 527333
+            },
+            {
+              "path": "/assets/art/title-background.png",
+              "initiatorType": "css",
+              "durationMs": 36.7,
+              "transferSizeBytes": 0,
+              "encodedBodyBytes": 2129759,
+              "decodedBodyBytes": 2129759
+            },
+            {
+              "path": "/assets/icons/app-icon.svg",
+              "initiatorType": "other",
+              "durationMs": 1.1,
+              "transferSizeBytes": 0,
+              "encodedBodyBytes": 477,
+              "decodedBodyBytes": 477
+            },
+            {
+              "path": "/assets/3d/festival-trail-bike.glb",
+              "initiatorType": "fetch",
+              "durationMs": 0.7,
+              "transferSizeBytes": 0,
+              "encodedBodyBytes": 15172,
+              "decodedBodyBytes": 15172
+            },
+            {
+              "path": "/assets/transcoders/basis/basis_transcoder.js",
+              "initiatorType": "fetch",
+              "durationMs": 0.7,
+              "transferSizeBytes": 0,
+              "encodedBodyBytes": 57529,
+              "decodedBodyBytes": 57529
+            },
+            {
+              "path": "/assets/transcoders/basis/basis_transcoder.wasm",
+              "initiatorType": "fetch",
+              "durationMs": 0.6,
+              "transferSizeBytes": 0,
+              "encodedBodyBytes": 527333,
+              "decodedBodyBytes": 527333
+            },
+            {
+              "path": "/assets/3d/festival-trail-bike.glb",
+              "initiatorType": "fetch",
+              "durationMs": 0.8,
+              "transferSizeBytes": 0,
+              "encodedBodyBytes": 15172,
+              "decodedBodyBytes": 15172
+            },
+            {
+              "path": "/assets/transcoders/basis/basis_transcoder.js",
+              "initiatorType": "fetch",
+              "durationMs": 1.1,
+              "transferSizeBytes": 0,
+              "encodedBodyBytes": 57529,
+              "decodedBodyBytes": 57529
+            },
+            {
+              "path": "/assets/transcoders/basis/basis_transcoder.wasm",
+              "initiatorType": "fetch",
+              "durationMs": 1.1,
+              "transferSizeBytes": 0,
+              "encodedBodyBytes": 527333,
+              "decodedBodyBytes": 527333
+            },
+            {
+              "path": "/assets/3d/festival-trail-bike.glb",
+              "initiatorType": "fetch",
+              "durationMs": 0.8,
+              "transferSizeBytes": 0,
+              "encodedBodyBytes": 15172,
+              "decodedBodyBytes": 15172
+            },
+            {
+              "path": "/assets/transcoders/basis/basis_transcoder.js",
+              "initiatorType": "fetch",
+              "durationMs": 1,
+              "transferSizeBytes": 0,
+              "encodedBodyBytes": 57529,
+              "decodedBodyBytes": 57529
+            },
+            {
+              "path": "/assets/transcoders/basis/basis_transcoder.wasm",
+              "initiatorType": "fetch",
+              "durationMs": 1,
+              "transferSizeBytes": 0,
+              "encodedBodyBytes": 527333,
+              "decodedBodyBytes": 527333
+            },
+            {
+              "path": "/assets/3d/festival-trail-bike.glb",
+              "initiatorType": "fetch",
+              "durationMs": 0.8,
+              "transferSizeBytes": 0,
+              "encodedBodyBytes": 15172,
+              "decodedBodyBytes": 15172
+            },
+            {
+              "path": "/assets/transcoders/basis/basis_transcoder.js",
+              "initiatorType": "fetch",
+              "durationMs": 2.3,
+              "transferSizeBytes": 0,
+              "encodedBodyBytes": 57529,
+              "decodedBodyBytes": 57529
+            },
+            {
+              "path": "/assets/transcoders/basis/basis_transcoder.wasm",
+              "initiatorType": "fetch",
+              "durationMs": 2.5,
+              "transferSizeBytes": 0,
+              "encodedBodyBytes": 527333,
+              "decodedBodyBytes": 527333
+            }
+          ]
+        }
+      },
+      "consoleMessages": [],
+      "screenshot": "artifacts/performance/headed-screenshots/mobile-390x844.png"
+    }
+  ],
+  "durationMs": 48359
+}

@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="Rivet Ridge Rally helmet mark">
+  <rect width="512" height="512" rx="88" fill="#061c32"/>
+  <path d="M78 263C78 139 159 65 284 65c83 0 147 43 181 106l-136 22 94 81-73 135H184L78 326Z" fill="#22cfcc"/>
+  <path d="m129 282 188-73 62 52-156 53Z" fill="#061c32" opacity=".88"/>
+  <path d="m154 351 151-42 65 51-45 82H204Z" fill="#f15f50"/>
+  <path d="M104 99h104L84 204Z" fill="#ffd23f"/>
+</svg>
