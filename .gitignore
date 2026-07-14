@@ -13,3 +13,6 @@ artifacts/release-manifest 2.json
 .env.*
 !.env.example
 .DS_Store
+
+# Personal Claude Code settings (machine-local, not shared)
+.claude/settings.local.json
