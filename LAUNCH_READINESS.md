@@ -2,11 +2,11 @@
 
 # NOT READY
 
-**Decision date:** 2026-07-13
+**Decision date:** 2026-07-14
 
-**Candidate:** annotated `v1.0.0-rc.1` release tag on `main`
+**Candidate:** `1.0.0-rc.2` working tree; no release commit or tag
 
-**Code-owned gate status:** PASS
+**Code-owned gate status:** UNVERIFIED
 
 **Commercial readiness status:** NOT READY
 
@@ -14,102 +14,93 @@
 
 **Decision owner:** Unassigned
 
-RIVET RIDGE RALLY is feature-complete for the defined RC1 scope and its current automated product matrix passes. The path-clean current-source browser run completed in approximately **48.4 minutes** with **67 passed, 221 intentional project-scoped skips, and 0 failures** across 288 project results. Eight Vitest files contain **76 passing tests**. Gameplay, the under-three-minute tutorial, every applicable launch-track/race-mode combination, campaign progression, shared-rule AI, the complete editor, accessibility, persistence, lifecycle/restart recovery, offline operation, visual regression, headed performance, the post-fix continuous 30-minute Rival soak, the final non-QA artifact, and installed-Chrome production smoke are `PASS` in their recorded scope.
+Player feedback reopened default lane controls, first-play training, and visual fidelity after the immutable `v1.0.0-rc.1` predecessor. The changed work is therefore a new `1.0.0-rc.2` candidate; the predecessor's tag, artifact, and evidence remain historical and do not qualify these bytes.
 
-All repository-controlled implementation, evidence, artifact, and immutable-source gates are `PASS`. No known product P0 or P1 remains in the completed automated scope. The earlier soak that reproduced WebGL-context leakage is retained as failed evidence; renderer lifecycle regressions, the current full matrix, and the post-fix 30-minute soak now pass. The non-QA manifest, actual Google Chrome 150 production smoke, release commit, and annotated tag also pass.
+Final post-scene static and unit validation passes: whole-project strict typechecking, full lint, diff validation, and Vitest 9 files / 78 tests. Focused Chromium groups also pass for migrations, tutorial/quality, lifecycle, reliability, offline service-worker behavior, fresh keyboard race/save/retry, gamepad emulation/persistence/release quality, accessibility controls, and core fresh-race/editor journeys. Campaign qualification is complete in isolated Chromium: the original suite passed 3/3 in 6.4 minutes, and the hardened suite passed 18/18 in 7.3 minutes across all 16 applicable track/mode combinations plus the two progression scenarios. Selected Firefox, WebKit, Android-phone, iPhone, and tablet engine journeys added 19 passes; the only two initial failures were one stale focus-order assertion that omitted Rider School, and the corrected Firefox/WebKit rerun passed 2/2.
 
-The commercial decision remains **NOT READY** because physical and application-specific gaps remain explicitly `UNVERIFIED`, while owner-only legal, licensing, naming, hosting, deployment, support, rollback, and physical-matrix actions remain `EXTERNAL BLOCKER` items.
+The documented asset pipeline verifies, and the final normal production build passes with 38,475-byte notices. The final release manifest records 21 files, 4,689,233 bytes, and aggregate SHA-256 `6a55c00ea36debe543ab946dee06dc5fa73cf8a13d45b047aec399469c9931a3`. `npm audit --audit-level=high` reports 0 vulnerabilities. Installed Google Chrome 150.0.7871.115 passes the normal-build boot/version, race/restart, editor, and offline service-worker smoke with no network, HTTP, or console failures.
+
+Headed Chromium 149 local performance passes its desktop and emulated-mobile profiles, with mean FPS of 59.31/59.31 in normal/stress desktop sampling and 59.54/59.77 in normal/stress mobile-viewport sampling. The 30-minute headless Chromium 149 Rival soak's automated release gate also passes: 1,800,607 ms active workload, 58 completed races, 0 timeouts, and no failed requests, HTTP errors, harness errors, or unexpected console/page messages. The soak artifact still requires human interpretation of memory, input-latency, and fixed-step trends; headless FPS and the cross-restart cumulative dropped-time counter are diagnostic, not physical-device performance evidence.
+
+The release remains **NOT READY**. In the current controlled visual run and repeat, editor passes but desktop race, portrait race, and high-contrast race fail the owner-unaccepted baselines by 61%, 36%, and 39% against a 2% threshold. Baselines remain untouched pending owner acceptance. Visual concept acceptance, the complete cross-browser and physical-device matrix, physical/manual input and accessibility review, and immutable `rc.2` source identity remain unresolved.
 
 ## Gate summary
 
 | Gate | Required outcome | Status | Current evidence |
 |---|---|---:|---|
-| Clean install and static validation | Lockfile install, strict typecheck, lint, unit tests, asset verification, dependency audit, and direct tree pass | PASS | `npm ci`; typecheck; lint; 8 files/76 tests; GLB/KTX2 validator 0 errors; audit 0 vulnerabilities/320 entries; 31 exact direct dependencies |
-| Playable core and tutorial | Title, no-skip tutorial, handling, finish/results, persistence, pause, and immediate retry/restart | PASS | Tutorial clears every required mechanic and both collision drills in 48.0 seconds; desktop core journeys pass in Chromium, Firefox, and WebKit |
-| Five-track content | Every launch track loads and completes two production-distance laps with ordered checkpoints | PASS | Canyon Kickoff, Pine Run, Coastline Clash, Foundry Flight, and Summit Showdown each complete Lap 1 and Lap 2 in Chromium |
-| Modes and progression | Solo, Rival, Practice, campaign unlocks, classification, and seven-tier Summit mastery work | PASS | Browser Solo/Rival/Mastery journeys plus progression unit matrix pass; official Rival field contains six sorted finishers |
-| Simulation, AI, and collisions | Deterministic fixed-step rules, three difficulties, route/pursuer behaviors, and asymmetric rear contact pass | PASS | Shared `RaceSimulation` unit coverage and browser Rival results pass |
-| Track editor | All 25 modules, camera, 50-action history, tools, 1–9 laps, validation, interchange, examples, save/reload, and test play pass | PASS | Exhaustive Chromium matrix plus cross-engine core editor journeys and deterministic conversion/validation tests pass |
-| Controls and accessibility | Keyboard/remap, synthetic gamepad, touch/mirror, settings, captions, non-color cues, axe, and responsive layouts pass | PASS | Desktop engine, Pixel 7, iPhone 15, Galaxy Tab S9, high-contrast, all-screen axe, and layout gates pass |
-| Persistence and reliability | Browser restart, repeated in-place restart, visibility suspension, v1/v2 migrations, corruption, unavailable/quota/version failures, unsupported WebGL, asset fallback, and offline reload pass | PASS | Persistence, migration, Chromium/WebKit lifecycle, reliability, and service-worker v7 tests pass |
-| Visual acceptance | Accepted title/race/mobile/editor/high-contrast compositions and five track identities remain stable | PASS | Seven visual baselines, ten five-track review captures, and `docs/design/FIDELITY_LEDGER.md` report no visual P0/P1 |
-| Privacy, dependencies, and asset provenance | Local-only runtime, no tracking/account, pinned dependencies, inventoried original/licensed assets, and notices | PASS | Source/static audit, zero-vulnerability audit, asset verifier, `ASSET_LICENSES.md`, and generated full third-party notice pass |
-| Headed local performance | Desktop 1920×1080 and emulated mobile metrics, load/restart/editor timing, heap checkpoints, and Rival stress are recorded | PASS | Desktop normal/stress mean 59.31 FPS; mobile normal mean 58.50 and stress mean 59.54 FPS; exact artifact below |
-| QA payload budget | Measured QA candidate remains below 12 MB raw | PASS | 21 files; 4,678,172 raw bytes; 3,025,236 independently gzipped bytes |
-| No known product P0/P1 | Completed automated scope contains no open product-blocking defect | PASS | Current full matrix has zero failures; lifecycle failure is closed by targeted tests, full rerun, and post-fix soak |
-| Continuous 30-minute Rival soak | No runaway memory, dropped-time growth, input lag, crash loop, or save corruption | PASS | 1,800,503 ms active duration; 65 races; 0 timeouts; complete telemetry; no failed requests, HTTP errors, unexpected runtime messages, or harness errors; manual trend review passed |
-| Final non-QA release artifact | Release build, notices, source/path/QA-marker guard, checksums, and production smoke pass | PASS | Manifest: 21 files/4,675,553 bytes, aggregate SHA-256 `d953ed1ed66f82a26043d3fbffe634ed8d35021edb8e90ee0f8f064567a70a97`; installed Chrome 150 boot/race/editor/offline smoke passes cleanly |
-| Immutable source identity | Final evidence is tied to a source commit and annotated release tag | PASS | Release commit on `main` is identified by annotated tag `v1.0.0-rc.1`; source/history hygiene scans pass |
+| Candidate identity | Final bytes tied to a clean source commit and annotated `v1.0.0-rc.2` tag | UNVERIFIED | A checksummed `rc.2` artifact exists and passes installed-Chrome smoke, but the working tree is uncommitted and the artifact is not tied to a clean source revision or annotated tag. |
+| Strict typecheck | Whole-project strict TypeScript check passes | PASS | Executed successfully after the final scenery-density adjustment. |
+| Lint | Whole-project lint passes | PASS | The final full lint run passed after the final scenery-density adjustment. |
+| Unit tests | Whole-project deterministic suite passes | PASS | Vitest passed 9 files / 78 tests after the final scenery-density adjustment. |
+| Asset pipeline and verification | Every shipped asset matches the committed licensed inventory | PASS | `npm run assets:build` normalized only the Basis license to the already-inventoried 9,197-byte pinned output (SHA-256 `a7d00bfd54525bc694b6e32f64c7ebcf5e6b7ae3657be5cc12767bce74654a47`); no GLB, KTX2, or asset-manifest content changed, and `npm run assets:verify` passes. |
+| Normal release build | Repository build wrapper and notices complete | PASS | After the final scenery-density adjustment, `npm run build` completed asset verification, strict typecheck, Vite production compilation, and 38,475-byte notices generation (SHA-256 `c959caf9bfbb3d9b051921453e8a19132c1b40fec2ef3f3db41676d3492f84a1`). |
+| Dependency audit | Installed dependency tree has no reported vulnerabilities | PASS | `npm audit --audit-level=high` exited 0 and reported 0 vulnerabilities. |
+| Comprehensive first-play tutorial | Expanded no-skip lessons and training route complete below three minutes and remain replayable | PASS | The focused tutorial/quality group passed 2/2; the 12-lesson tutorial completed in approximately 1.2 minutes and the production smoke confirmed its adaptive control guide. |
+| Keyboard defaults and remapping | Arrow-cluster lane defaults, targeted migration, and custom remaps work | PASS | Migrations passed 4/4, remapping passed 1/1, the fresh keyboard race/save/retry passed 1/1, and the production smoke confirmed `← Left` / `→ Right` plus live ArrowLeft/ArrowRight input. |
+| Modes and progression | Complete campaign/mode matrix remains correct | PASS | The original isolated campaign suite passed 3/3 in 6.4 minutes. The hardened isolated suite then passed 18/18 in 7.3 minutes, independently covering all 16 applicable track/mode combinations plus Solo-to-Rival and Summit Mastery progression. |
+| Gamepad, touch, accessibility, and responsive layouts | All required projects and interaction gates pass | UNVERIFIED | Emulated gamepad/persistence/release quality passed 3/3; focused Chromium accessibility passed 7 checks; selected mobile-chrome, mobile-safari, and tablet-chrome touch/mirroring journeys passed. Physical inputs/devices and the full project matrix remain unverified. |
+| Visual acceptance | Desktop/mobile composition and five-track identity meet accepted concept direction | UNVERIFIED | Fresh production captures exist, but owner concept review is required. Visual baselines remain untouched. |
+| Visual regression | Accepted desktop/mobile/editor/high-contrast baselines pass | FAIL | The controlled run and repeat each produced 1 pass / 3 failures: editor passed; desktop race differed by 61%, portrait race by 36%, and high contrast by 39% against the 2% threshold. Baselines remain owner-unaccepted and untouched. |
+| Focused lifecycle/reliability/offline | Required focused Chromium behaviors pass | PASS | Lifecycle passed 5/5, reliability passed 6/6 after the paused fallback HUD emit and explicit Lesson 1 start, and offline service-worker behavior passed 1/1. |
+| Full cross-browser/device matrix | Chromium, Firefox, WebKit, mobile/tablet, persistence, lifecycle, offline, and error gates pass | UNVERIFIED | Focused Chromium scopes, campaign qualification, installed-Chrome smoke, and selected Firefox/WebKit/mobile/tablet journeys pass. The complete all-project suite, installed non-Chrome applications, and physical-device/input projects have not qualified one exact final source identity. |
+| Headed local performance | Changed scene meets measured desktop/mobile-viewport budgets | PASS | `artifacts/performance/final-headed-measurement.json` records headed Chromium 149.0.7827.55. Desktop normal/stress mean FPS is 59.31/59.31 with p95 frame work 4.45/4.73 ms; emulated-mobile normal/stress mean FPS is 59.54/59.77 with p95 frame work 3.16/3.25 ms. Exact timing, draw-call, heap, host, and build details are recorded; physical mobile remains unverified. |
+| Continuous 30-minute Rival soak | Automated 30-minute stability gate passes, with trends retained for human interpretation | PASS | `artifacts/performance/final-30m-soak.json` reports `releaseGate.status: PASS`: 1,800,607 ms active workload, 58 completed races, 0 timeouts, and 0 harness, failed-request, HTTP, or unexpected console/page errors. Manual memory/input/fixed-step trend review and headless scheduling caveats remain explicit; this pass is not physical-device performance evidence. |
+| Final non-QA artifact and production smoke | Complete notices, checksum manifest, and installed-Chrome boot/race/editor/offline smoke pass | PASS | `artifacts/release-manifest.json` records 21 files, 4,689,233 bytes, and aggregate SHA-256 `6a55c00ea36debe543ab946dee06dc5fa73cf8a13d45b047aec399469c9931a3`. Installed Google Chrome 150.0.7871.115 passes boot/version, race/restart, editor, service-worker control, and offline reload with no network/HTTP/console failures. |
+| No known product P0/P1 | Every mandatory code-owned gate is closed | UNVERIFIED | Visual regression remains `FAIL` pending owner acceptance, while visual concept review, the full cross-browser/physical-device matrix, manual/physical interaction review, and immutable source identity remain open. |
 
-## Validated evidence
+## Focused evidence retained for `rc.2`
 
-### Automated matrix
+- Final post-adjustment whole-project strict typecheck — `PASS`.
+- Final post-adjustment full lint and diff validation — `PASS`.
+- Final post-adjustment Vitest — `PASS`, 9 files / 78 tests.
+- `VITE_QA_MODE=1 npx vite build` — `PASS` for direct compilation only.
+- Chromium quality presets + comprehensive tutorial — `PASS`, 2/2; the tutorial completed in approximately 1.2 minutes, below three minutes.
+- Chromium migrations — `PASS`, 4/4.
+- Chromium keyboard remapping — `PASS`, 1/1.
+- Chromium lifecycle — `PASS`, 5/5.
+- Chromium reliability — `PASS`, 6/6 after the paused fallback HUD emit and explicit Lesson 1 start.
+- Chromium offline service worker — `PASS`, 1/1.
+- Chromium fresh keyboard race/save/retry — `PASS`, 1/1.
+- Chromium gamepad emulation + persistence + release quality — `PASS`, 3/3.
+- Chromium accessibility controls — `PASS`, 7 checks; 1 touch-project case intentionally skipped.
+- Chromium core fresh race/editor — `PASS`; touch-project case intentionally skipped.
+- Original isolated Chromium campaign suite — `PASS`, 3/3 in 6.4 minutes.
+- Hardened isolated Chromium campaign suite — `PASS`, 18/18 in 7.3 minutes: 16 independent track/mode cases plus Solo-to-Rival and Summit Mastery.
+- Selected Firefox/WebKit/mobile-chrome/mobile-safari/tablet-chrome journeys — 19 initial passes / 74 project-scope skips; the only two failures were the same stale keyboard focus-order assertion. After adding Rider School to the expected tab sequence, the Firefox/WebKit targeted rerun passed 2/2. Covered fresh race, editor, settings, release-quality, WebKit lifecycle stress, and emulated phone/tablet touch/mirroring scopes.
+- Controlled Chromium/mobile-chrome visual regression and repeat — `FAIL`, each 1 pass / 3 failures; editor passed, while desktop race differed by 61%, portrait race by 36%, and high contrast by 39% against 2%; baselines untouched pending owner acceptance.
+- Headed local performance — `PASS`, `artifacts/performance/final-headed-measurement.json`; Chromium 149.0.7827.55 headed on macOS arm64. Desktop normal/stress mean FPS 59.31/59.31; emulated-mobile normal/stress mean FPS 59.54/59.77. Exact frame-work, draw-call, timing, heap, host, and build-size results are retained in the artifact and `QA_REPORT.md`.
+- Continuous 30-minute Rival soak automated gate — `PASS`, `artifacts/performance/final-30m-soak.json`; 1,800,607 ms active workload, 58 completed races, 0 timeouts, and no harness/network/HTTP/unexpected console-page errors. Heap, input, and fixed-step trends remain recorded for manual interpretation; headless FPS and cumulative dropped time are diagnostic.
+- `npm run assets:build` — `PASS`; normalized only the Basis license to the already-inventoried 9,197-byte pinned pipeline output, with no GLB, KTX2, or asset-manifest content change.
+- Final `npm run assets:verify` — `PASS`.
+- Final normal `npm run build` — `PASS` after the final scenery-density adjustment; asset verification, strict typecheck, Vite production build, and 38,475-byte notices generation completed (SHA-256 `c959caf9bfbb3d9b051921453e8a19132c1b40fec2ef3f3db41676d3492f84a1`).
+- `npm audit --audit-level=high` — `PASS`, exit 0 and 0 vulnerabilities.
+- Final non-QA release manifest — `PASS`, format 1, 21 files, 4,689,233 bytes, aggregate SHA-256 `6a55c00ea36debe543ab946dee06dc5fa73cf8a13d45b047aec399469c9931a3`.
+- Installed-Chrome production smoke — `PASS`, `artifacts/production-smoke/chrome-smoke.json`; Google Chrome 150.0.7871.115 headless passed boot/version, race/restart, editor, service-worker control, and offline reload with empty network/HTTP/console failure lists.
+- Final production in-app-browser smoke — `PASS` at `http://127.0.0.1:4173/`: desktop 1280×720 and emulated portrait 390×844 inspected; Settings showed `← Left` / `→ Right`; live Practice accepted ArrowLeft/ArrowRight and pause/resume; Rider School showed 12 lessons/current adaptive controls. Captures: `/tmp/rivet-ridge-final-desktop.png`, `/tmp/rivet-ridge-final-mobile.png`, `/tmp/rivet-ridge-final-mobile-tutorial.png`.
 
-- `npm ci` — `PASS`; final clean install added 268 packages, audited 269, and reported zero vulnerabilities.
-- `npm run typecheck` — `PASS`.
-- `npm run lint` — `PASS`.
-- `npm run test` — `PASS`; 8 files, 76 tests, 0 failures.
-- `npm run test:coverage` — `PASS`; lines 631/3,540 (17.82%), statements 695/3,987 (17.43%), functions 110/647 (17.00%), branches 533/2,112 (25.23%). Browser-heavy UI/renderer code is covered primarily by Playwright; simulation exceeds 91% line coverage and editor validation/definition conversion exceed 89%.
-- `npm run assets:verify` — `PASS`; original 15,172-byte Meshopt GLB, 2,236-byte BasisLZ KTX2, required extensions, independent decode, and validator 0 errors.
-- `npm run audit` — `PASS`; zero vulnerabilities across 320 lockfile package entries.
-- `npm ls --depth=0 --json` — `PASS`; 31 exact direct dependencies, no problems/missing/extraneous entries.
-- `npm run test:e2e` — `PASS`; 48 definitions across six projects, 67 passed, 221 intentional project-routed skips, 0 failed, approximately 48.4 minutes.
+The performance and soak artifacts qualify the deterministic QA-enabled production build at `http://127.0.0.1:4373`. The release manifest and installed-Chrome smoke qualify the separate normal non-QA build at `http://127.0.0.1:4173`. These are deliberately distinct byte sets. Emulated portrait/mobile viewport results remain responsive/local evidence only, not physical-mobile qualification.
 
-The durable path-clean current-source report is `artifacts/playwright/full-matrix-current/index.html`, SHA-256 `cbf40421cd5fd9a1c1982a467e67fd38270514c46ad5f4fb1cfb3cf8d3ea3590`. Its embedded archive has zero `/Users/` and local workspace-folder-name hits. The passing projects are Playwright Chromium, Firefox, WebKit, Pixel 7 mobile-Chrome, iPhone 15 mobile-Safari, and Galaxy Tab S9 tablet-Chrome.
+## Required code-owned closure
 
-### Headed performance
+1. Complete concept-art review using fresh desktop and portrait captures, deliberately accept or revise the visual baselines, and rerun the controlled visual suite after that owner decision.
+2. Complete the Firefox, WebKit, installed-browser, physical mobile/tablet, physical gamepad, accessibility, touch, audio, persistence, reliability, and offline matrix against one exact final source identity. Chromium campaign qualification, headed local performance, the automated soak gate, the checksum manifest, and installed-Chrome smoke already pass in their recorded scopes.
+3. Tie the exact qualified artifact and evidence to a clean source commit and annotated `v1.0.0-rc.2` tag, rebuilding and rechecking the manifest/smoke if the bytes change.
 
-`artifacts/performance/final-headed-measurement.json` records headed Chromium 149.0.7827.55 on the local arm64 Mac:
+## Historical `v1.0.0-rc.1` predecessor
 
-| Metric | Desktop 1920×1080 | Mobile viewport 390×844 |
-|---|---:|---:|
-| First race ready | 137.42 ms | 129.16 ms |
-| Restart | 238.33 ms | 163.23 ms |
-| Editor open / test play | 848.26 / 170.09 ms | 838.15 / 181.10 ms |
-| Normal FPS min / mean / max | 57 / 59.31 / 60 | 55 / 58.50 / 60 |
-| Normal CPU work p95 | 4.59 ms | 2.84 ms |
-| Normal draw calls max | 367 | 232 |
-| Rival-stress FPS mean | 59.31 | 59.54 |
-| Rival-stress CPU work p95 | 4.49 ms | 3.15 ms |
-| Rival-stress draw calls max | 559 | 309 |
-
-### Continuous Rival soak
-
-`artifacts/performance/final-30m-soak.json` is `PASS`: Chromium 149.0.7827.55 headless, 1920×1080 Rival mode, 1,800,503 ms active and 1,808,774 ms total harness duration, 65 completed races, 0 timeouts, and 196 complete samples. It recorded 0 failed requests, 0 HTTP error responses, 0 unexpected console/page messages, and 0 harness errors. Four known headless `ReadPixels` driver diagnostics were classified separately.
-
-Manual trend review passed. Key-to-frame latency remained flat at 2.63 ms mean/3.3 ms p95. The first-to-last heap delta was +18.39 MB, but the final three five-minute-window means were 31.09/35.93/35.13 MB with stable maxima and minima, consistent with warm-up and garbage-collection plateaus rather than runaway growth. Per-attempt dropped-time first/last window means were 10,512.64/10,580.64 ms (+68 ms); the 679,807 ms cumulative value is a sum of independent attempt-local headless diagnostics, not worsening simulation debt.
-
-The historical `artifacts/performance/failed-context-leak-30m-soak.json` remains explicit failed evidence: 56 races, 1 timeout, 43 WebGL-context warnings, and +18.60 MB first-to-last heap growth. The renderer lifecycle fix closed that defect. An interrupted harness invocation produced no artifact and is not counted.
-
-### Final non-QA artifact and production smoke
-
-`artifacts/release-manifest.json` passes with 21 files, 4,675,553 raw bytes, complete notices, no source maps/QA marker/local path/prohibited workspace-name bytes, and aggregate SHA-256 `d953ed1ed66f82a26043d3fbffe634ed8d35021edb8e90ee0f8f064567a70a97`.
-
-`artifacts/production-smoke/chrome-smoke.json`, SHA-256 `c63e476ed8b62205374cd8704770ab7f886f9defb56227b8d64ee3178e04061b`, is a `PASS` from installed Google Chrome 150.0.7871.115 headless against those non-QA bytes. It verifies boot/version and QA absence, race restart, editor open, service-worker control, and offline reload, with 0 failed requests, HTTP errors, console messages, or smoke errors. Three matching screenshots are retained under `artifacts/production-smoke/`. A clean in-app-browser manual smoke is supplemental only and does not certify actual Firefox, Safari, Edge, or physical devices.
-
-## Accepted candidate decisions
-
-The stable public Basis transcoder and Vite-emitted hashed copy create an intentional **584,862-byte raw duplicate**. This is an accepted `1.0.0-rc.1` P2 because it preserves explicit same-origin/offline paths, retains required license/NOTICE material, and remains within the payload budget. Removing it is a later optimization and requires a new offline and asset audit.
-
-The CSP is hardened to same-origin defaults/connections, self/blob workers, no media or objects, and constrained form/base behavior. The remaining Basis-required `'unsafe-eval'` and controlled inline-style allowances are documented compatibility decisions. They are not known P0/P1 defects; any transcoder or UI dependency change must reopen CSP review. The final non-QA bundle/network scan passed as part of the recorded release-artifact evidence.
-
-## Remaining code-owned work
-
-None. The immutable release identity and all other repository-controlled RC1 gates are `PASS`.
+The annotated predecessor tag remains immutable. Its 67-pass Playwright report, 76-test Vitest run, headed-performance capture, post-fix 30-minute soak, checksum manifest, and installed-Chrome production smoke remain valid only for the predecessor's source and bytes. They may be used as comparison evidence, but they must not be relabeled as `rc.2` results or used to skip rerunning gates affected by the current changes.
 
 ## Unverified physical and application environments
-
-These gaps are not converted into failures or passes. Emulation and Playwright engines remain explicitly scoped evidence.
 
 | Environment | Status | Missing evidence |
 |---|---:|---|
 | Actual installed Firefox | UNVERIFIED | Separate current installed-application run |
-| Actual Edge | UNVERIFIED | Edge is not installed in the test environment |
+| Actual Edge | UNVERIFIED | Current installed-application run |
 | Actual Safari | UNVERIFIED | Current installed Safari run; Playwright WebKit is not equivalent |
 | Physical Android Chrome | UNVERIFIED | Real touch, audio, storage, GPU, thermal, and battery session |
 | Physical iPhone/iPad Safari | UNVERIFIED | Real touch, audio, storage, GPU, thermal, and battery session |
 | Physical gamepad | UNVERIFIED | Controller model, prompts, stuck-input cleanup, and vibration where supported |
-| Subjective audio, touch comfort, and race fairness | UNVERIFIED | Human review on representative physical devices and inputs |
+| Subjective audio, touch comfort, visual fidelity, and race fairness | UNVERIFIED | Human review on representative physical devices and inputs |
 
 ## External owner actions
 
@@ -122,21 +113,5 @@ These gaps are not converted into failures or passes. Emulation and Playwright e
 | Production hosting, DNS/TLS, security headers, credentials, and deployment target | EXTERNAL BLOCKER | Owner-selected host, verified response headers, and tested immutable deploy/rollback procedure |
 | Public support, release, rollback, and incident ownership | EXTERNAL BLOCKER | Named release/support/rollback/incident owners and public support path |
 | Physical/application test-matrix access | EXTERNAL BLOCKER | Owner-provided devices, gamepad, installed browsers, and assigned human review |
-
-## Artifacts
-
-- `QA_REPORT.md` — detailed requirement-level authority.
-- `artifacts/playwright/full-matrix-current/index.html` — current-source 67-pass browser report.
-- `coverage/index.html` — unit coverage report.
-- `artifacts/performance/final-headed-measurement.json` and `artifacts/performance/headed-screenshots/` — headed performance evidence.
-- `artifacts/performance/final-30m-soak.json` — passing post-fix 30-minute Rival soak.
-- `artifacts/performance/failed-context-leak-30m-soak.json` — retained historical failed soak and defect evidence.
-- `artifacts/release-manifest.json` — final non-QA 21-file checksum manifest.
-- `artifacts/production-smoke/chrome-smoke.json` and its three screenshots — installed-Chrome production-smoke evidence.
-- `e2e/core-flow.spec.ts-snapshots/` and `e2e/visual-regression.spec.ts-snapshots/` — accepted visual baselines.
-- `artifacts/visual-review/` and `docs/design/FIDELITY_LEDGER.md` — five-track and concept fidelity review.
-- `ASSET_LICENSES.md` and `THIRD_PARTY_NOTICES.md` — source/static provenance and notice evidence.
-
-The release commit, annotated tag, continuous 30-minute soak, final non-QA release manifest, and installed-Chrome production smoke are complete and `PASS`. The remaining decision gates require physical/application testing or owner action outside the repository.
 
 **Current final status: NOT READY.**

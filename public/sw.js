@@ -1,7 +1,7 @@
 /* global caches, self */
 
 const CACHE_PREFIX = "rivet-ridge-rally-";
-const CACHE_NAME = `${CACHE_PREFIX}shell-v7`;
+const CACHE_NAME = `${CACHE_PREFIX}shell-v8`;
 const CORE_ASSETS = [
   "/",
   "/index.html",

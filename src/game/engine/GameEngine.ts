@@ -24,6 +24,7 @@ import {
   type CompressedAssetLoader,
 } from "../assets/compressedAssetLoader";
 import { InputManager, type InputDevice } from "../input/InputManager";
+import { formatKeyCode } from "../input/keyLabels";
 import {
   observeWebglContext,
   releaseWebglContext,
@@ -57,6 +58,7 @@ import {
   type AiDifficultyProfile,
   type AiObstaclePolicy,
 } from "./aiRules";
+import { parseQaVisualDistance } from "./qaVisualCapture";
 
 const PLAYER_COLOR = 0x19b8b0;
 const PLAYER_ACCENT = 0xf15f50;
@@ -99,13 +101,21 @@ export interface EngineHudState {
   drawCalls: number;
   droppedSimulationMs: number;
   demonstrated: {
+    coast: boolean;
     cooling: boolean;
+    coolingRelease: boolean;
     laneChange: boolean;
     wheelie: boolean;
     airbornePitch: boolean;
+    airbornePitchUp: boolean;
+    airbornePitchDown: boolean;
+    airborneNeutral: boolean;
     cleanLanding: boolean;
+    hazardAvoided: boolean;
     mud: boolean;
     grass: boolean;
+    crash: boolean;
+    recovery: boolean;
   };
 }
 
@@ -155,6 +165,134 @@ interface ObstacleMaterials {
   wood: THREE.MeshStandardMaterial;
   warning: THREE.MeshStandardMaterial;
 }
+
+interface WorldVisualProfile {
+  background: number;
+  fog: number;
+  fogNear: number;
+  fogFar: number;
+  hemisphereSky: number;
+  hemisphereGround: number;
+  hemisphereIntensity: number;
+  sun: number;
+  sunIntensity: number;
+  exposure: number;
+  treeDensity: number;
+  mesaDensity: number;
+  terraceHeight: number;
+}
+
+interface CameraPresentationProfile {
+  fov: number;
+  height: number;
+  trailingDistance: number;
+  lookHeight: number;
+  lookAhead: number;
+  laneFollow: number;
+  lookAtLaneFollow: number;
+  playerScale: number;
+}
+
+const CAMERA_PRESENTATION_PROFILES = {
+  desktop: {
+    fov: 50,
+    height: 7.4,
+    trailingDistance: 9.1,
+    lookHeight: 1,
+    lookAhead: 20.5,
+    laneFollow: 0.76,
+    lookAtLaneFollow: 0.72,
+    playerScale: 1.38,
+  },
+  portrait: {
+    fov: 58,
+    height: 8.5,
+    trailingDistance: 9.8,
+    lookHeight: 0.95,
+    lookAhead: 18.5,
+    laneFollow: 0.92,
+    lookAtLaneFollow: 0.9,
+    playerScale: 1.62,
+  },
+} as const satisfies Record<"desktop" | "portrait", CameraPresentationProfile>;
+
+const WORLD_VISUAL_PROFILES = {
+  "canyon-kickoff": {
+    background: 0x5cbce7,
+    fog: 0xe7c8a5,
+    fogNear: 105,
+    fogFar: 340,
+    hemisphereSky: 0xe1f7ff,
+    hemisphereGround: 0x6c3525,
+    hemisphereIntensity: 1.65,
+    sun: 0xffd6a0,
+    sunIntensity: 3.45,
+    exposure: 1.15,
+    treeDensity: 1,
+    mesaDensity: 2.05,
+    terraceHeight: 1.55,
+  },
+  "pine-run": {
+    background: 0x77c9de,
+    fog: 0xc5d8c5,
+    fogNear: 82,
+    fogFar: 292,
+    hemisphereSky: 0xe5fbff,
+    hemisphereGround: 0x274431,
+    hemisphereIntensity: 1.55,
+    sun: 0xffdfb0,
+    sunIntensity: 3.15,
+    exposure: 1.13,
+    treeDensity: 1.35,
+    mesaDensity: 0.34,
+    terraceHeight: 1,
+  },
+  "coastline-clash": {
+    background: 0x55cbe4,
+    fog: 0xdce9d6,
+    fogNear: 100,
+    fogFar: 340,
+    hemisphereSky: 0xe8ffff,
+    hemisphereGround: 0x54715e,
+    hemisphereIntensity: 1.65,
+    sun: 0xffe5b5,
+    sunIntensity: 3.3,
+    exposure: 1.17,
+    treeDensity: 0.42,
+    mesaDensity: 0.35,
+    terraceHeight: 0.55,
+  },
+  "foundry-flight": {
+    background: 0x6e9fac,
+    fog: 0xb6a093,
+    fogNear: 68,
+    fogFar: 252,
+    hemisphereSky: 0xdcecf1,
+    hemisphereGround: 0x402d2a,
+    hemisphereIntensity: 1.25,
+    sun: 0xffbb78,
+    sunIntensity: 3.6,
+    exposure: 1.12,
+    treeDensity: 0.16,
+    mesaDensity: 0.12,
+    terraceHeight: 0.78,
+  },
+  "summit-showdown": {
+    background: 0x7887aa,
+    fog: 0xaab0c6,
+    fogNear: 66,
+    fogFar: 272,
+    hemisphereSky: 0xdbe9ff,
+    hemisphereGround: 0x443e55,
+    hemisphereIntensity: 1.35,
+    sun: 0xffd49e,
+    sunIntensity: 3,
+    exposure: 1.08,
+    treeDensity: 0.55,
+    mesaDensity: 0.12,
+    terraceHeight: 1.35,
+  },
+} as const satisfies Record<TrackDefinition["id"], WorldVisualProfile>;
 
 function clamp(value: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, value));
@@ -330,8 +468,8 @@ function paintDirtLanes(
   }
 
   context.strokeStyle = `#${mark.clone().multiplyScalar(0.68).getHexString()}`;
-  context.globalAlpha = 0.32;
-  context.lineWidth = 5;
+  context.globalAlpha = 0.46;
+  context.lineWidth = 6.5;
   for (const center of [0.1375, 0.375, 0.625, 0.8625]) {
     for (const offset of [-0.025, 0.025]) {
       context.beginPath();
@@ -342,6 +480,18 @@ function paintDirtLanes(
       }
       context.stroke();
     }
+
+    context.globalAlpha = 0.3;
+    context.lineWidth = 1.5;
+    for (let y = 7; y < height; y += 17) {
+      const wobble = Math.sin(y * 0.041 + center * 23) * 2.2;
+      context.beginPath();
+      context.moveTo(width * center - 7 + wobble, y);
+      context.lineTo(width * center + 7 + wobble, y + 3);
+      context.stroke();
+    }
+    context.globalAlpha = 0.46;
+    context.lineWidth = 6.5;
   }
 }
 
@@ -580,12 +730,13 @@ function qaTrack(track: TrackDefinition, mode: RaceMode): TrackDefinition {
       soloTargetMs: 30_000,
       parTimeMs: 24_000,
       obstacles: [
-        { id: "qa-cooling", kind: "cooling-gate", distance: 180, lanes: [0, 1, 2, 3], length: 16 },
-        { id: "qa-bump", kind: "bump", distance: 225, lanes: [0, 1, 2, 3], length: 10 },
-        { id: "qa-ramp", kind: "medium-ramp", distance: 245, lanes: [0, 1, 2, 3], length: 16, rampImpulse: 12 },
-        { id: "qa-mud", kind: "mud", distance: 360, lanes: [0, 3], length: 30 },
-        { id: "qa-barrier", kind: "barrier", distance: 410, lanes: [1, 2], length: 6 },
-        { id: "qa-grass", kind: "grass", distance: 460, lanes: [0, 1, 2, 3], length: 20 },
+        { id: "qa-cooling", kind: "cooling-gate", distance: 190, lanes: [0, 1, 2, 3], length: 18 },
+        { id: "qa-bump", kind: "bump", distance: 240, lanes: [0, 1, 2, 3], length: 10 },
+        { id: "qa-ramp", kind: "medium-ramp", distance: 280, lanes: [0, 1, 2, 3], length: 18, rampImpulse: 12 },
+        { id: "qa-choice-barrier", kind: "barrier", distance: 380, lanes: [1, 2], length: 6 },
+        { id: "qa-mud", kind: "mud", distance: 440, lanes: [0, 3], length: 30 },
+        { id: "qa-grass", kind: "grass", distance: 500, lanes: [0, 1, 2, 3], length: 22 },
+        { id: "qa-recovery-barrier", kind: "barrier", distance: 560, lanes: [0, 1, 2, 3], length: 6 },
       ],
     };
   }
@@ -628,6 +779,7 @@ export class GameEngine {
 
   private readonly canvas: HTMLCanvasElement;
   private readonly track: TrackDefinition;
+  private readonly visualProfile: WorldVisualProfile;
   private readonly mode: RaceMode;
   private settings: GameSettings;
   private quality: Exclude<GameSettings["quality"], "auto">;
@@ -644,6 +796,7 @@ export class GameEngine {
   private readonly webglContext: WebGLRenderingContext;
   private readonly player: THREE.Group;
   private readonly compressedAssetLoader: CompressedAssetLoader;
+  private readonly visualQualificationFreeze: boolean;
   private readonly aiRiders: AiRider[] = [];
   private readonly timer = new THREE.Timer();
   private readonly performanceWindow: PerformanceWindow = {
@@ -674,6 +827,7 @@ export class GameEngine {
   private lastObstacleKey = "";
   private readonly handledObstacleKeys = new Set<string>();
   private cameraShake = 0;
+  private cameraInitialized = false;
   private readonly replayBytes: number[] = [];
   private lastReplayStep = -6;
   private dustCursor = 0;
@@ -686,25 +840,38 @@ export class GameEngine {
   private overheats = 0;
   private caption = "Engines ready";
   private captionUntil = 0;
-  private hint = "W to ride · Shift for turbo · A / D to change lanes";
+  private hint = "W to ride · Shift for turbo · ← / → to change lanes";
   private readonly demonstrated = {
+    coast: false,
     cooling: false,
+    coolingRelease: false,
     laneChange: false,
     wheelie: false,
     airbornePitch: false,
+    airbornePitchUp: false,
+    airbornePitchDown: false,
+    airborneNeutral: false,
     cleanLanding: false,
+    hazardAvoided: false,
     mud: false,
     grass: false,
+    crash: false,
+    recovery: false,
   };
 
   constructor(options: GameEngineOptions) {
     this.canvas = options.canvas;
+    this.visualQualificationFreeze = import.meta.env.VITE_QA_MODE === "1"
+      && new URLSearchParams(window.location.search).has("qa-visual-freeze");
+    this.canvas.dataset.bikeAsset = "loading";
+    this.canvas.dataset.visualState = this.visualQualificationFreeze ? "loading" : "live";
     this.track = qaTrack(
       options.customTrack
         ? customTrackToDefinition(options.customTrack)
         : getTrack(options.trackId),
       options.mode,
     );
+    this.visualProfile = WORLD_VISUAL_PROFILES[this.track.id];
     this.mode = options.mode;
     this.settings = options.settings;
     this.quality = resolveQuality(options.settings.quality);
@@ -736,13 +903,17 @@ export class GameEngine {
     try {
       this.renderer.outputColorSpace = THREE.SRGBColorSpace;
       this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
-      this.renderer.toneMappingExposure = 1.34;
+      this.renderer.toneMappingExposure = this.visualProfile.exposure;
       this.renderer.shadowMap.enabled = this.quality !== "low";
       this.renderer.shadowMap.type = THREE.PCFShadowMap;
       compressedAssetLoader = createCompressedAssetLoader(this.renderer);
       this.compressedAssetLoader = compressedAssetLoader;
-      this.scene.background = new THREE.Color(this.track.palette.sky);
-      this.scene.fog = new THREE.Fog(this.track.palette.fog, 75, 300);
+      this.scene.background = new THREE.Color(this.visualProfile.background);
+      this.scene.fog = new THREE.Fog(
+        this.visualProfile.fog,
+        this.visualProfile.fogNear,
+        this.visualProfile.fogFar,
+      );
 
       this.player = this.createBike(PLAYER_COLOR, PLAYER_ACCENT, true);
       this.player.scale.setScalar(1.3);
@@ -750,6 +921,7 @@ export class GameEngine {
       this.createWorld();
       this.createDustPool();
       this.createAiField();
+      this.applyQaVisualDistance();
       this.applyRendererAccessibility();
       this.resize();
       startLifecycleResource("gameEngines");
@@ -889,22 +1061,29 @@ export class GameEngine {
       const backWheel = compressedBike.getObjectByName("RearTire");
       if (frontWheel) this.player.userData.frontWheel = frontWheel;
       if (backWheel) this.player.userData.backWheel = backWheel;
+      this.canvas.dataset.bikeAsset = "ready";
     } catch {
       if (this.disposed) return;
+      this.canvas.dataset.bikeAsset = "fallback";
       this.caption = "Compressed bike unavailable — safe built-in model active";
       this.captionUntil = 6;
+      this.emitHud(this.simulation.snapshot);
     }
   }
 
   private readonly resize = (): void => {
     const width = Math.max(1, this.canvas.clientWidth);
     const height = Math.max(1, this.canvas.clientHeight);
+    const presentation = width < 680
+      ? CAMERA_PRESENTATION_PROFILES.portrait
+      : CAMERA_PRESENTATION_PROFILES.desktop;
     const qualityRatio = this.quality === "low" ? 1 : this.quality === "medium" ? 1.35 : 2;
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, qualityRatio));
     this.renderer.setSize(width, height, false);
     this.camera.aspect = width / height;
-    this.camera.fov = width < 680 ? 62 : 50;
+    this.camera.fov = presentation.fov;
     this.camera.updateProjectionMatrix();
+    this.player.scale.setScalar(presentation.playerScale);
   };
 
   private readonly frame = (): void => {
@@ -913,7 +1092,8 @@ export class GameEngine {
     this.timer.update();
     const measuredDelta = this.timer.getDelta();
     if (
-      !this.paused
+      !this.visualQualificationFreeze
+      && !this.paused
       && !this.finished
       && Number.isFinite(measuredDelta)
       && measuredDelta > MAX_DELTA_SECONDS
@@ -924,11 +1104,16 @@ export class GameEngine {
       ? clamp(measuredDelta, 0, MAX_DELTA_SECONDS)
       : 0;
 
-    if (!this.paused && !this.finished) {
+    if (!this.visualQualificationFreeze && !this.paused && !this.finished) {
       this.update(delta);
     }
-    this.render(delta);
-    this.capturePerformance(delta, performance.now() - frameStart);
+    const renderDelta = this.visualQualificationFreeze ? 0 : delta;
+    this.render(renderDelta);
+    if (this.visualQualificationFreeze) {
+      this.canvas.dataset.visualState = "frozen";
+    } else {
+      this.capturePerformance(delta, performance.now() - frameStart);
+    }
     this.animationFrame = requestAnimationFrame(this.frame);
   };
 
@@ -941,6 +1126,7 @@ export class GameEngine {
 
     this.processTrackEvents(before, state);
     this.processBikeEvents(state);
+    this.captureDemonstratedMechanics(before, state, input);
     this.updateAi(fixedSteps, state);
     if (this.simulation.snapshot.race.finished) this.finishRace();
     this.updateDust(delta, state);
@@ -984,11 +1170,15 @@ export class GameEngine {
       }
     }
 
-    const speedLift = reducedMotion ? 0 : clamp(bike.speed / 20, 0, 1) * 0.65;
+    const portrait = this.canvas.clientWidth < 680;
+    const presentation = portrait
+      ? CAMERA_PRESENTATION_PROFILES.portrait
+      : CAMERA_PRESENTATION_PROFILES.desktop;
+    const speedLift = reducedMotion ? 0 : clamp(bike.speed / 20, 0, 1) * 0.58;
     const targetCamera = this.cameraTarget.set(
-      bike.lanePosition * 0.38,
-      4.95 + playerRouteHeight + speedLift,
-      -bike.forwardPosition + (this.canvas.clientWidth < 680 ? 8.45 : 9.55),
+      bike.lanePosition * presentation.laneFollow,
+      presentation.height + playerRouteHeight + speedLift,
+      -bike.forwardPosition + presentation.trailingDistance,
     );
     if (this.cameraShake > 0 && !this.settings.accessibility.reducedShake) {
       const pulse = Math.sin(state.timeSeconds * 91) * this.cameraShake;
@@ -998,12 +1188,17 @@ export class GameEngine {
     } else {
       this.cameraShake = 0;
     }
-    const cameraBlend = reducedMotion ? 1 : 1 - Math.exp(-delta * 6.5);
-    this.camera.position.lerp(targetCamera, cameraBlend);
+    if (!this.cameraInitialized) {
+      this.camera.position.copy(targetCamera);
+      this.cameraInitialized = true;
+    } else {
+      const cameraBlend = reducedMotion ? 1 : 1 - Math.exp(-delta * 6.5);
+      this.camera.position.lerp(targetCamera, cameraBlend);
+    }
     this.camera.lookAt(
-      bike.lanePosition * 0.22,
-      1.3 + playerRouteHeight + bike.height * 0.2,
-      -bike.forwardPosition - 19,
+      bike.lanePosition * presentation.lookAtLaneFollow,
+      presentation.lookHeight + playerRouteHeight + bike.height * 0.2,
+      -bike.forwardPosition - presentation.lookAhead,
     );
     if (this.sunLight) {
       this.sunLight.position.z = -bike.forwardPosition + 24;
@@ -1113,6 +1308,18 @@ export class GameEngine {
       }
     }
 
+    for (const candidate of this.track.obstacles) {
+      const absolute = lapStart + candidate.distance;
+      if (
+        start < absolute
+        && end >= absolute
+        && this.obstaclePolicy(candidate).crashesOnContact
+        && !laneMatches(candidate, state.bike.lane)
+      ) {
+        this.demonstrated.hazardAvoided = true;
+      }
+    }
+
     const obstacle = this.nearestObstacle(end % course, state.bike.lane, state.bike.height);
     if (obstacle && state.bike.phase === "grounded") {
       const key = `${lapIndex}:${obstacle.id}`;
@@ -1135,6 +1342,7 @@ export class GameEngine {
 
   private processBikeEvents(state: SimulationState): void {
     const { bike } = state;
+    const previousPhase = this.lastBikePhase;
     if (bike.lastLanding && bike.lastLanding !== this.lastLanding) {
       this.captionEvent(
         bike.lastLanding === "clean" ? "Clean landing — speed held" : bike.lastLanding === "rough" ? "Rough landing — rebalance" : "Bad landing — hold recover",
@@ -1146,6 +1354,10 @@ export class GameEngine {
 
     if (bike.phase === "crashed" && this.lastBikePhase !== "crashed" && bike.lastLanding !== "crash") {
       this.crashes += 1;
+    }
+    if (bike.phase === "crashed") this.demonstrated.crash = true;
+    if (previousPhase === "recovering" && bike.phase === "grounded") {
+      this.demonstrated.recovery = true;
     }
     this.lastBikePhase = bike.phase;
 
@@ -1161,6 +1373,26 @@ export class GameEngine {
       this.captionEvent("Overheated — controls return below the recovery mark", "overheat");
     }
     this.lastOverheated = bike.overheated;
+  }
+
+  private captureDemonstratedMechanics(
+    before: SimulationState,
+    state: SimulationState,
+    input: SimulationInput,
+  ): void {
+    this.demonstrated.coast ||= before.bike.speed >= 5
+      && !input.throttle
+      && !input.turbo
+      && state.bike.speed < before.bike.speed;
+    this.demonstrated.coolingRelease ||= state.bike.surface === "cooling" && !input.turbo;
+
+    if (state.bike.phase === "airborne") {
+      this.demonstrated.airbornePitchUp ||= input.pitch > 0.1;
+      this.demonstrated.airbornePitchDown ||= input.pitch < -0.1;
+      this.demonstrated.airborneNeutral ||= Math.abs(input.pitch) <= 0.1
+        && this.demonstrated.airbornePitchUp
+        && this.demonstrated.airbornePitchDown;
+    }
   }
 
   private updateAi(fixedSteps: number, state: SimulationState): void {
@@ -1324,16 +1556,17 @@ export class GameEngine {
     const now = state.timeSeconds;
     if (this.captionUntil < now) this.caption = "";
     const device = this.input.activeDevice;
+    const keyBindings = this.settings.controls.keyBindings;
     const recoverPrompt = device === "gamepad"
       ? "Hold A to recover"
       : device === "touch"
         ? "Hold RIDE to recover"
-        : "Hold Space to recover";
+        : `Hold ${formatKeyCode(keyBindings.recover ?? "Space")} to recover`;
     const ridingPrompt = device === "gamepad"
       ? "RT ride · LT turbo · left stick lanes / pitch · Start pause"
       : device === "touch"
         ? "RIDE + TURBO · arrows choose lane and pitch"
-        : "W ride · Shift turbo · A / D lanes · ↑ / ↓ pitch";
+        : `${formatKeyCode(keyBindings.throttle ?? "KeyW")} ride · ${formatKeyCode(keyBindings.turbo ?? "ShiftLeft")} turbo · ${formatKeyCode(keyBindings.laneLeft ?? "ArrowLeft")} / ${formatKeyCode(keyBindings.laneRight ?? "ArrowRight")} lanes · ${formatKeyCode(keyBindings.pitchUp ?? "ArrowUp")} / ${formatKeyCode(keyBindings.pitchDown ?? "ArrowDown")} pitch`;
     this.hint = state.bike.phase === "crashed"
       ? recoverPrompt
       : state.bike.overheated
@@ -1572,9 +1805,13 @@ export class GameEngine {
 
   private createWorld(): void {
     const palette = this.track.palette;
-    const hemisphere = new THREE.HemisphereLight(0xf2fbff, 0x85492d, 2.85);
+    const hemisphere = new THREE.HemisphereLight(
+      this.visualProfile.hemisphereSky,
+      this.visualProfile.hemisphereGround,
+      this.visualProfile.hemisphereIntensity,
+    );
     this.scene.add(hemisphere);
-    const sun = new THREE.DirectionalLight(0xfff0cf, 4.15);
+    const sun = new THREE.DirectionalLight(this.visualProfile.sun, this.visualProfile.sunIntensity);
     sun.position.set(-30, 42, 22);
     sun.target = this.sunTarget;
     sun.castShadow = this.quality !== "low";
@@ -1604,7 +1841,7 @@ export class GameEngine {
     const dirtMaterial = new THREE.MeshStandardMaterial({
       map: dirtTexture,
       bumpMap: dirtTexture,
-      bumpScale: 0.055,
+      bumpScale: 0.082,
       color: 0xffffff,
       roughness: 0.91,
       metalness: 0,
@@ -1624,7 +1861,37 @@ export class GameEngine {
     shoulderMatrix.makeTranslation(7.45, 0.02, -totalLength / 2 + 30);
     shoulders.setMatrixAt(1, shoulderMatrix);
     shoulders.receiveShadow = true;
-    this.scene.add(shoulders);
+    const bermSegmentDepth = this.quality === "low" ? 26 : this.quality === "medium" ? 18 : 12;
+    const bermSegmentsPerLane = Math.ceil(totalLength / bermSegmentDepth);
+    const laneRidges = new THREE.InstancedMesh(
+      new THREE.BoxGeometry(1, 1, 1),
+      grassMaterial,
+      bermSegmentsPerLane * 3,
+    );
+    const bermRandom = seededRandom(this.track.order * 213_119);
+    let bermIndex = 0;
+    for (const x of [-3, 0, 3]) {
+      for (let segment = 0; segment < bermSegmentsPerLane; segment += 1) {
+        const depth = Math.min(bermSegmentDepth + 1.4, totalLength - segment * bermSegmentDepth);
+        const widthScale = 0.82 + bermRandom() * 0.36;
+        const heightScale = 0.8 + bermRandom() * 0.42;
+        shoulderMatrix.compose(
+          new THREE.Vector3(
+            x + (bermRandom() - 0.5) * 0.12,
+            0.07 * heightScale,
+            30 - segment * bermSegmentDepth - depth / 2,
+          ),
+          new THREE.Quaternion().setFromEuler(new THREE.Euler(0, (bermRandom() - 0.5) * 0.025, 0)),
+          new THREE.Vector3(0.22 * widthScale, 0.14 * heightScale, depth),
+        );
+        laneRidges.setMatrixAt(bermIndex, shoulderMatrix);
+        bermIndex += 1;
+      }
+    }
+    laneRidges.instanceMatrix.needsUpdate = true;
+    laneRidges.receiveShadow = true;
+    this.scene.add(shoulders, laneRidges);
+    this.createTerracedCourseEdges(totalLength);
     this.createHighContrastTrackGuides(totalLength);
 
     const authoredCourse = this.track.authoredCourse;
@@ -1646,6 +1913,133 @@ export class GameEngine {
     this.createSkyDecor(totalLength);
     this.createThemeDecor(totalLength);
     this.createFestivalDecor(totalLength);
+  }
+
+  private createTerracedCourseEdges(totalLength: number): void {
+    const segmentDepth = this.quality === "low" ? 68 : this.quality === "medium" ? 50 : 38;
+    const segmentCount = Math.ceil((totalLength + 50) / segmentDepth);
+    const instanceCount = segmentCount * 2;
+    const palette = this.track.palette;
+    const shelfColor = this.track.id === "foundry-flight"
+      ? new THREE.Color(palette.rock).lerp(new THREE.Color(0x59636a), 0.38).getHex()
+      : new THREE.Color(palette.grass).lerp(new THREE.Color(palette.dirt), 0.12).getHex();
+    const wallColor = new THREE.Color(palette.rock).offsetHSL(0, 0.01, -0.07).getHex();
+    const capColor = new THREE.Color(palette.rock).offsetHSL(0.01, 0.02, 0.07).getHex();
+    const shelves = new THREE.InstancedMesh(
+      new THREE.BoxGeometry(4.8, 0.72, segmentDepth + 1.6),
+      makeMaterial(0xffffff, 0.96),
+      instanceCount,
+    );
+    const lowerSteps = new THREE.InstancedMesh(
+      new THREE.BoxGeometry(4.6, 1.25, segmentDepth * 0.86),
+      makeMaterial(0xffffff, 0.94),
+      instanceCount,
+    );
+    const upperGeometry = this.track.id === "foundry-flight"
+      ? new THREE.BoxGeometry(7.2, 2.8, segmentDepth * 0.68)
+      : new THREE.CylinderGeometry(3.35, 4.25, 2.8, 6);
+    const upperSteps = new THREE.InstancedMesh(
+      upperGeometry,
+      makeMaterial(0xffffff, 0.94),
+      instanceCount,
+    );
+    const caps = new THREE.InstancedMesh(
+      new THREE.CylinderGeometry(2.72, 3.25, 0.42, 6),
+      makeMaterial(0xffffff, 0.92),
+      instanceCount,
+    );
+    const matrix = new THREE.Matrix4();
+    const rotation = new THREE.Quaternion();
+    const random = seededRandom(this.track.order * 48_271);
+    let instanceIndex = 0;
+
+    for (let segment = 0; segment < segmentCount; segment += 1) {
+      const z = 26 - segment * segmentDepth;
+      for (const side of [-1, 1]) {
+        const openWaterSide = this.track.id === "coastline-clash" && side > 0;
+        if (openWaterSide) {
+          const hiddenScale = new THREE.Vector3(0.001, 0.001, 0.001);
+          matrix.compose(new THREE.Vector3(0, -8, z), rotation, hiddenScale);
+          shelves.setMatrixAt(instanceIndex, matrix);
+          lowerSteps.setMatrixAt(instanceIndex, matrix);
+          upperSteps.setMatrixAt(instanceIndex, matrix);
+          caps.setMatrixAt(instanceIndex, matrix);
+          instanceIndex += 1;
+          continue;
+        }
+
+        const height = this.visualProfile.terraceHeight * (0.84 + random() * 0.28);
+        const lateralJitter = (random() - 0.5) * 1.4;
+        const depthJitter = (random() - 0.5) * segmentDepth * 0.16;
+        const depthScale = 0.86 + random() * 0.12;
+        rotation.setFromEuler(new THREE.Euler(0, (random() - 0.5) * 0.08, 0));
+        matrix.compose(
+          new THREE.Vector3(side * (10.1 + lateralJitter * 0.35), 0.02 + height * 0.04, z),
+          rotation,
+          new THREE.Vector3(1, 0.9 + height * 0.1, depthScale),
+        );
+        shelves.setMatrixAt(instanceIndex, matrix);
+
+        const lowerX = side * (12.9 + lateralJitter * 0.55);
+        matrix.compose(
+          new THREE.Vector3(lowerX, 0.45 + height * 0.3, z + depthJitter * 0.35),
+          rotation,
+          new THREE.Vector3(1, 0.82 + height * 0.18, depthScale),
+        );
+        lowerSteps.setMatrixAt(instanceIndex, matrix);
+
+        const upperScaleY = 0.72 + height * 0.38;
+        const upperDepthScale = this.track.id === "foundry-flight"
+          ? depthScale
+          : (segmentDepth * 0.68 * depthScale) / 8.5;
+        rotation.setFromEuler(new THREE.Euler(0, (random() - 0.5) * 0.16, 0));
+        matrix.compose(
+          new THREE.Vector3(
+            side * (17.15 + lateralJitter),
+            1.5 + height * 0.62,
+            z + depthJitter,
+          ),
+          rotation,
+          new THREE.Vector3(1, upperScaleY, upperDepthScale),
+        );
+        upperSteps.setMatrixAt(instanceIndex, matrix);
+
+        const upperTop = 1.5 + height * 0.62 + 1.4 * upperScaleY;
+        const capDepthScale = (segmentDepth * 0.68 * depthScale) / 6.5;
+        matrix.compose(
+          new THREE.Vector3(
+            side * (17.15 + lateralJitter),
+            upperTop + 0.16,
+            z + depthJitter,
+          ),
+          rotation,
+          new THREE.Vector3(1, 1, capDepthScale),
+        );
+        caps.setMatrixAt(instanceIndex, matrix);
+        const toneJitter = (random() - 0.5) * 0.09;
+        shelves.setColorAt(instanceIndex, new THREE.Color(shelfColor).offsetHSL(0, 0.01, toneJitter * 0.45));
+        lowerSteps.setColorAt(instanceIndex, new THREE.Color(wallColor).offsetHSL(0.006, 0.015, toneJitter));
+        upperSteps.setColorAt(instanceIndex, new THREE.Color(wallColor).offsetHSL(-0.004, 0.01, toneJitter * 0.8));
+        caps.setColorAt(instanceIndex, new THREE.Color(capColor).offsetHSL(0.004, 0.015, toneJitter * 0.55));
+        instanceIndex += 1;
+      }
+    }
+
+    shelves.instanceMatrix.needsUpdate = true;
+    lowerSteps.instanceMatrix.needsUpdate = true;
+    upperSteps.instanceMatrix.needsUpdate = true;
+    caps.instanceMatrix.needsUpdate = true;
+    if (shelves.instanceColor) shelves.instanceColor.needsUpdate = true;
+    if (lowerSteps.instanceColor) lowerSteps.instanceColor.needsUpdate = true;
+    if (upperSteps.instanceColor) upperSteps.instanceColor.needsUpdate = true;
+    if (caps.instanceColor) caps.instanceColor.needsUpdate = true;
+    shelves.receiveShadow = true;
+    lowerSteps.receiveShadow = true;
+    lowerSteps.castShadow = this.quality === "high";
+    upperSteps.receiveShadow = true;
+    upperSteps.castShadow = this.quality === "high";
+    caps.receiveShadow = true;
+    this.scene.add(shelves, lowerSteps, upperSteps, caps);
   }
 
   private createHighContrastTrackGuides(totalLength: number): void {
@@ -2106,7 +2500,7 @@ export class GameEngine {
     const zoneCount = totalLaps + 1;
     const blockCount = zoneCount * blocksPerSide * 2;
     const blocks = new THREE.InstancedMesh(
-      new THREE.BoxGeometry(1.45, 0.58, 0.64),
+      new THREE.BoxGeometry(1.35, 0.58, 4.05),
       makeMaterial(0xffffff, 0.74),
       blockCount,
     );
@@ -2124,7 +2518,7 @@ export class GameEngine {
           matrix.makeTranslation(
             side * 7.35,
             0.36,
-            -(zoneDistance + 7 + index * 4.35),
+            -(zoneDistance + 6 + index * 3.8),
           );
           blocks.setMatrixAt(blockIndex, matrix);
           blocks.setColorAt(
@@ -2226,8 +2620,17 @@ export class GameEngine {
     this.scene.add(tufts, pebbles);
   }
 
+  private sceneryElevation(lateralPosition: number): number {
+    if (this.track.id === "coastline-clash" && lateralPosition > 0) return 0;
+    const lateralDistance = Math.abs(lateralPosition);
+    if (lateralDistance >= 15) return 2.7 + this.visualProfile.terraceHeight * 0.68;
+    if (lateralDistance >= 11.8) return 0.9 + this.visualProfile.terraceHeight * 0.38;
+    return 0;
+  }
+
   private createScenery(totalLength: number): void {
-    const treeCount = this.quality === "low" ? 42 : this.quality === "medium" ? 66 : 88;
+    const baseTreeCount = this.quality === "low" ? 42 : this.quality === "medium" ? 66 : 88;
+    const treeCount = Math.max(4, Math.round(baseTreeCount * this.visualProfile.treeDensity));
     const foliageGeometry = new THREE.ConeGeometry(1.4, 3.5, 7);
     const upperFoliageGeometry = new THREE.ConeGeometry(1.02, 2.8, 7);
     const trunkGeometry = new THREE.CylinderGeometry(0.18, 0.27, 1.8, 7);
@@ -2245,11 +2648,12 @@ export class GameEngine {
       const z = -20 - (index / treeCount) * totalLength;
       const x = side * (11.2 + ((index * 37) % 12));
       const scale = 0.75 + ((index * 13) % 7) * 0.06;
-      matrix.compose(new THREE.Vector3(x, 2.55 * scale, z), new THREE.Quaternion(), new THREE.Vector3(scale, scale, scale));
+      const terraceLift = this.sceneryElevation(x);
+      matrix.compose(new THREE.Vector3(x, terraceLift + 2.55 * scale, z), new THREE.Quaternion(), new THREE.Vector3(scale, scale, scale));
       foliage.setMatrixAt(index, matrix);
-      matrix.compose(new THREE.Vector3(x, 4.1 * scale, z), new THREE.Quaternion(), new THREE.Vector3(scale, scale, scale));
+      matrix.compose(new THREE.Vector3(x, terraceLift + 4.1 * scale, z), new THREE.Quaternion(), new THREE.Vector3(scale, scale, scale));
       upperFoliage.setMatrixAt(index, matrix);
-      matrix.compose(new THREE.Vector3(x, 0.72 * scale, z), new THREE.Quaternion(), new THREE.Vector3(scale, scale, scale));
+      matrix.compose(new THREE.Vector3(x, terraceLift + 0.72 * scale, z), new THREE.Quaternion(), new THREE.Vector3(scale, scale, scale));
       trunks.setMatrixAt(index, matrix);
     }
     foliage.castShadow = this.quality !== "low";
@@ -2274,7 +2678,8 @@ export class GameEngine {
     rocks.castShadow = this.quality !== "low";
     this.scene.add(rocks);
 
-    const mesaCount = this.quality === "low" ? 18 : this.quality === "medium" ? 26 : 34;
+    const baseMesaCount = this.quality === "low" ? 18 : this.quality === "medium" ? 26 : 34;
+    const mesaCount = Math.max(4, Math.round(baseMesaCount * this.visualProfile.mesaDensity));
     const mesaMaterial = makeMaterial(this.track.palette.rock, 0.96);
     const capMaterial = makeMaterial(new THREE.Color(this.track.palette.rock).offsetHSL(0.01, 0.02, 0.08).getHex(), 0.94);
     const mesas = new THREE.InstancedMesh(new THREE.CylinderGeometry(2.7, 4.1, 6.5, 7), mesaMaterial, mesaCount);
@@ -2282,18 +2687,20 @@ export class GameEngine {
     for (let index = 0; index < mesaCount; index += 1) {
       const side = index % 2 === 0 ? -1 : 1;
       const z = -15 - (index / mesaCount) * totalLength;
-      const x = side * (25 + ((index * 19) % 13));
+      const canyonSkyline = this.track.id === "canyon-kickoff";
+      const x = side * ((canyonSkyline ? 18.5 : 25) + ((index * 19) % 13));
+      const terraceLift = this.sceneryElevation(x);
       const width = 0.95 + (index % 4) * 0.22;
       const height = 0.78 + ((index * 7) % 6) * 0.13;
       const rotation = new THREE.Quaternion().setFromEuler(new THREE.Euler(0, index * 0.47, 0));
       matrix.compose(
-        new THREE.Vector3(x, 3.25 * height, z),
+        new THREE.Vector3(x, terraceLift + 3.25 * height, z),
         rotation,
         new THREE.Vector3(width, height, width * (0.8 + (index % 3) * 0.12)),
       );
       mesas.setMatrixAt(index, matrix);
       matrix.compose(
-        new THREE.Vector3(x, 6.5 * height + 0.5, z),
+        new THREE.Vector3(x, terraceLift + 6.5 * height + 0.5, z),
         rotation,
         new THREE.Vector3(width, 1, width * (0.8 + (index % 3) * 0.12)),
       );
@@ -2305,7 +2712,7 @@ export class GameEngine {
   }
 
   private createSkyDecor(totalLength: number): void {
-    const cloudGroupCount = this.quality === "low" ? 6 : 10;
+    const cloudGroupCount = this.quality === "low" ? 14 : this.quality === "medium" ? 22 : 28;
     const cloudCount = cloudGroupCount * 3;
     const clouds = new THREE.InstancedMesh(
       new THREE.SphereGeometry(1.7, 8, 5),
@@ -2358,7 +2765,7 @@ export class GameEngine {
     water.castShadow = false;
     const boardwalk = makeBox(2.5, 0.22, totalLength, makeMaterial(0xb98252, 0.9));
     boardwalk.position.set(11.4, 0, -totalLength / 2 + 30);
-    const hutCount = this.quality === "low" ? 8 : 14;
+    const hutCount = this.quality === "low" ? 10 : this.quality === "medium" ? 16 : 22;
     const huts = new THREE.InstancedMesh(
       new THREE.BoxGeometry(2.5, 1.45, 2.2),
       makeMaterial(0xffffff, 0.72),
@@ -2373,15 +2780,16 @@ export class GameEngine {
     for (let index = 0; index < hutCount; index += 1) {
       const x = 15.8 + (index % 2) * 3.2;
       const z = -80 - (index / hutCount) * totalLength;
+      const terraceLift = this.sceneryElevation(x);
       matrix.compose(
-        new THREE.Vector3(x, 0.76, z),
+        new THREE.Vector3(x, terraceLift + 0.76, z),
         new THREE.Quaternion().setFromEuler(new THREE.Euler(0, index % 2 === 0 ? 0.08 : -0.08, 0)),
         new THREE.Vector3(1, 1, 1),
       );
       huts.setMatrixAt(index, matrix);
       huts.setColorAt(index, hutColors[index % hutColors.length] ?? new THREE.Color(0x2fb7b7));
       matrix.compose(
-        new THREE.Vector3(x, 1.97, z),
+        new THREE.Vector3(x, terraceLift + 1.97, z),
         new THREE.Quaternion().setFromEuler(new THREE.Euler(0, Math.PI / 4, 0)),
         new THREE.Vector3(1, 1, 1),
       );
@@ -2403,8 +2811,10 @@ export class GameEngine {
       );
       for (let index = 0; index < stackCount; index += 1) {
         const side = index % 2 === 0 ? -1 : 1;
+        const x = side * (15 + (index % 4) * 2.2);
+        const terraceLift = this.sceneryElevation(x);
         matrix.compose(
-          new THREE.Vector3(side * (15 + (index % 4) * 2.2), 3.55, -70 - (index / stackCount) * totalLength),
+          new THREE.Vector3(x, terraceLift + 3.55, -70 - (index / stackCount) * totalLength),
           new THREE.Quaternion(),
           new THREE.Vector3(1, 0.8 + (index % 3) * 0.16, 1),
         );
@@ -2427,14 +2837,15 @@ export class GameEngine {
         const x = side * (21 + (index % 3) * 3.6);
         const z = -42 - (index / buildingCount) * totalLength;
         const scale = 0.8 + (index % 4) * 0.1;
+        const terraceLift = this.sceneryElevation(x);
         matrix.compose(
-          new THREE.Vector3(x, 1.55 * scale, z),
+          new THREE.Vector3(x, terraceLift + 1.55 * scale, z),
           new THREE.Quaternion().setFromEuler(new THREE.Euler(0, Math.PI / 4 + side * 0.05, 0)),
           new THREE.Vector3(scale, scale, scale),
         );
         buildings.setMatrixAt(index, matrix);
         matrix.compose(
-          new THREE.Vector3(x, 3.72 * scale, z),
+          new THREE.Vector3(x, terraceLift + 3.72 * scale, z),
           new THREE.Quaternion().setFromEuler(new THREE.Euler(0, Math.PI / 4, 0)),
           new THREE.Vector3(scale, scale, scale),
         );
@@ -2449,8 +2860,10 @@ export class GameEngine {
       for (let index = 0; index < smokeCount; index += 1) {
         const side = index % 2 === 0 ? -1 : 1;
         const scale = 0.75 + (index % 3) * 0.3;
+        const x = side * (15 + (index % 4) * 2.2);
+        const terraceLift = this.sceneryElevation(x);
         matrix.compose(
-          new THREE.Vector3(side * (15 + (index % 4) * 2.2), 8.2 + (index % 3) * 1.2, -70 - (index / smokeCount) * totalLength),
+          new THREE.Vector3(x, terraceLift + 8.2 + (index % 3) * 1.2, -70 - (index / smokeCount) * totalLength),
           new THREE.Quaternion(),
           new THREE.Vector3(scale * 1.2, scale, scale),
         );
@@ -2477,14 +2890,15 @@ export class GameEngine {
         const x = side * (20 + (index % 5) * 3.2);
         const z = -55 - (index / peakCount) * totalLength;
         const scale = 0.82 + (index % 4) * 0.13;
+        const terraceLift = this.sceneryElevation(x);
         matrix.compose(
-          new THREE.Vector3(x, 4.2 * scale, z),
+          new THREE.Vector3(x, terraceLift + 4.2 * scale, z),
           new THREE.Quaternion().setFromEuler(new THREE.Euler(0, index * 0.29, 0)),
           new THREE.Vector3(scale, scale, scale),
         );
         rockPeaks.setMatrixAt(index, matrix);
         matrix.compose(
-          new THREE.Vector3(x, 7.15 * scale, z),
+          new THREE.Vector3(x, terraceLift + 7.15 * scale, z),
           new THREE.Quaternion().setFromEuler(new THREE.Euler(0, index * 0.29, 0)),
           new THREE.Vector3(scale, scale, scale),
         );
@@ -2505,8 +2919,10 @@ export class GameEngine {
       const rotation = new THREE.Quaternion().setFromEuler(new THREE.Euler(0, 0, Math.PI / 2));
       for (let index = 0; index < logCount; index += 1) {
         const side = index % 2 === 0 ? -1 : 1;
+        const x = side * (11 + (index % 3) * 1.2);
+        const terraceLift = this.sceneryElevation(x);
         matrix.compose(
-          new THREE.Vector3(side * (11 + (index % 3) * 1.2), 0.45 + (index % 2) * 0.5, -65 - (index / logCount) * totalLength),
+          new THREE.Vector3(x, terraceLift + 0.45 + (index % 2) * 0.5, -65 - (index / logCount) * totalLength),
           rotation,
           new THREE.Vector3(1, 1, 1),
         );
@@ -2527,10 +2943,11 @@ export class GameEngine {
         const side = index % 2 === 0 ? -1 : 1;
         const x = side * (16 + (index % 3) * 2.8);
         const z = -110 - (index / cabinCount) * totalLength;
-        matrix.makeTranslation(x, 1.05, z);
+        const terraceLift = this.sceneryElevation(x);
+        matrix.makeTranslation(x, terraceLift + 1.05, z);
         cabins.setMatrixAt(index, matrix);
         matrix.compose(
-          new THREE.Vector3(x, 2.75, z),
+          new THREE.Vector3(x, terraceLift + 2.75, z),
           new THREE.Quaternion().setFromEuler(new THREE.Euler(0, Math.PI / 4, 0)),
           new THREE.Vector3(1, 1, 1),
         );
@@ -2544,13 +2961,27 @@ export class GameEngine {
   private createCanyonThemeDecor(totalLength: number): void {
     const matrix = new THREE.Matrix4();
     const archMaterial = makeMaterial(this.track.palette.rock, 0.9);
+    const arches = new THREE.InstancedMesh(
+      new THREE.TorusGeometry(3.6, 0.95, 6, 12, Math.PI),
+      archMaterial,
+      5,
+    );
     for (let index = 0; index < 5; index += 1) {
-      const arch = new THREE.Mesh(new THREE.TorusGeometry(3.6, 0.95, 6, 12, Math.PI), archMaterial);
-      arch.position.set(index % 2 === 0 ? -18 : 18, 2.4, -95 - index * Math.max(95, totalLength / 6));
-      arch.rotation.z = index % 2 === 0 ? 0.08 : -0.08;
-      arch.castShadow = this.quality !== "low";
-      this.scene.add(arch);
+      const x = index % 2 === 0 ? -18 : 18;
+      matrix.compose(
+        new THREE.Vector3(
+          x,
+          this.sceneryElevation(x) + 2.4,
+          -95 - index * Math.max(95, totalLength / 6),
+        ),
+        new THREE.Quaternion().setFromEuler(new THREE.Euler(0, 0, index % 2 === 0 ? 0.08 : -0.08)),
+        new THREE.Vector3(1, 1, 1),
+      );
+      arches.setMatrixAt(index, matrix);
     }
+    arches.instanceMatrix.needsUpdate = true;
+    arches.castShadow = this.quality !== "low";
+    this.scene.add(arches);
     const cactusCount = this.quality === "low" ? 14 : 24;
     const cacti = new THREE.InstancedMesh(
       new THREE.CylinderGeometry(0.3, 0.42, 3.1, 7),
@@ -2560,8 +2991,9 @@ export class GameEngine {
     for (let index = 0; index < cactusCount; index += 1) {
       const side = index % 2 === 0 ? -1 : 1;
       const scale = 0.65 + (index % 5) * 0.12;
+      const x = side * (12 + (index % 4) * 2.2);
       matrix.compose(
-        new THREE.Vector3(side * (12 + (index % 4) * 2.2), 1.5 * scale, -75 - (index / cactusCount) * totalLength),
+        new THREE.Vector3(x, this.sceneryElevation(x) + 1.5 * scale, -75 - (index / cactusCount) * totalLength),
         new THREE.Quaternion().setFromEuler(new THREE.Euler(0, index * 0.55, 0)),
         new THREE.Vector3(scale, scale, scale),
       );
@@ -2578,8 +3010,104 @@ export class GameEngine {
     this.createFestivalCrowd();
     this.createFestivalTents(timber);
     this.createFestivalBanners(totalLength);
+    this.createFestivalRoutePockets(totalLength, timber);
     this.createFestivalBillboards(timber);
     this.createFestivalLandmark(timber, roofMaterial);
+  }
+
+  private createFestivalRoutePockets(
+    totalLength: number,
+    timber: THREE.MeshStandardMaterial,
+  ): void {
+    const spacing = this.quality === "low" ? 250 : this.quality === "medium" ? 180 : 135;
+    const pocketCount = Math.max(4, Math.floor((totalLength - 150) / spacing));
+    const peoplePerPocket = this.quality === "low" ? 4 : 6;
+    const platforms = new THREE.InstancedMesh(
+      new THREE.BoxGeometry(4.3, 0.34, 4.5),
+      makeMaterial(0x875235, 0.9),
+      pocketCount,
+    );
+    const canopies = new THREE.InstancedMesh(
+      new THREE.ConeGeometry(2.55, 1.35, 4),
+      makeMaterial(0xffffff, 0.68),
+      pocketCount,
+    );
+    const posts = new THREE.InstancedMesh(
+      new THREE.CylinderGeometry(0.08, 0.1, 3.7, 6),
+      timber,
+      pocketCount * 4,
+    );
+    const peopleCount = pocketCount * peoplePerPocket;
+    const people = new THREE.InstancedMesh(
+      new THREE.CapsuleGeometry(0.16, 0.42, 3, 6),
+      makeMaterial(0xffffff, 0.8),
+      peopleCount,
+    );
+    const heads = new THREE.InstancedMesh(
+      new THREE.SphereGeometry(0.17, 7, 5),
+      makeMaterial(0xffffff, 0.86),
+      peopleCount,
+    );
+    const canopyColors = [new THREE.Color(0x18aaa8), new THREE.Color(0xef6354), new THREE.Color(0xf3c94b)];
+    const peopleColors = [new THREE.Color(0xf0a33a), new THREE.Color(0x20b8b5), new THREE.Color(0xe65f53), new THREE.Color(0x466fba), new THREE.Color(0xf0dfc0)];
+    const skinColors = [new THREE.Color(0xf2c18f), new THREE.Color(0xb87855), new THREE.Color(0x7f4c38), new THREE.Color(0xe0a877)];
+    const random = seededRandom(this.track.order * 377_911);
+    const matrix = new THREE.Matrix4();
+    const rotation = new THREE.Quaternion();
+    let postIndex = 0;
+    let personIndex = 0;
+
+    for (let pocket = 0; pocket < pocketCount; pocket += 1) {
+      const side = (pocket + this.track.order) % 2 === 0 ? -1 : 1;
+      const x = side * (11.85 + random() * 0.45);
+      const z = -125 - pocket * spacing - (random() - 0.5) * 34;
+      const elevation = this.sceneryElevation(x);
+      rotation.setFromEuler(new THREE.Euler(0, side * (0.04 + random() * 0.035), 0));
+      matrix.compose(
+        new THREE.Vector3(x, elevation + 0.17, z),
+        rotation,
+        new THREE.Vector3(1, 1, 1),
+      );
+      platforms.setMatrixAt(pocket, matrix);
+      matrix.compose(
+        new THREE.Vector3(x, elevation + 4.05, z),
+        new THREE.Quaternion().setFromEuler(new THREE.Euler(0, Math.PI / 4, 0)),
+        new THREE.Vector3(1, 1, 1),
+      );
+      canopies.setMatrixAt(pocket, matrix);
+      canopies.setColorAt(pocket, canopyColors[pocket % canopyColors.length] ?? new THREE.Color(0x18aaa8));
+
+      for (const xOffset of [-1.65, 1.65]) {
+        for (const zOffset of [-1.65, 1.65]) {
+          matrix.makeTranslation(x + xOffset, elevation + 1.95, z + zOffset);
+          posts.setMatrixAt(postIndex, matrix);
+          postIndex += 1;
+        }
+      }
+
+      for (let person = 0; person < peoplePerPocket; person += 1) {
+        const column = person % 3;
+        const row = Math.floor(person / 3);
+        const personX = x - side * (0.55 + row * 0.55);
+        const personZ = z - 1.05 + column * 1.05;
+        const bodyY = elevation + 0.82;
+        matrix.makeTranslation(personX, bodyY, personZ);
+        people.setMatrixAt(personIndex, matrix);
+        people.setColorAt(personIndex, peopleColors[(person + pocket) % peopleColors.length] ?? new THREE.Color(0xf0a33a));
+        matrix.makeTranslation(personX, bodyY + 0.47, personZ);
+        heads.setMatrixAt(personIndex, matrix);
+        heads.setColorAt(personIndex, skinColors[(person + pocket) % skinColors.length] ?? new THREE.Color(0xe0a877));
+        personIndex += 1;
+      }
+    }
+
+    platforms.castShadow = this.quality !== "low";
+    platforms.receiveShadow = true;
+    canopies.castShadow = this.quality !== "low";
+    posts.castShadow = this.quality === "high";
+    people.castShadow = this.quality === "high";
+    heads.castShadow = this.quality === "high";
+    this.scene.add(platforms, canopies, posts, people, heads);
   }
 
   private createFestivalStands(
@@ -2595,19 +3123,19 @@ export class GameEngine {
     let standPostIndex = 0;
     for (const side of [-1, 1]) {
       const standIndex = side < 0 ? 0 : 1;
-      matrix.makeTranslation(side * 10.65, 1.15, -25);
+      matrix.makeTranslation(side * 10.65, 1.15, -18);
       stands.setMatrixAt(standIndex, matrix);
-      matrix.makeTranslation(side * 10.65, 4.25, -25);
+      matrix.makeTranslation(side * 10.65, 4.25, -18);
       standRoofs.setMatrixAt(standIndex, matrix);
       standRoofs.setColorAt(standIndex, side < 0 ? new THREE.Color(0x159ca2) : new THREE.Color(0xef6254));
       for (let row = 0; row < 3; row += 1) {
-        matrix.makeTranslation(side * 10.65, 1.35 + row * 0.34, -23.9 - row * 0.76);
+        matrix.makeTranslation(side * 10.65, 1.35 + row * 0.34, -16.9 - row * 0.76);
         bleachers.setMatrixAt(bleacherIndex, matrix);
         bleacherIndex += 1;
       }
       for (const xOffset of [-2.5, 2.5]) {
         for (const zOffset of [-1.65, 1.65]) {
-          matrix.makeTranslation(side * 10.65 + xOffset, 2.05, -25 + zOffset);
+          matrix.makeTranslation(side * 10.65 + xOffset, 2.05, -18 + zOffset);
           standPosts.setMatrixAt(standPostIndex, matrix);
           standPostIndex += 1;
         }
@@ -2641,7 +3169,7 @@ export class GameEngine {
       const column = localIndex % 7;
       const row = Math.floor(localIndex / 7) % 4;
       const x = side * 10.65 - 2.25 + column * 0.75;
-      const z = -23.55 - row * 0.72;
+      const z = -16.55 - row * 0.72;
       const bodyY = 1.82 + row * 0.32;
       matrix.makeTranslation(x, bodyY, z);
       people.setMatrixAt(index, matrix);
@@ -2780,22 +3308,22 @@ export class GameEngine {
       billboardCount,
     );
     const billboardPosts = new THREE.InstancedMesh(
-      new THREE.CylinderGeometry(0.09, 0.12, 3.5, 6),
+      new THREE.CylinderGeometry(0.11, 0.15, 6.2, 6),
       timber,
       billboardCount * 2,
     );
     for (let index = 0; index < billboardCount; index += 1) {
       const side = index % 2 === 0 ? -1 : 1;
-      const z = -36 - Math.floor(index / 2) * 58;
-      const x = side * 13.1;
+      const z = -22 - Math.floor(index / 2) * 72;
+      const x = side * 11.75;
       matrix.compose(
-        new THREE.Vector3(x, 3.45, z),
+        new THREE.Vector3(x, 5.95, z),
         new THREE.Quaternion().setFromEuler(new THREE.Euler(0, side * -0.2, 0)),
         new THREE.Vector3(1, 1, 1),
       );
       billboards.setMatrixAt(index, matrix);
       for (const postOffset of [-1.85, 1.85]) {
-        matrix.makeTranslation(x + postOffset, 1.7, z + 0.08);
+        matrix.makeTranslation(x + postOffset, 2.95, z + 0.08);
         billboardPosts.setMatrixAt(index * 2 + (postOffset > 0 ? 1 : 0), matrix);
       }
     }
@@ -2828,7 +3356,7 @@ export class GameEngine {
     distantTower.castShadow = false;
     landmark.addLevel(detailedTower, 0);
     landmark.addLevel(distantTower, 95);
-    landmark.position.set(-15.5, 0, -128);
+    landmark.position.set(15.5, 0, -68);
     this.scene.add(landmark);
   }
 
@@ -2852,6 +3380,20 @@ export class GameEngine {
         lastObstacleKey: "",
       });
     }
+  }
+
+  private applyQaVisualDistance(): void {
+    if (!this.visualQualificationFreeze || import.meta.env.VITE_QA_MODE !== "1") return;
+    const distance = parseQaVisualDistance(window.location.search, this.track.courseLength);
+    if (distance === undefined) return;
+
+    this.simulation.relocate(distance);
+    for (const ai of this.aiRiders) {
+      const gridOffset = ai.simulation.snapshot.bike.forwardPosition;
+      ai.simulation.relocate(distance + gridOffset);
+    }
+    this.canvas.dataset.visualDistance = String(distance);
+    this.emitHud(this.simulation.snapshot);
   }
 
   private createBike(color: number, accentColor: number, player: boolean): THREE.Group {
@@ -2880,26 +3422,57 @@ export class GameEngine {
     const handle = makeBox(1.0, 0.09, 0.09, metal);
     handle.position.set(0, 0.98, -0.64);
 
-    const torso = makeBox(0.72, 0.78, 0.42, player ? bodyMaterial : accent);
-    torso.position.set(0, 1.22, 0.12);
+    const torso = new THREE.Mesh(
+      new THREE.CapsuleGeometry(0.31, 0.34, 4, 8),
+      player ? bodyMaterial : accent,
+    );
+    torso.position.set(0, 1.23, 0.12);
     torso.rotation.x = 0.35;
     const helmet = new THREE.Mesh(new THREE.IcosahedronGeometry(0.34, 1), player ? accent : bodyMaterial);
     helmet.position.set(0, 1.74, -0.2);
     const visor = makeBox(0.42, 0.12, 0.18, dark);
     visor.position.set(0, 1.72, -0.45);
-    const armLeft = makeBox(0.16, 0.58, 0.16, bodyMaterial);
+    const helmetPeak = makeBox(0.54, 0.07, 0.27, player ? bodyMaterial : accent);
+    helmetPeak.position.set(0, 1.88, -0.34);
+    helmetPeak.rotation.x = -0.16;
+    const armLeft = new THREE.Mesh(new THREE.CapsuleGeometry(0.085, 0.39, 3, 6), bodyMaterial);
     const armRight = armLeft.clone();
     armLeft.position.set(-0.4, 1.28, -0.35);
     armRight.position.set(0.4, 1.28, -0.35);
     armLeft.rotation.x = armRight.rotation.x = 0.75;
     armLeft.rotation.z = -0.35;
     armRight.rotation.z = 0.35;
-    const backPlate = makeBox(0.56, 0.5, 0.1, player ? makeMaterial(0xf4edda, 0.62) : dark);
+    const backPlate = makeBox(0.58, 0.52, 0.11, player ? makeMaterial(0xf3ead5, 0.72) : dark);
     backPlate.position.set(0, 1.32, 0.34);
     backPlate.rotation.x = 0.35;
+    const backStripe = makeBox(0.4, 0.12, 0.14, player ? accent : bodyMaterial);
+    backStripe.position.set(0, 1.15, 0.405);
+    backStripe.rotation.x = 0.35;
+    const numberBars = new THREE.InstancedMesh(
+      new THREE.BoxGeometry(0.075, 0.25, 0.055),
+      dark,
+      2,
+    );
+    const numberMatrix = new THREE.Matrix4();
+    const numberRotation = new THREE.Quaternion().setFromEuler(new THREE.Euler(0.35, 0, 0));
+    numberMatrix.compose(
+      new THREE.Vector3(-0.075, 1.42, 0.43),
+      numberRotation,
+      new THREE.Vector3(1, 1, 1),
+    );
+    numberBars.setMatrixAt(0, numberMatrix);
+    numberMatrix.compose(
+      new THREE.Vector3(0.075, 1.42, 0.43),
+      numberRotation,
+      new THREE.Vector3(1, 1, 1),
+    );
+    numberBars.setMatrixAt(1, numberMatrix);
     const hips = makeBox(0.64, 0.3, 0.46, dark);
     hips.position.set(0, 0.88, 0.42);
-    const leftLeg = makeBox(0.2, 0.62, 0.22, player ? bodyMaterial : accent);
+    const leftLeg = new THREE.Mesh(
+      new THREE.CapsuleGeometry(0.11, 0.38, 3, 6),
+      player ? bodyMaterial : accent,
+    );
     const rightLeg = leftLeg.clone();
     leftLeg.position.set(-0.27, 0.72, 0.48);
     rightLeg.position.set(0.27, 0.72, 0.48);
@@ -2950,31 +3523,6 @@ export class GameEngine {
     );
     kneePads.setMatrixAt(1, detailMatrix);
 
-    let raceNumber: THREE.InstancedMesh | null = null;
-    if (player) {
-      const numberMaterial = makeMaterial(NAVY, 0.58);
-      raceNumber = new THREE.InstancedMesh(new THREE.BoxGeometry(0.08, 0.026, 0.026), numberMaterial, 10);
-      const plateRotation = new THREE.Quaternion().setFromEuler(new THREE.Euler(0.35, 0, 0));
-      let segmentIndex = 0;
-      for (const centerX of [-0.13, 0.13]) {
-        for (const [xOffset, yOffset, horizontal] of [
-          [0, 0.11, true],
-          [0.045, 0.055, false],
-          [0, 0, true],
-          [-0.045, -0.055, false],
-          [0, -0.11, true],
-        ] as const) {
-          detailMatrix.compose(
-            new THREE.Vector3(centerX + xOffset, 1.34 + yOffset, 0.414),
-            plateRotation,
-            horizontal ? new THREE.Vector3(1, 1, 1) : new THREE.Vector3(0.34, 3, 1),
-          );
-          raceNumber.setMatrixAt(segmentIndex, detailMatrix);
-          segmentIndex += 1;
-        }
-      }
-    }
-
     const bikeVisual = new THREE.Group();
     bikeVisual.name = "procedural-bike-fallback";
     bikeVisual.add(frontWheel, backWheel, body, tank, fork, handle);
@@ -2984,9 +3532,12 @@ export class GameEngine {
       torso,
       helmet,
       visor,
+      helmetPeak,
       armLeft,
       armRight,
       backPlate,
+      backStripe,
+      numberBars,
       hips,
       leftLeg,
       rightLeg,
@@ -2996,7 +3547,6 @@ export class GameEngine {
       gloves,
       kneePads,
     );
-    if (raceNumber) riderVisual.add(raceNumber);
     group.add(bikeVisual, riderVisual);
     group.userData.frontWheel = frontWheel;
     group.userData.backWheel = backWheel;

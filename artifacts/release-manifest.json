@@ -1,10 +1,10 @@
 {
   "product": "RIVET RIDGE RALLY",
-  "version": "1.0.0-rc.1",
+  "version": "1.0.0-rc.2",
   "format": 1,
-  "totalBytes": 4675553,
+  "totalBytes": 4689233,
   "fileCount": 21,
-  "aggregateSha256": "d953ed1ed66f82a26043d3fbffe634ed8d35021edb8e90ee0f8f064567a70a97",
+  "aggregateSha256": "6a55c00ea36debe543ab946dee06dc5fa73cf8a13d45b047aec399469c9931a3",
   "files": [
     {
       "path": "THIRD_PARTY_NOTICES.txt",
@@ -27,14 +27,14 @@
       "sha256": "a748123dff38f90dbd29c476244cbffe8fe93d7c8a20de909e6c040af52d2123"
     },
     {
-      "path": "assets/GameView-BCKA6P4v.js",
-      "bytes": 210084,
-      "sha256": "6ed6d576b3977b1bba295bed2c303864ec48a90d99e40af8bacbd1fee317b261"
+      "path": "assets/GameView-C5MgqFSS.js",
+      "bytes": 220450,
+      "sha256": "11c301bf12d8a78f769d5ed6e065fa1d6268f3e6b368b7c821f0dd388fbcd8aa"
     },
     {
-      "path": "assets/TrackEditorScreen-BMHZkMEk.js",
+      "path": "assets/TrackEditorScreen-J9JG3myS.js",
       "bytes": 36510,
-      "sha256": "139ed12b9ca6b81e4c303c04979bafbf213d3ad712571678b201a688caa1bdc2"
+      "sha256": "7ac123acabaaeeffe68a91ae409b3abf2b99da32ef4a27a6ae56092c00b32f49"
     },
     {
       "path": "assets/art/title-background.png",
@@ -57,14 +57,14 @@
       "sha256": "7d55e5fe2392a4d091f962e01e2a09dc6a21def5c1e9886a2bb39bb478f395a5"
     },
     {
-      "path": "assets/index-7zkWWQtB.js",
-      "bytes": 412688,
-      "sha256": "d570a23afbca97d7adbe1b655144c843fcae3f8934cb6a1550edfcb85dd8a44f"
+      "path": "assets/index-CaHElCoL.js",
+      "bytes": 413686,
+      "sha256": "ac9ad1770cf17966d534f86c770b22601c805b6569724718470f0f6850ab2f52"
     },
     {
-      "path": "assets/index-BsX4JgSA.css",
-      "bytes": 46626,
-      "sha256": "9d64c238523852beb44564f2dccab719d82ee3ff2190db1bb833be582ec73377"
+      "path": "assets/index-D3iRu6uC.css",
+      "bytes": 48942,
+      "sha256": "c3e6065bec28a86226d14209b7ea510a3f6d6b705d2f9a9ae4fedaac19cf8fd9"
     },
     {
       "path": "assets/three.module-CYIrST_y.js",
@@ -99,7 +99,7 @@
     {
       "path": "index.html",
       "bytes": 1176,
-      "sha256": "f2f858f3ff6c108abe4c58338e9dff04440ee3374e03be48cd8b35b08a753a4f"
+      "sha256": "b3710cc9d981ee8feb92dc507739efa4f28c9557e274152df21ec6be2e406092"
     },
     {
       "path": "manifest.webmanifest",
@@ -109,7 +109,7 @@
     {
       "path": "sw.js",
       "bytes": 2912,
-      "sha256": "daa43f5ba6755dff80e5ea128af9f85961cb0758dd68a4961952dcd7efdbb8e0"
+      "sha256": "e79e2b8ee6f7948db723a0d3f91cde2817c81501ca5200cee2d166c5a91cade2"
     }
   ]
 }

@@ -294,28 +294,43 @@ kbd {
 
 .touch-controls { pointer-events: none; position: absolute; right: 0; bottom: 1rem; left: 0; display: none; justify-content: space-between; align-items: end; padding: 1rem; }
 .touch-controls button { pointer-events: auto; user-select: none; -webkit-user-select: none; }
-.touch-steering { display: grid; grid-template-columns: 3.9rem 3.9rem; gap: .45rem; }
-.touch-steering button { height: 3.9rem; border: 2px solid #91a9b7; background: radial-gradient(circle at 30% 28%, #173d56 0 .08rem, transparent .09rem) 0 0 / .45rem .45rem, linear-gradient(180deg, #11344d, #071f35); box-shadow: inset 0 0 0 2px #06162588, 0 .38rem 0 #00101ecc; font: 900 1.4rem var(--display); text-shadow: 0 .12rem 0 #00101e; }
-.touch-steering button:nth-child(3), .touch-steering button:nth-child(4) { height: 3rem; }
-.touch-throttle { display: grid; grid-template-columns: 5.6rem; gap: .65rem; }
-.touch-throttle button { height: 4.6rem; border: 3px solid #e5f5f1; box-shadow: inset 0 0 0 2px #06162555, 0 .42rem 0 #00101ecc; font: 900 1rem var(--display); letter-spacing: .045em; text-transform: uppercase; text-shadow: 0 .12rem 0 #00101e88; }
+.touch-steering { display: grid; grid-template-columns: 4.45rem 4.45rem; gap: .5rem; }
+.touch-steering button { height: 4.15rem; border: 2px solid #91a9b7; border-radius: .28rem; background: radial-gradient(circle at 30% 28%, #173d56 0 .08rem, transparent .09rem) 0 0 / .45rem .45rem, linear-gradient(180deg, #16415d, #071f35); box-shadow: inset 0 0 0 2px #06162588, 0 .42rem 0 #00101ecc, 0 .55rem 1rem #00101e55; font: 900 1.75rem var(--display); text-shadow: 0 .12rem 0 #00101e; }
+.touch-steering button:nth-child(3), .touch-steering button:nth-child(4) { height: 3.45rem; }
+.touch-throttle { display: grid; grid-template-columns: 6.25rem; gap: .7rem; }
+.touch-throttle button { height: 5.05rem; border: 3px solid #e5f5f1; border-radius: .28rem; box-shadow: inset 0 0 0 2px #06162555, 0 .45rem 0 #00101ecc, 0 .6rem 1.1rem #00101e55; font: 900 1.05rem var(--display); letter-spacing: .045em; text-transform: uppercase; text-shadow: 0 .12rem 0 #00101e88; }
 .touch-ride { background: radial-gradient(circle at 30% 28%, #69dfd9 0 .08rem, transparent .09rem) 0 0 / .48rem .48rem, #109c9ce8; }
 .touch-turbo { background: radial-gradient(circle at 30% 28%, #ff9187 0 .08rem, transparent .09rem) 0 0 / .48rem .48rem, #d84f45eb; }
 .touch-controls.mirrored { flex-direction: row-reverse; }
 
-.tutorial-card { position: absolute; top: 18%; left: 2rem; width: min(24rem, calc(100vw - 4rem)); padding: 1.25rem 1.35rem; border-left: .45rem solid var(--yellow); background: #061c32ed; box-shadow: .55rem .55rem 0 #00101e99; }
+.tutorial-card { position: absolute; z-index: 3; right: 2rem; bottom: 6.7rem; width: min(27rem, calc(100vw - 4rem)); max-height: calc(100vh - 10rem); padding: 1.25rem 1.35rem; border: 1px solid #7893a4; border-top: .38rem solid var(--yellow); background: linear-gradient(145deg, #0b3049f5, #061827f5 68%); box-shadow: .55rem .55rem 0 #00101e99; overflow-y: auto; }
+.tutorial-card::before { content: ""; position: absolute; top: 0; right: 0; width: 4rem; height: .7rem; background: repeating-linear-gradient(115deg, var(--coral) 0 .8rem, var(--yellow) .8rem 1.6rem); clip-path: polygon(18% 0, 100% 0, 100% 100%, 0 100%); }
+.tutorial-card.tutorial-intro { width: min(29rem, calc(100vw - 4rem)); }
 .tutorial-card > span { color: var(--teal); font: 800 .7rem var(--display); letter-spacing: .12em; text-transform: uppercase; }
 .tutorial-card h2 { margin: .35rem 0 .5rem; font: 900 2rem var(--display); text-transform: uppercase; }
 .tutorial-card p { margin: 0 0 .8rem; color: #d6e0e4; font-size: .85rem; line-height: 1.5; }
+.tutorial-progress { display: grid; grid-template-columns: repeat(12, 1fr); gap: .22rem; margin: 0 4rem .8rem 0; }
+.tutorial-progress span { height: .3rem; background: #38576b; transform: skewX(-13deg); }
+.tutorial-progress span[data-state="active"] { background: var(--yellow); box-shadow: 0 0 .5rem #f8c84c88; }
+.tutorial-progress span[data-state="complete"] { background: var(--teal); }
+.tutorial-control { display: block; margin: .2rem 0 .65rem; padding: .65rem .8rem; border-left: .25rem solid var(--teal); background: #123b54; color: #fffaf0; font: 900 .86rem var(--display); letter-spacing: .055em; text-transform: uppercase; }
+.tutorial-control-map { display: grid; grid-template-columns: minmax(4.5rem, auto) 1fr; gap: .12rem .85rem; margin: .75rem 0; padding: .65rem .75rem; background: #0416258f; }
+.tutorial-control-map span, .tutorial-control-map strong { min-height: 1.45rem; padding-block: .2rem; border-bottom: 1px solid #36556a; font: 800 .67rem var(--display); letter-spacing: .045em; text-transform: uppercase; }
+.tutorial-control-map span { color: #9eb3c0; }
+.tutorial-control-map strong { color: var(--yellow); text-align: right; }
+.tutorial-control-map-compact { margin-bottom: 1rem; }
+.tutorial-card p.tutorial-objective { padding-left: .7rem; border-left: .18rem solid var(--teal); color: #afc5ce; font-size: .74rem; }
+.tutorial-card .tutorial-start { width: 100%; }
 .tutorial-answers { display: grid; grid-template-columns: 1fr 1fr; gap: .5rem; margin-top: .75rem; }
 .tutorial-answers button { min-height: 2.7rem; padding: .45rem .65rem; border: 1px solid #557086; background: #102d44; color: var(--sand); font: 800 .7rem var(--display); text-transform: uppercase; }
 .tutorial-card small { color: var(--yellow); font: 800 .65rem var(--display); letter-spacing: .07em; text-transform: uppercase; }
 .tutorial-card button { min-height: 2.8rem; padding: .6rem 1rem; border: 0; font: 800 .85rem var(--display); text-transform: uppercase; }
 .tutorial-card .tutorial-skip { display: block; min-height: auto; margin: .8rem 0 0 auto; padding: .25rem 0; border-bottom: 1px solid #7890a0; background: transparent; color: #b9c8d0; font-size: .65rem; }
 
-.pause-overlay { position: absolute; top: 50%; left: 50%; display: grid; width: min(25rem, calc(100vw - 2rem)); gap: .6rem; transform: translate(-50%, -50%); padding: 2rem; border: 2px solid #7c93a2; background: #061c32f2; box-shadow: .8rem .8rem 0 #0007; }
+.pause-overlay { position: absolute; z-index: 10; top: 50%; left: 50%; display: grid; width: min(25rem, calc(100vw - 2rem)); gap: .6rem; transform: translate(-50%, -50%); padding: 2rem; border: 2px solid #7c93a2; background: #061c32f2; box-shadow: .8rem .8rem 0 #0007; }
 .pause-overlay p { margin: 0; color: var(--teal); font: 800 .75rem var(--display); letter-spacing: .12em; text-transform: uppercase; }
 .pause-overlay h1 { margin: 0 0 1rem; font: 900 2.4rem var(--display); text-transform: uppercase; }
+.pause-overlay small { margin: -.6rem 0 .7rem; color: #bed0d8; line-height: 1.45; }
 .game-shell[data-paused="true"] .game-canvas { filter: saturate(.6) brightness(.55); }
 .race-settings-overlay { position: fixed; z-index: 20; inset: 0; }
 .race-settings-overlay > .settings-screen { height: 100%; box-shadow: 0 0 0 100vmax #00101d99; }
@@ -461,6 +476,8 @@ html[data-reduced-motion="true"] *, html[data-reduced-motion="true"] *::before, 
   .position-block { min-width: 4.4rem; padding: .42rem .6rem; background: linear-gradient(180deg, #0b2b45ed, #061c32ed); clip-path: polygon(10% 0, 90% 0, 100% 14%, 94% 100%, 6% 100%, 0 14%); filter: drop-shadow(0 .2rem 0 #00101e77); }
   .position-block span { display: none; }
   .position-block strong { font-size: clamp(1.35rem, 7vw, 2.15rem); text-align: center; }
+  .position-block.run-label { min-width: 6.3rem; }
+  .position-block.run-label strong { font-size: clamp(.9rem, 4.7vw, 1.25rem); letter-spacing: .01em; }
   .target-hud { position: absolute; top: 5.35rem; left: 50%; grid-template-columns: auto auto; align-items: baseline; gap: .12rem .4rem; min-width: 9rem; padding: .3rem .72rem .38rem; transform: translateX(-50%); background: #061c32e8; text-align: center; clip-path: polygon(6% 0, 94% 0, 100% 25%, 94% 100%, 6% 100%, 0 25%); }
   .target-hud span { font-size: .58rem; }
   .target-hud strong { font-size: clamp(.95rem, 4vw, 1.2rem); white-space: nowrap; }
@@ -473,9 +490,12 @@ html[data-reduced-motion="true"] *, html[data-reduced-motion="true"] *::before, 
   .caption-cue { right: 50%; bottom: 13.5rem; max-width: 82vw; transform: translateX(50%); }
   .performance-hud { display: none; }
   .input-device { display: none; }
-  .tutorial-card { top: 8.65rem; left: .75rem; width: min(21rem, calc(100vw - 1.5rem)); padding: .8rem 1rem; }
+  .tutorial-card { top: 8.65rem; right: auto; bottom: auto; left: .75rem; width: min(22rem, calc(100vw - 1.5rem)); max-height: calc(100svh - 20rem); padding: .8rem 1rem; }
+  .tutorial-card.tutorial-intro { width: min(22rem, calc(100vw - 1.5rem)); }
   .tutorial-card h2 { font-size: 1.35rem; }
   .tutorial-card p { font-size: .73rem; }
+  .tutorial-control-map { margin-block: .5rem; padding-block: .4rem; }
+  .tutorial-control { padding: .48rem .65rem; font-size: .72rem; }
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -541,12 +561,13 @@ html[data-reduced-motion="true"] *, html[data-reduced-motion="true"] *::before, 
   .editor-inspector { display: none; }
   .editor-status { grid-template-columns: 1fr auto; gap: .5rem; }
   .editor-status span:nth-of-type(2), .editor-status output { display: none; }
-  .touch-steering { grid-template-columns: 3.35rem 3.35rem; }
-  .touch-steering button { width: 3.35rem; height: 3.35rem; }
-  .touch-throttle { grid-template-columns: 4.7rem; }
-  .touch-throttle button { height: 4.1rem; }
-  .heat-meter { min-width: 62vw; }
-  .heat-meter > strong { display: none; }
+  .touch-steering { grid-template-columns: 3.75rem 3.75rem; }
+  .touch-steering button { width: 3.75rem; height: 3.75rem; }
+  .touch-steering button:nth-child(3), .touch-steering button:nth-child(4) { height: 3.15rem; }
+  .touch-throttle { grid-template-columns: 5.3rem; }
+  .touch-throttle button { height: 4.45rem; }
+  .heat-meter { min-width: min(18rem, 76vw); }
+  .heat-meter > strong { font-size: .78rem; }
 }
 
 @media (min-width: 1600px) {

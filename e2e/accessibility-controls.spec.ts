@@ -80,6 +80,8 @@ test("keyboard-only menus reach a race and Escape freezes then resumes it", asyn
   await pressTab();
   await expect(page.getByRole("button", { name: "Track Builder", exact: true })).toBeFocused();
   await pressTab();
+  await expect(page.getByRole("button", { name: "Rider School", exact: true })).toBeFocused();
+  await pressTab();
   await expect(page.getByRole("button", { name: "Settings", exact: true })).toBeFocused();
   await page.keyboard.press("Enter");
 

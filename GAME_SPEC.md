@@ -1,8 +1,8 @@
 # RIVET RIDGE RALLY — Game Specification
 
-**Status:** Normative RC1 requirements; implementation tracked in `QA_REPORT.md`
+**Status:** Normative requirements for the post-`1.0.0-rc.1` candidate; implementation and executed evidence are tracked in `QA_REPORT.md`
 
-**Current milestone:** Phase 1 documentation baseline
+**Current milestone:** Post-RC1 corrective revision; input, tutorial, and visual acceptance are being requalified
 
 **Current release decision:** NOT READY
 
@@ -141,29 +141,38 @@ Easy, Standard, and Expert shall vary decision quality, consistency, route plann
 
 ### 7.1 Tutorial
 
-The first-play tutorial shall be interactive and use its dedicated 1,200-unit production Canyon training course in both normal and QA builds. It shall not depend on a QA-only compressed race. The course shall safely sequence a cooling gate, wheelie bump, launch ramp and landing, mud, a lane-choice obstacle, and grass/off-track terrain, with enough remaining route that crossing the finish cannot bypass the contact drills.
+The first-play tutorial shall be interactive and use its dedicated 1,200-unit production Canyon training course in both normal and QA builds. It shall not depend on a QA-only compressed race. Before movement begins, an input-adaptive rider-school panel shall summarize Ride, Turbo, lane, pitch, recovery, and pause controls. The course shall then safely sequence a cooling gate, wheelie bump, launch ramp and landing, an avoidable lane-choice barrier, mud, grass/off-track terrain, and a final unavoidable training barrier for a real crash-and-recovery exercise, with enough remaining route that crossing the finish cannot bypass the contact drills.
 
-The tutorial shall retain cumulative mechanic demonstrations across lesson changes and advance only after the current requirement has been observed. In order, the player shall demonstrate:
+The tutorial shall retain cumulative mechanic demonstrations across lesson changes and advance only after the current requirement has been observed. Its visible progress treatment shall identify the active lesson and completed lessons. In order, the player shall complete these 12 guided lessons:
 
-1. Standard throttle and usable forward speed.
-2. Turbo, its speed benefit, and the critical heat warning.
-3. Releasing turbo and passing through a cooling gate.
-4. A committed lane change.
-5. A controlled wheelie over a bump.
-6. Airborne pitch control, including returning toward level with neutral pitch input.
-7. A clean landing.
-8. Mud slowdown followed by grass/off-track slowdown.
-9. Both Rival collision rules: the rider who strikes from behind crashes, whether that rider is the player or a pursuing rival.
+1. Hold Ride to reach usable forward speed while locating run/position, lap/time, and target information in the HUD.
+2. Release Ride and Turbo to demonstrate safe coasting and speed loss; there is no separate brake action.
+3. Make a committed lane change, with one lane move per press.
+4. Use Turbo to gain speed and reach the critical heat warning without treating the red zone as safe.
+5. Release Turbo and pass through the cyan, snowflake-marked cooling gate.
+6. Raise the front wheel and clear the training bump with a controlled wheelie.
+7. Shape the launch by commanding nose-up and nose-down airborne pitch, then release pitch so the bike returns toward level.
+8. Complete a clean, nearly level two-wheel landing.
+9. Read the striped barrier and move to an open lane before contact.
+10. Experience the deterministic speed loss from glossy, rutted mud.
+11. Experience grass/off-track slowdown, then return to the marked dirt lanes.
+12. Strike the final training barrier, enter the real crash state, and hold the active Recover control until the bike returns to grounded riding.
+
+After the 12 riding lessons, the player shall correctly complete both Rival contact drills: the rider who strikes from behind crashes, whether that rider is the player or a pursuing rival.
+
+Tutorial copy and the control recap shall adapt immediately to keyboard, gamepad, or touch input. Keyboard prompts shall use the player's current remapped bindings rather than hard-coded labels. Tutorial pause shall freeze simulation and input, and the pause surface shall offer resume, full training restart, and a return path without silently clearing completion requirements.
 
 Tutorial mode shall use the same fixed-step handling rules as normal racing except that its continuously held wheelie window shall be 6 seconds rather than the ordinary 1.4 seconds. The longer finite window shall allow a first-time player to demonstrate the mechanic without making excessive wheelies permanently safe.
 
-The complete sequence, including both contact drills, shall reach the training-cleared state in under three minutes during recorded QA without skipping any lesson.
+The complete sequence, including all 12 guided lessons and both contact drills, shall reach the training-cleared state in under three minutes during recorded QA without skipping any lesson.
 
-Tutorial completion shall persist, while replay shall remain available.
+Tutorial completion shall persist, while replay shall remain available from a clearly labeled Rider School action on the main menu.
 
 ### 7.2 Input methods
 
 - Keyboard play and keyboard-only menu navigation shall be complete.
+- The default keyboard lane controls shall be `ArrowLeft` and `ArrowRight`; `A` and `D` shall not change lanes in a fresh profile. `ArrowUp` and `ArrowDown` remain the default pitch controls.
+- `A` and `D` may still be selected through explicit remapping. A sequential settings migration shall change only the exact historical default pair `laneLeft = KeyA` and `laneRight = KeyD` to the arrow-key pair; any other stored pair shall be preserved as a player customization.
 - Gamepads shall support appropriate prompts and optional vibration where the browser permits.
 - Phone and tablet shall have touch controls sized for safe use.
 - Touch controls shall support a left-handed/mirrored layout.
@@ -177,6 +186,7 @@ Tutorial completion shall persist, while replay shall remain available.
 - Solo may omit position; Practice may omit target pressure.
 - Critical information shall never depend on color alone.
 - The race camera shall keep upcoming obstacles and landing zones visible and avoid preventable occlusion.
+- The camera shall initialize at its gameplay target on the first rendered frame rather than visibly easing from an unrelated origin. Desktop and portrait compositions shall retain a readable rider silhouette, marked lanes, near hazards, and useful route look-ahead.
 - Reduced-screen-shake settings shall affect crash and landing responses.
 - Results shall offer immediate retry/restart and an understandable return path.
 
@@ -251,13 +261,16 @@ Layouts shall be verified at 16:9 desktop, ultrawide, tablet, phone, and narrow-
 - The visual identity shall be bright, chunky, colorful, low-poly, coherent, and original.
 - Track, lane paint, hazards, mud, grass, cooling zones, riders, UI, and scenery shall have a deliberate hierarchy.
 - Each track shall use a limited, intentional palette.
+- The gameplay concepts in `docs/design/concepts/` are acceptance references for camera composition, hierarchy, environmental richness, rider readability, track depth, and HUD/control presence. They are not pixel-accurate screenshots, but materially coarser or emptier output shall not be accepted solely because it is internally consistent or faster.
+- Race rendering shall establish its intended composition on the first frame, use per-track lighting, exposure, and fog profiles, and reinforce the toy-diorama course with terraced edges, visible lane ridges, connected barrier runs, and scenery density appropriate to each venue.
+- Portrait touch controls shall retain safe reach and labels while presenting stronger scale, contrast, depth, and separation comparable to the concepts' control hierarchy.
 - UI, icons, typography, animation, effects, vehicles, riders, sounds, writing, and layouts shall be original or commercially licensed.
-- Temporary meshes, generic dashboard styling, excessive gradients, inconsistent stock icons, and default engine widgets shall not remain in RC1.
+- Temporary meshes, generic dashboard styling, excessive gradients, inconsistent stock icons, and default engine widgets shall not remain in a release candidate.
 - Original or licensed engine, landing, crash, crowd, wind, UI, music, and terrain audio shall be inventoried.
 
 ## 13. Performance and compatibility
 
-| Area | RC1 requirement |
+| Area | Release-candidate requirement |
 |---|---|
 | Desktop | Target 60 FPS at 1920×1080 on a representative current desktop browser |
 | Mobile | Target 30 FPS on a representative mid-range mobile browser |
@@ -275,7 +288,7 @@ QA shall record FPS, frame time, memory, draw calls, compressed asset size, init
 - Loading, retry, offline, unsupported-browser, and asset-failure states shall be implemented and tested.
 - Save corruption and migration failure shall recover safely without a crash loop.
 - No credentials, API keys, private tokens, or secrets shall exist in source control or the client bundle.
-- Dependency vulnerabilities shall be audited; known critical vulnerabilities block RC1.
+- Dependency vulnerabilities shall be audited; known critical vulnerabilities block a release candidate.
 - A 30-minute continuous session shall show no runaway memory growth, accumulating input lag, crash loop, or save corruption.
 - Analytics, if ever added, shall be privacy-conscious, documented, easy to disable, and outside the default RC1 requirement.
 - Future leaderboards must validate scores server-side and shall never trust browser-submitted scores.
@@ -286,6 +299,7 @@ QA shall record FPS, frame time, memory, draw calls, compressed asset size, init
 - Playwright shall cover real-browser flows from fresh load through a completed race and a saved/reloaded custom track.
 - Axe checks and keyboard-only journeys shall cover menus and settings.
 - Screenshot comparisons shall cover key screens and required responsive widths.
+- Visual regression screenshots shall be accepted only after side-by-side review against the corresponding concepts. Desktop race, portrait race, high contrast, and all five track start/midcourse compositions require renewed owner acceptance after the post-RC1 rendering changes; matching a superseded RC1 baseline is not concept-fidelity evidence.
 - Manual browser/device, soak, performance, gamepad, touch, and gameplay-fairness results shall be recorded in `QA_REPORT.md`.
 
-No requirement becomes `PASS` merely because code exists. It requires a named test or recorded manual procedure, environment, date, result, and evidence. RC1 is permitted only when mandatory requirements pass, except honestly documented hardware-specific `UNVERIFIED` cases and genuine external blockers.
+No requirement becomes `PASS` merely because code exists. It requires a named test or recorded manual procedure, environment, date, result, and evidence. A new release candidate is permitted only when mandatory requirements pass, except honestly documented hardware-specific `UNVERIFIED` cases and genuine external blockers.

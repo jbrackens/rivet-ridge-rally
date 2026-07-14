@@ -10,8 +10,8 @@ const settings: ControlSettings = {
   keyBindings: {
     throttle: "KeyW",
     turbo: "ShiftLeft",
-    laneLeft: "KeyA",
-    laneRight: "KeyD",
+    laneLeft: "ArrowLeft",
+    laneRight: "ArrowRight",
     pitchUp: "ArrowUp",
     pitchDown: "ArrowDown",
     recover: "Space",
@@ -52,14 +52,36 @@ describe("InputManager", () => {
     manager.connect();
     manager.updateSettings({ ...settings, keyBindings: { ...settings.keyBindings, throttle: "KeyQ" } });
     window.dispatchEvent(new KeyboardEvent("keydown", { code: "KeyQ" }));
-    window.dispatchEvent(new KeyboardEvent("keydown", { code: "KeyD" }));
+    window.dispatchEvent(new KeyboardEvent("keydown", { code: "ArrowRight" }));
 
     expect(manager.sample()).toMatchObject({ throttle: true, laneChange: 1 });
     expect(manager.activeDevice).toBe("keyboard");
 
     window.dispatchEvent(new KeyboardEvent("keyup", { code: "KeyQ" }));
-    window.dispatchEvent(new KeyboardEvent("keyup", { code: "KeyD" }));
+    window.dispatchEvent(new KeyboardEvent("keyup", { code: "ArrowRight" }));
     expect(manager.sample()).toMatchObject({ throttle: false, laneChange: 0 });
+    manager.disconnect();
+  });
+
+  it("falls back to arrow lane controls without reserving A or D", () => {
+    const keyBindings = { ...settings.keyBindings };
+    delete keyBindings.laneLeft;
+    delete keyBindings.laneRight;
+    const manager = new InputManager({ ...settings, keyBindings });
+    manager.connect();
+
+    window.dispatchEvent(new KeyboardEvent("keydown", { code: "KeyA" }));
+    window.dispatchEvent(new KeyboardEvent("keydown", { code: "KeyD" }));
+    expect(manager.sample().laneChange).toBe(0);
+    window.dispatchEvent(new KeyboardEvent("keyup", { code: "KeyA" }));
+    window.dispatchEvent(new KeyboardEvent("keyup", { code: "KeyD" }));
+
+    window.dispatchEvent(new KeyboardEvent("keydown", { code: "ArrowLeft" }));
+    expect(manager.sample().laneChange).toBe(-1);
+    window.dispatchEvent(new KeyboardEvent("keyup", { code: "ArrowLeft" }));
+    window.dispatchEvent(new KeyboardEvent("keydown", { code: "ArrowRight" }));
+    expect(manager.sample().laneChange).toBe(1);
+    window.dispatchEvent(new KeyboardEvent("keyup", { code: "ArrowRight" }));
     manager.disconnect();
   });
 

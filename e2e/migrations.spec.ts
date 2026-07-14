@@ -33,6 +33,30 @@ const LEGACY_SETTINGS = {
   },
 } as const;
 
+const LEGACY_DEFAULT_LANE_SETTINGS = {
+  ...LEGACY_SETTINGS,
+  controls: {
+    ...LEGACY_SETTINGS.controls,
+    keyBindings: {
+      ...LEGACY_SETTINGS.controls.keyBindings,
+      laneLeft: "KeyA",
+      laneRight: "KeyD",
+    },
+  },
+} as const;
+
+const MIGRATED_DEFAULT_LANE_SETTINGS = {
+  ...LEGACY_DEFAULT_LANE_SETTINGS,
+  controls: {
+    ...LEGACY_DEFAULT_LANE_SETTINGS.controls,
+    keyBindings: {
+      ...LEGACY_DEFAULT_LANE_SETTINGS.controls.keyBindings,
+      laneLeft: "ArrowLeft",
+      laneRight: "ArrowRight",
+    },
+  },
+} as const;
+
 const LEGACY_PROGRESS = {
   version: 1,
   tutorialComplete: true,
@@ -111,7 +135,7 @@ const LEGACY_REPLAY = {
 } as const;
 
 interface LegacyFixture {
-  logicalVersion: 1 | 2;
+  logicalVersion: 1 | 2 | 3;
   settingsRecord: Record<string, unknown>;
   progressRecord: Record<string, unknown>;
   customTrack?: Record<string, unknown>;
@@ -177,19 +201,33 @@ async function seedLegacyDatabase(page: Page, fixture: LegacyFixture): Promise<D
       const database = request.result;
       const settings = database.createObjectStore("settings", { keyPath: "id" });
       const progress = database.createObjectStore("progress", { keyPath: "id" });
+      if (input.logicalVersion === 3) {
+        settings.createIndex("schemaVersion", "schemaVersion");
+        settings.createIndex("updatedAt", "updatedAt");
+        progress.createIndex("schemaVersion", "schemaVersion");
+        progress.createIndex("updatedAt", "updatedAt");
+      }
       settings.put(input.settingsRecord);
       progress.put(input.progressRecord);
 
-      if (input.logicalVersion === 2) {
+      if (input.logicalVersion >= 2) {
         const customTracks = database.createObjectStore("customTracks", { keyPath: "id" });
+        if (input.logicalVersion === 3) customTracks.createIndex("schemaVersion", "schemaVersion");
         customTracks.createIndex("name", "name");
         customTracks.createIndex("updatedAt", "updatedAt");
-        customTracks.put(input.customTrack);
+        if (input.customTrack) customTracks.put(input.customTrack);
 
         const replays = database.createObjectStore("replays", { keyPath: "id" });
+        if (input.logicalVersion === 3) replays.createIndex("schemaVersion", "schemaVersion");
         replays.createIndex("trackId", "trackId");
         replays.createIndex("createdAt", "createdAt");
-        replays.put({ ...input.replay, samples: new Uint8Array(input.replay?.samples ?? []) });
+        if (input.replay) replays.put({ ...input.replay, samples: new Uint8Array(input.replay.samples) });
+      }
+
+      if (input.logicalVersion === 3) {
+        const quarantine = database.createObjectStore("quarantine", { keyPath: "key", autoIncrement: true });
+        quarantine.createIndex("kind", "kind");
+        quarantine.createIndex("createdAt", "createdAt");
       }
     };
     const database = await waitForRequest(request);
@@ -257,7 +295,25 @@ async function readDatabase(page: Page): Promise<DatabaseSnapshot> {
   });
 }
 
-test("a native v1 profile runs the v1 to v2 to v3 migration and preserves rider data", async ({ page }) => {
+test("a fresh v4 profile stores and labels arrow lane defaults", async ({ page }) => {
+  await page.goto("/");
+  await expect(page.getByRole("button", { name: "Skip training" })).toBeVisible({ timeout: 15_000 });
+  await page.getByRole("button", { name: "Skip training" }).click();
+  await page.getByRole("button", { name: "Settings", exact: true }).click();
+  await page.getByRole("button", { name: "play", exact: true }).click();
+
+  const bindings = page.getByLabel("Keyboard bindings");
+  await expect(bindings.locator("div").filter({ hasText: /^lane Left/ }).getByRole("button")).toHaveText("← Left");
+  await expect(bindings.locator("div").filter({ hasText: /^lane Right/ }).getByRole("button")).toHaveText("→ Right");
+
+  const snapshot = await readDatabase(page);
+  expect(snapshot.nativeVersion).toBe(40);
+  expect(snapshot.settings).toMatchObject({
+    value: { controls: { keyBindings: { laneLeft: "ArrowLeft", laneRight: "ArrowRight" } } },
+  });
+});
+
+test("a native v1 profile runs through the v4 migration and preserves custom controls", async ({ page }) => {
   const before = await seedLegacyDatabase(page, {
     logicalVersion: 1,
     settingsRecord: { id: PROFILE_ID, value: LEGACY_SETTINGS },
@@ -278,7 +334,7 @@ test("a native v1 profile runs the v1 to v2 to v3 migration and preserves rider 
   await expect(page.getByRole("heading", { name: "Coastline Clash" })).toBeVisible();
 
   const after = await readDatabase(page);
-  expect(after.nativeVersion).toBe(30);
+  expect(after.nativeVersion).toBe(40);
   expect(after.stores).toEqual(["customTracks", "progress", "quarantine", "replays", "settings"]);
   expect(after.indexes).toEqual({
     customTracks: ["name", "schemaVersion", "updatedAt"],
@@ -296,7 +352,7 @@ test("a native v1 profile runs the v1 to v2 to v3 migration and preserves rider 
   expect(after.quarantineCount).toBe(0);
 });
 
-test("a native v2 profile upgrades to v3 without losing its track or replay", async ({ page }) => {
+test("a native v2 profile upgrades to v4 without losing its track, replay, or custom controls", async ({ page }) => {
   const before = await seedLegacyDatabase(page, {
     logicalVersion: 2,
     settingsRecord: { id: PROFILE_ID, value: LEGACY_SETTINGS, updatedAt: V2_UPDATED_AT },
@@ -317,7 +373,7 @@ test("a native v2 profile upgrades to v3 without losing its track or replay", as
   await expect(page.getByText(LEGACY_CUSTOM_TRACK.name, { exact: true })).toBeVisible();
 
   const after = await readDatabase(page);
-  expect(after.nativeVersion).toBe(30);
+  expect(after.nativeVersion).toBe(40);
   expect(after.stores).toEqual(["customTracks", "progress", "quarantine", "replays", "settings"]);
   expect(after.settings).toEqual({
     id: PROFILE_ID,
@@ -335,5 +391,49 @@ test("a native v2 profile upgrades to v3 without losing its track or replay", as
   expect(after.replay).toEqual({ ...LEGACY_REPLAY, schemaVersion: 1, samples: [...LEGACY_REPLAY.samples] });
   expect(after.customTrackCount).toBe(1);
   expect(after.replayCount).toBe(1);
+  expect(after.quarantineCount).toBe(0);
+});
+
+test("a native v3 profile migrates only the exact legacy A and D lane pair", async ({ page }) => {
+  const before = await seedLegacyDatabase(page, {
+    logicalVersion: 3,
+    settingsRecord: {
+      id: PROFILE_ID,
+      schemaVersion: 1,
+      value: LEGACY_DEFAULT_LANE_SETTINGS,
+      updatedAt: V2_UPDATED_AT,
+    },
+    progressRecord: {
+      id: PROFILE_ID,
+      schemaVersion: 1,
+      value: LEGACY_PROGRESS,
+      updatedAt: V2_UPDATED_AT,
+    },
+  });
+  expect(before.nativeVersion).toBe(30);
+  expect(before.settings).toMatchObject({
+    value: { controls: { keyBindings: { laneLeft: "KeyA", laneRight: "KeyD" } } },
+  });
+
+  await page.goto("/");
+  await expect(page.getByRole("button", { name: "Ride", exact: true })).toBeVisible({ timeout: 15_000 });
+
+  const after = await readDatabase(page);
+  expect(after.nativeVersion).toBe(40);
+  expect(after.settings).toEqual({
+    id: PROFILE_ID,
+    schemaVersion: 1,
+    value: MIGRATED_DEFAULT_LANE_SETTINGS,
+    updatedAt: expect.any(Number),
+  });
+  expect(after.settings?.updatedAt as number).toBeGreaterThan(V2_UPDATED_AT);
+  expect(after.progress).toEqual({
+    id: PROFILE_ID,
+    schemaVersion: 1,
+    value: LEGACY_PROGRESS,
+    updatedAt: V2_UPDATED_AT,
+  });
+  expect(after.customTrackCount).toBe(0);
+  expect(after.replayCount).toBe(0);
   expect(after.quarantineCount).toBe(0);
 });

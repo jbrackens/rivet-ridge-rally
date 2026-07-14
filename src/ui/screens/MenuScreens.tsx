@@ -9,6 +9,7 @@ import {
   useAppStore,
 } from "../../app/store";
 import { TRACKS, getTrack } from "../../game/content/tracks";
+import { formatKeyCode } from "../../game/input/keyLabels";
 import { formatTime } from "../format";
 
 function ChevronIcon() {
@@ -86,6 +87,9 @@ export function TitleScreen() {
           </button>
           <button className="menu-action" onClick={() => navigate("editor")}>
             <span>Track Builder</span><ChevronIcon />
+          </button>
+          <button className="menu-action" onClick={() => navigate("tutorial")}>
+            <span>Rider School</span><ChevronIcon />
           </button>
           <button className="menu-action" onClick={openSettings}>
             <span>Settings</span><ChevronIcon />
@@ -294,13 +298,13 @@ export function SettingsScreen() {
                     event.preventDefault();
                     const conflict = Object.entries(settings.controls.keyBindings).find(([otherAction, otherCode]) => otherAction !== action && otherCode === event.code);
                     if (conflict) {
-                      setRemapError(`${event.code.replace("Key", "")} is already assigned to ${conflict[0].replace(/([A-Z])/g, " $1")}. Choose another key.`);
+                      setRemapError(`${formatKeyCode(event.code)} is already assigned to ${conflict[0].replace(/([A-Z])/g, " $1")}. Choose another key.`);
                       return;
                     }
                     updateControls({ keyBindings: { ...settings.controls.keyBindings, [action]: event.code } });
                     setRemapError("");
                     setRemapping(null);
-                  }}>{remapping === action ? "Press a key…" : code.replace("Key", "")}</button></div>
+                  }}>{remapping === action ? "Press a key…" : formatKeyCode(code)}</button></div>
                 ))}
               </div>
               {remapError ? <p className="control-error" role="alert">{remapError}</p> : null}

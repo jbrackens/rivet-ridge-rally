@@ -5,6 +5,7 @@ import { GameEngine, type EngineHudState } from "../../game/engine/GameEngine";
 import type { LaneChange } from "../../game/simulation";
 import { getTrack } from "../../game/content/tracks";
 import { customTrackToDefinition } from "../../game/editor/toTrackDefinition";
+import { formatKeyCode } from "../../game/input/keyLabels";
 import { saveReplay } from "../../game/persistence/database";
 import {
   startLifecycleResource,
@@ -38,27 +39,141 @@ const INITIAL_HUD: EngineHudState = {
   drawCalls: 0,
   droppedSimulationMs: 0,
   demonstrated: {
+    coast: false,
     cooling: false,
+    coolingRelease: false,
     laneChange: false,
     wheelie: false,
     airbornePitch: false,
+    airbornePitchUp: false,
+    airbornePitchDown: false,
+    airborneNeutral: false,
     cleanLanding: false,
+    hazardAvoided: false,
     mud: false,
     grass: false,
+    crash: false,
+    recovery: false,
   },
 };
 
-const TUTORIAL_STEPS = [
-  { title: "Ride", copy: "Hold W, RIDE, or the south gamepad button to build speed.", complete: (hud: EngineHudState) => hud.speed >= 5 },
-  { title: "Turbo and heat", copy: "Hold Shift, TURBO, or the east button until the warning marker. Release before overheat.", complete: (hud: EngineHudState) => hud.heat >= 78 },
-  { title: "Cooling gates", copy: "Release turbo and pass through a cyan gate. Cyan arches also use a snowflake shape.", complete: (hud: EngineHudState) => hud.demonstrated.cooling },
-  { title: "Choose a lane", copy: "Tap A / D, the direction rocker, or the left stick. A lane move commits once per press.", complete: (hud: EngineHudState) => hud.demonstrated.laneChange },
-  { title: "Wheelie the bump", copy: "Hold ↑ or pull back while grounded. Keep the front wheel raised to clear the bump ahead.", complete: (hud: EngineHudState) => hud.demonstrated.wheelie },
-  { title: "Air control", copy: "Pull back for lift as the ramp launches, then press ↓ to bring both wheels near level before touchdown.", complete: (hud: EngineHudState) => hud.demonstrated.airbornePitch },
-  { title: "Clean landing", copy: "Land nearly level to retain momentum. A harsh angle causes a fair crash.", complete: (hud: EngineHudState) => hud.demonstrated.cleanLanding },
-  { title: "Mud slowdown", copy: "Ride through the glossy mud and feel the speed fall. Mud slows every rider.", complete: (hud: EngineHudState) => hud.demonstrated.mud },
-  { title: "Track edges", copy: "Grass and off-line terrain also reduce grip. Return to dirt for full pace.", complete: (hud: EngineHudState) => hud.demonstrated.grass },
-] as const;
+interface TutorialStep {
+  title: string;
+  copy: string;
+  control: string;
+  complete: (hud: EngineHudState) => boolean;
+}
+
+function getTutorialControls(hud: EngineHudState, bindings: Record<string, string>) {
+  if (hud.inputDevice === "gamepad") {
+    return {
+      ride: "A / RT",
+      turbo: "B / LT",
+      lane: "D-pad or left stick ← / →",
+      pitch: "left stick ↑ / ↓",
+      recover: "hold A",
+      pause: "Start",
+    };
+  }
+  if (hud.inputDevice === "touch") {
+    return {
+      ride: "RIDE",
+      turbo: "TURBO",
+      lane: "← / → rocker",
+      pitch: "↑ / ↓ rocker",
+      recover: "hold RIDE",
+      pause: "pause button",
+    };
+  }
+  return {
+    ride: formatKeyCode(bindings.throttle ?? "KeyW"),
+    turbo: formatKeyCode(bindings.turbo ?? "ShiftLeft"),
+    lane: `${formatKeyCode(bindings.laneLeft ?? "ArrowLeft")} / ${formatKeyCode(bindings.laneRight ?? "ArrowRight")}`,
+    pitch: `${formatKeyCode(bindings.pitchUp ?? "ArrowUp")} / ${formatKeyCode(bindings.pitchDown ?? "ArrowDown")}`,
+    recover: formatKeyCode(bindings.recover ?? "Space"),
+    pause: formatKeyCode(bindings.pause ?? "Escape"),
+  };
+}
+
+function getTutorialSteps(hud: EngineHudState, bindings: Record<string, string>): readonly TutorialStep[] {
+  const controls = getTutorialControls(hud, bindings);
+  return [
+    {
+      title: "Ride and read the HUD",
+      copy: "Build usable speed. Position or run type sits left, lap and time sit center, and the target sits right.",
+      control: `Hold ${controls.ride}`,
+      complete: (state) => state.speed >= 5,
+    },
+    {
+      title: "Coast to slow",
+      copy: "There is no separate brake: release Ride before a tight line or hot section and the bike coasts down safely.",
+      control: `Release ${controls.ride}`,
+      complete: (state) => state.demonstrated.coast,
+    },
+    {
+      title: "Choose a lane",
+      copy: "Use the left and right directions. One press commits one lane, so choose early instead of weaving constantly.",
+      control: controls.lane,
+      complete: (state) => state.demonstrated.laneChange,
+    },
+    {
+      title: "Turbo and heat",
+      copy: "Turbo adds speed and heat. Reach the white warning marker, then release before the red zone disables control.",
+      control: `Hold ${controls.turbo}`,
+      complete: (state) => state.heat >= 78,
+    },
+    {
+      title: "Cool the bike",
+      copy: "Release Turbo and pass through the cyan snowflake gate. Cooling gates remove heat much faster than coasting.",
+      control: `Release ${controls.turbo}`,
+      complete: (state) => state.demonstrated.coolingRelease,
+    },
+    {
+      title: "Wheelie the bump",
+      copy: "Raise the front wheel while grounded to skim the bump and keep speed. Holding a wheelie too long will crash.",
+      control: controls.pitch.split(" / ")[0] ?? controls.pitch,
+      complete: (state) => state.demonstrated.wheelie,
+    },
+    {
+      title: "Shape the jump",
+      copy: "Pitch nose-up after takeoff, then nose-down and release the control so the bike returns toward level.",
+      control: controls.pitch,
+      complete: (state) => state.demonstrated.airbornePitchUp
+        && state.demonstrated.airbornePitchDown
+        && state.demonstrated.airborneNeutral,
+    },
+    {
+      title: "Land both wheels",
+      copy: "Touch down nearly level to keep momentum. Steep landings are rough; extreme angles cause a fair crash.",
+      control: "Level the bike before touchdown",
+      complete: (state) => state.demonstrated.cleanLanding,
+    },
+    {
+      title: "Read the barrier",
+      copy: "Striped barriers are hard hazards. Move into an open lane before the barrier reaches the rider.",
+      control: controls.lane,
+      complete: (state) => state.demonstrated.hazardAvoided,
+    },
+    {
+      title: "Mud slowdown",
+      copy: "Ride through the glossy ruts and feel the speed fall. Mud slows the player and every rival by the same rules.",
+      control: "Keep the bike steady",
+      complete: (state) => state.demonstrated.mud,
+    },
+    {
+      title: "Track edges",
+      copy: "Grass and off-line terrain reduce grip. Return to the marked dirt lanes for full acceleration and control.",
+      control: controls.lane,
+      complete: (state) => state.demonstrated.grass,
+    },
+    {
+      title: "Crash and recover",
+      copy: "The training barrier will stop the bike. Hold Recover until the meter fills; tapping is optional in Settings.",
+      control: `Hold ${controls.recover}`,
+      complete: (state) => state.demonstrated.crash && state.demonstrated.recovery,
+    },
+  ];
+}
 
 function HeatMeter({ heat, overheated }: { heat: number; overheated: boolean }) {
   return (
@@ -105,6 +220,9 @@ export function GameView({ tutorial = false }: { tutorial?: boolean }) {
   const navigate = useAppStore((state) => state.navigate);
   const [hud, setHud] = useState(INITIAL_HUD);
   const [fatal, setFatal] = useState<string | null>(null);
+  const [tutorialStarted, setTutorialStarted] = useState(false);
+  const [tutorialPaused, setTutorialPaused] = useState(false);
+  const [tutorialAttempt, setTutorialAttempt] = useState(0);
   const [tutorialStep, setTutorialStep] = useState(0);
   const [collisionQuizStep, setCollisionQuizStep] = useState(0);
   const [collisionQuizError, setCollisionQuizError] = useState("");
@@ -114,10 +232,15 @@ export function GameView({ tutorial = false }: { tutorial?: boolean }) {
   const track = activeRace?.customTrack
     ? customTrackToDefinition(activeRace.customTrack)
     : getTrack(trackId);
-  const paused = screen === "paused" || (screen === "settings" && returnScreen === "paused");
+  const appPaused = screen === "paused" || (screen === "settings" && returnScreen === "paused");
+  const paused = tutorial ? !tutorialStarted || tutorialPaused : appPaused;
   const pausedRef = useRef(paused);
+  const tutorialSteps = tutorial
+    ? getTutorialSteps(hud, settings.controls.keyBindings)
+    : [];
+  const tutorialControls = getTutorialControls(hud, settings.controls.keyBindings);
   const tutorialStepComplete = tutorial
-    ? Boolean(TUTORIAL_STEPS[tutorialStep]?.complete(hud))
+    ? Boolean(tutorialStarted && tutorialSteps[tutorialStep]?.complete(hud))
     : false;
 
   useEffect(() => {
@@ -162,7 +285,7 @@ export function GameView({ tutorial = false }: { tutorial?: boolean }) {
       engine.dispose({ retainRenderer });
       engineRef.current = null;
     };
-  }, [activeRace?.customTrack, completeTutorial, finishRace, mode, progress.tracks, raceAttempt, trackId, tutorial]);
+  }, [activeRace?.customTrack, completeTutorial, finishRace, mode, progress.tracks, raceAttempt, trackId, tutorial, tutorialAttempt]);
 
   useLayoutEffect(() => {
     if (!fatal) return;
@@ -186,7 +309,10 @@ export function GameView({ tutorial = false }: { tutorial?: boolean }) {
       if (event.code !== (settings.controls.keyBindings.pause ?? "Escape")) return;
       if (screen === "settings") return;
       event.preventDefault();
-      if (tutorial) return;
+      if (tutorial) {
+        if (tutorialStarted) setTutorialPaused((value) => !value);
+        return;
+      }
       if (paused) resumeRace(); else pauseRace();
     };
     const onVisibility = () => {
@@ -200,16 +326,17 @@ export function GameView({ tutorial = false }: { tutorial?: boolean }) {
       document.removeEventListener("visibilitychange", onVisibility);
       stopLifecycleResource("visibilityListenerGroups");
     };
-  }, [pauseRace, paused, resumeRace, screen, settings.controls.keyBindings.pause, tutorial]);
+  }, [pauseRace, paused, resumeRace, screen, settings.controls.keyBindings.pause, tutorial, tutorialStarted]);
 
   useEffect(() => {
-    if (tutorial) return undefined;
     let animationFrame = 0;
     let startWasPressed = false;
     const pollPause = () => {
       const pressed = Boolean(navigator.getGamepads?.()[0]?.buttons[9]?.pressed);
       if (pressed && !startWasPressed && useAppStore.getState().screen !== "settings") {
-        if (pausedRef.current) resumeRace(); else pauseRace();
+        if (tutorial) {
+          if (tutorialStarted) setTutorialPaused((value) => !value);
+        } else if (pausedRef.current) resumeRace(); else pauseRace();
       }
       startWasPressed = pressed;
       animationFrame = requestAnimationFrame(pollPause);
@@ -220,40 +347,63 @@ export function GameView({ tutorial = false }: { tutorial?: boolean }) {
       cancelAnimationFrame(animationFrame);
       stopLifecycleResource("pausePollLoops");
     };
-  }, [pauseRace, resumeRace, tutorial]);
+  }, [pauseRace, resumeRace, tutorial, tutorialStarted]);
 
   useEffect(() => {
     if (!tutorial) return undefined;
     if (tutorialStepComplete) {
-      const timer = window.setTimeout(() => setTutorialStep((value) => Math.min(value + 1, TUTORIAL_STEPS.length)), 550);
+      const timer = window.setTimeout(() => setTutorialStep((value) => Math.min(value + 1, tutorialSteps.length)), 550);
       return () => window.clearTimeout(timer);
     }
     return undefined;
-  }, [tutorial, tutorialStep, tutorialStepComplete]);
+  }, [tutorial, tutorialStep, tutorialStepComplete, tutorialSteps.length]);
 
   const setTouch = (control: "throttle" | "turbo" | "laneChange" | "pitch" | "recover", value: boolean | number) => engineRef.current?.input.setTouchControl(control, value);
   const mirrored = settings.controls.mirroredTouch;
   const laneControl = (direction: LaneChange) => setTouch("laneChange", direction);
   const runLabel = tutorial ? "Training" : mode === "practice" ? "Practice" : mode === "solo" ? "Solo" : null;
+  const restartTutorial = () => {
+    setHud(INITIAL_HUD);
+    setTutorialStep(0);
+    setCollisionQuizStep(0);
+    setCollisionQuizError("");
+    setTutorialPaused(false);
+    setTutorialStarted(true);
+    setTutorialAttempt((value) => value + 1);
+  };
 
   if (fatal) {
     return <main className="fatal-screen"><div><span>Graphics recovery</span><h1>Race paused at the gate</h1><p>{fatal}</p><button className="button-primary" onClick={() => window.location.reload()}>Retry loading</button><button onClick={() => navigate("title")}>Return to menu</button></div></main>;
   }
 
+  const visuallyPaused = tutorial ? tutorialPaused : paused;
+
   return (
-    <main className="game-shell" data-paused={paused} inert={screen === "settings" ? true : undefined} aria-hidden={screen === "settings" ? true : undefined}>
+    <main className="game-shell" data-paused={visuallyPaused} inert={screen === "settings" ? true : undefined} aria-hidden={screen === "settings" ? true : undefined}>
       <h1 className="sr-only">{tutorial ? `${track.name} training` : `${track.name} ${runLabel ?? mode} race`}</h1>
       <canvas ref={canvasRef} className="game-canvas" tabIndex={0} aria-label={`Live 3D race on ${track.name}`} />
       <div className="race-vignette" aria-hidden="true" />
       <header className="race-hud">
-        <div className="position-block"><span>{runLabel ? "Run" : "Position"}</span><strong>{runLabel ?? `${hud.position} / ${hud.fieldSize}`}</strong></div>
+        <div className={`position-block ${runLabel ? "run-label" : ""}`}><span>{runLabel ? "Run" : "Position"}</span><strong>{runLabel ?? `${hud.position} / ${hud.fieldSize}`}</strong></div>
         <div className="timing-block"><span>Lap <b>{hud.lap}</b> / {hud.totalLaps}</span><strong>{formatTime(hud.elapsedMs)}</strong></div>
         <div className="target-hud">
           <span>Target</span>
           <strong>{mode === "practice" || mode === "custom" || tutorial ? "Free ride" : formatTime(hud.targetMs)}</strong>
           {mode === "solo" ? <small>Saved best <b>{hud.savedBestMs === undefined ? "No time" : formatTime(hud.savedBestMs)}</b></small> : null}
         </div>
-        {!tutorial ? <button className="pause-button" aria-label={paused ? "Resume race" : "Pause race"} onClick={paused ? resumeRace : pauseRace}>{paused ? "▶" : "Ⅱ"}</button> : null}
+        {!tutorial || tutorialStarted ? (
+          <button
+            className="pause-button"
+            aria-label={visuallyPaused ? (tutorial ? "Resume training" : "Resume race") : (tutorial ? "Pause training" : "Pause race")}
+            onClick={() => {
+              if (tutorial) setTutorialPaused((value) => !value);
+              else if (paused) resumeRace();
+              else pauseRace();
+            }}
+          >
+            {visuallyPaused ? "▶" : "Ⅱ"}
+          </button>
+        ) : null}
       </header>
       <div className="race-bottom">
         <HeatMeter heat={hud.heat} overheated={hud.overheated} />
@@ -274,12 +424,74 @@ export function GameView({ tutorial = false }: { tutorial?: boolean }) {
           <TouchButton label="Turbo" className="touch-turbo" onChange={(value) => setTouch("turbo", value)} />
         </div>
       </div>
-      {tutorial ? (
-        <aside className="tutorial-card" aria-live="polite">
-          {tutorialStep < TUTORIAL_STEPS.length ? <><span>Lesson {tutorialStep + 1} / {TUTORIAL_STEPS.length}</span><h2>{TUTORIAL_STEPS[tutorialStep]?.title}</h2><p>{TUTORIAL_STEPS[tutorialStep]?.copy}</p><small>Complete the action to continue</small><button className="tutorial-skip" onClick={completeTutorial}>Skip training</button></> : collisionQuizStep === 0 ? <><span>Contact drill · 1 / 2</span><h2>Rival contact</h2><p>You catch a slower rider and hit their rear wheel. Who crashes?</p><div className="tutorial-answers"><button className="button-primary" onClick={() => { setCollisionQuizError(""); setCollisionQuizStep(1); }}>I crash</button><button onClick={() => setCollisionQuizError("Not quite — the rider who hits from behind crashes.")}>Rider ahead crashes</button></div>{collisionQuizError ? <small role="alert">{collisionQuizError}</small> : null}</> : collisionQuizStep === 1 ? <><span>Contact drill · 2 / 2</span><h2>Rear-wheel defense</h2><p>A pursuing rider clips your rear wheel from behind. Who crashes?</p><div className="tutorial-answers"><button className="button-primary" onClick={() => { setCollisionQuizError(""); setCollisionQuizStep(2); }}>Pursuer crashes</button><button onClick={() => setCollisionQuizError("Protect your line — the pursuer who clips you from behind crashes.")}>I crash</button></div>{collisionQuizError ? <small role="alert">{collisionQuizError}</small> : null}</> : <><span>Training cleared</span><h2>Race fair, ride bold</h2><p>You demonstrated throttle, heat, cooling, lanes, wheelies, air control, landings, mud, grass, and both contact rules.</p><button className="button-primary" onClick={completeTutorial}>Enter the festival</button></>}
+      {tutorial && !tutorialPaused ? (
+        <aside className={`tutorial-card ${!tutorialStarted ? "tutorial-intro" : ""}`} aria-label="Rider school lesson" aria-live="polite">
+          {!tutorialStarted ? (
+            <>
+              <span>First ride · 12 guided lessons</span>
+              <h2>Rider school</h2>
+              <p>Learn the full race loop on a purpose-built training route. Each lesson waits until you perform the action.</p>
+              <div className="tutorial-control-map" aria-label="Current controls">
+                <span>Ride</span><strong>{tutorialControls.ride}</strong>
+                <span>Turbo</span><strong>{tutorialControls.turbo}</strong>
+                <span>Lanes</span><strong>{tutorialControls.lane}</strong>
+                <span>Pitch</span><strong>{tutorialControls.pitch}</strong>
+                <span>Recover</span><strong>{tutorialControls.recover}</strong>
+                <span>Pause</span><strong>{tutorialControls.pause}</strong>
+              </div>
+              <p className="tutorial-objective">Pause freezes the lesson. Restart training resets the route and checklist.</p>
+              <button className="button-primary tutorial-start" onClick={() => setTutorialStarted(true)}>Start lesson 1</button>
+              <button className="tutorial-skip" onClick={completeTutorial}>Skip training</button>
+            </>
+          ) : tutorialStep < tutorialSteps.length ? (
+            <>
+              <div className="tutorial-progress" aria-label={`Lesson ${tutorialStep + 1} of ${tutorialSteps.length}`}>
+                {tutorialSteps.map((step, index) => <span key={step.title} data-state={index < tutorialStep ? "complete" : index === tutorialStep ? "active" : "future"} />)}
+              </div>
+              <span>Lesson {tutorialStep + 1} / {tutorialSteps.length}</span>
+              <h2>{tutorialSteps[tutorialStep]?.title}</h2>
+              <p>{tutorialSteps[tutorialStep]?.copy}</p>
+              <strong className="tutorial-control">{tutorialSteps[tutorialStep]?.control}</strong>
+              <small>{tutorialStepComplete ? "Lesson cleared" : "Complete the action to continue"}</small>
+              <button className="tutorial-skip" onClick={completeTutorial}>Skip training</button>
+            </>
+          ) : collisionQuizStep === 0 ? (
+            <>
+              <span>Contact drill · 1 / 2</span><h2>Rival contact</h2>
+              <p>You catch a slower rider and hit their rear wheel. Who crashes?</p>
+              <div className="tutorial-answers"><button className="button-primary" onClick={() => { setCollisionQuizError(""); setCollisionQuizStep(1); }}>I crash</button><button onClick={() => setCollisionQuizError("Not quite — the rider who hits from behind crashes.")}>Rider ahead crashes</button></div>
+              {collisionQuizError ? <small role="alert">{collisionQuizError}</small> : null}
+            </>
+          ) : collisionQuizStep === 1 ? (
+            <>
+              <span>Contact drill · 2 / 2</span><h2>Rear-wheel defense</h2>
+              <p>A pursuing rider clips your rear wheel from behind. Who crashes?</p>
+              <div className="tutorial-answers"><button className="button-primary" onClick={() => { setCollisionQuizError(""); setCollisionQuizStep(2); }}>Pursuer crashes</button><button onClick={() => setCollisionQuizError("Protect your line — the pursuer who clips you from behind crashes.")}>I crash</button></div>
+              {collisionQuizError ? <small role="alert">{collisionQuizError}</small> : null}
+            </>
+          ) : (
+            <>
+              <span>Training cleared</span><h2>Race fair, ride bold</h2>
+              <p>You rode, coasted, managed heat, cooled, changed lanes, shaped and landed a jump, read hazards, handled slow terrain, recovered from a crash, and learned both contact rules.</p>
+              <div className="tutorial-control-map tutorial-control-map-compact" aria-label="Control recap">
+                <span>Lanes</span><strong>{tutorialControls.lane}</strong>
+                <span>Pitch</span><strong>{tutorialControls.pitch}</strong>
+                <span>Pause</span><strong>{tutorialControls.pause}</strong>
+              </div>
+              <button className="button-primary" onClick={completeTutorial}>Enter the festival</button>
+            </>
+          )}
         </aside>
       ) : null}
-      {paused ? (
+      {tutorial && tutorialPaused ? (
+        <section className="pause-overlay" role="dialog" aria-modal="true" aria-label="Training paused">
+          <p>Training paused</p><h1>{track.name}</h1>
+          <small>The clock and rider input are frozen. Resume this lesson or reset the complete training route.</small>
+          <button className="button-primary" onClick={() => setTutorialPaused(false)}>Resume lesson</button>
+          <button onClick={restartTutorial}>Restart training</button>
+          <button onClick={() => navigate("title")}>Festival menu</button>
+        </section>
+      ) : !tutorial && paused ? (
         <section className="pause-overlay" role="dialog" aria-modal="true" aria-label="Race paused">
           <p>Race paused</p><h1>{track.name}</h1>
           <button className="button-primary" onClick={resumeRace}>Resume</button>

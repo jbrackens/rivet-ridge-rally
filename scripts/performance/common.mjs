@@ -289,8 +289,10 @@ export async function measureEditor(page) {
   };
 }
 
-export async function measureInputResponsiveness(page, key) {
-  const code = key.toLowerCase() === "a" ? "KeyA" : "KeyD";
+export async function measureInputResponsiveness(page, code) {
+  if (!["ArrowLeft", "ArrowRight"].includes(code)) {
+    throw new Error(`Unsupported lane input ${code}.`);
+  }
   await page.evaluate((expectedCode) => {
     window.__RRR_PERF_INPUT__ = null;
     const listener = (event) => {
@@ -307,7 +309,7 @@ export async function measureInputResponsiveness(page, key) {
     };
     window.addEventListener("keydown", listener, true);
   }, code);
-  await page.keyboard.press(key);
+  await page.keyboard.press(code);
   await page.waitForFunction(() => window.__RRR_PERF_INPUT__ !== null, undefined, { timeout: 2_000 });
   return page.evaluate(() => {
     const sample = window.__RRR_PERF_INPUT__;

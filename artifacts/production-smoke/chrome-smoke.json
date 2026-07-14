@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "kind": "production-smoke",
-  "createdAt": "2026-07-12T22:23:34.075Z",
+  "createdAt": "2026-07-14T07:12:46.847Z",
   "baseURL": "http://127.0.0.1:4173",
   "browser": {
     "name": "Google Chrome",

@@ -1,8 +1,8 @@
 # RIVET RIDGE RALLY — Game Bible
 
-**Document status:** Phase 1 product direction
+**Document status:** Product direction with post-RC1 acceptance revision
 
-**Implementation status:** Playable `1.0.0-rc.1` candidate; final release gates are tracked in `QA_REPORT.md`
+**Implementation status:** Post-`1.0.0-rc.1` corrective working revision; the tagged RC1 remains historical evidence and the revised candidate must be requalified in `QA_REPORT.md`
 
 **Release status:** NOT READY
 
@@ -125,23 +125,28 @@ Dirt is the racing baseline. Grass and track edges slow the bike, mud slows it m
 
 ## First-play tutorial
 
-The interactive tutorial must take under three minutes and require the player to demonstrate, in a safe sequence:
+The interactive tutorial begins with an input-adaptive rider-school map for Ride, Turbo, lanes, pitch, recovery, and pause. It must then take under three minutes and require the player to complete these 12 guided riding lessons in a safe sequence:
 
-1. Standard throttle.
-2. Turbo and its speed benefit.
-3. Heat warnings and a cooling zone.
-4. Lane changes.
-5. A controlled wheelie over a bump.
-6. Airborne pitch.
-7. A clean landing.
-8. Mud and off-track slowdown.
-9. Rival collision rules.
+1. Build usable speed and read the run/position, lap/time, and target HUD.
+2. Release Ride and Turbo to coast; the game has no separate brake action.
+3. Commit one lane per left/right press.
+4. Use Turbo to gain speed and reach the critical heat warning.
+5. Release Turbo and pass through a cyan, snowflake-marked cooling gate.
+6. Hold a controlled wheelie over a bump.
+7. Command nose-up and nose-down airborne pitch, then release toward neutral.
+8. Land nearly level on both wheels.
+9. Read a striped barrier and move to an open lane.
+10. Experience mud slowdown.
+11. Experience grass/off-track slowdown and return to the marked dirt.
+12. Hit the final training barrier and hold Recover through a real crash-and-recovery cycle.
 
-Prompts adapt to the active keyboard, gamepad, or touch scheme and never rely on color alone.
+Two contact-rule drills follow the riding lessons. Prompts and the control recap adapt to the active keyboard, remapped keyboard binding, gamepad, or touch scheme and never rely on color alone. Pause freezes the lesson; the training pause surface offers resume, a full route/checklist restart, and a return path. Completing or skipping training persists, while replay remains available through the main-menu Rider School action.
 
 ## Controls philosophy
 
 - Keyboard, gamepad, phone touch, and tablet touch are first-class play methods.
+- Fresh keyboard profiles use `ArrowLeft` and `ArrowRight` for lane changes and `ArrowUp` and `ArrowDown` for pitch. `A` and `D` are not default lane controls, but remain valid explicit remap choices.
+- Only the exact historical stored pair `A`/`D` migrates to the arrow-key lane defaults; a player-customized pair is preserved.
 - Menus are fully keyboard navigable.
 - Pause/resume is always reachable during gameplay.
 - Remapping is supported where practical and conflicts are explained.
@@ -160,8 +165,13 @@ Import/export is intentionally defensive: corrupt, malicious, oversized, incompa
 - Strong hierarchy between dirt, grass, lane paint, mud, cooling gates, hazards, riders, and scenery.
 - Original bikes and riders with silhouettes readable at gameplay distance.
 - Essential HUD only: position, lap, timer, target, heat, and actionable feedback.
-- Camera framing prioritizes upcoming obstacles and landing zones.
+- Camera framing prioritizes the rider silhouette, marked lanes, upcoming obstacles, and landing zones from its first rendered frame on desktop and portrait layouts.
+- Each venue uses its own lighting, exposure, fog distance, and scenery-density profile rather than a single global atmosphere.
+- Terraced course edges, visible lane ridges, connected safety barriers, and denser theme-specific scenery make the route read as a built festival diorama instead of a road floating through sparse props.
+- Mobile lane/pitch and Ride/Turbo controls use stronger scale, contrast, depth, and separation while retaining safe reach, readable labels, and mirrored layout support.
 - Avoid generic dashboard cards, default engine UI, excessive gradients, stock-icon misuse, random rounded panels, and visibly temporary meshes.
+
+The desktop and mobile gameplay concepts remain references for composition, hierarchy, richness, rider readability, track depth, and control presence, not pixel-accurate screenshots. The owner rejected the previous blanket acceptance of materially coarser and less-dense output. The post-RC1 rendering changes therefore reopen concept fidelity: they are proposed improvements, not accepted evidence, until renewed side-by-side owner review is recorded.
 
 ## Audio direction
 
@@ -184,4 +194,4 @@ Original or properly licensed audio must cover engine load/turbo, landing qualit
 
 ## Creative acceptance bar
 
-The game is not creatively complete when systems merely exist. Each track must be finishable, readable, visually coherent, and meaningfully distinct; controls must invite mastery; feedback must make mistakes understandable; and every shipped asset must have recorded provenance. These criteria require browser playtesting and cannot be marked complete from this Phase 1 document alone.
+The game is not creatively complete when systems merely exist. Each track must be finishable, readable, visually coherent, meaningfully distinct, and accepted against the relevant concept direction; controls must invite mastery; feedback must make mistakes understandable; and every shipped asset must have recorded provenance. Automated screenshot stability cannot substitute for concept-fidelity or first-time-player comprehension review. These criteria require browser playtesting and renewed owner acceptance and cannot be marked complete from this document alone.

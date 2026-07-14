@@ -2,7 +2,7 @@
 
 RIVET RIDGE RALLY is an original 3D arcade motocross game for desktop and mobile browsers. It ships five festival tracks, Solo and Rival campaign progression, Practice and Summit mastery, a fixed-60 Hz arcade simulation, keyboard/gamepad/touch controls, local persistence, accessibility options, procedural audio, and a local 3D track builder.
 
-The current package version is **1.0.0-rc.1**. Release evidence and the authoritative status live in `QA_REPORT.md` and `LAUNCH_READINESS.md`; those files must be updated from executed checks before representing this candidate as releasable.
+The current working candidate is **1.0.0-rc.2**. The annotated `v1.0.0-rc.1` predecessor and its evidence remain immutable historical records. Asset verification, the normal production build, headed local performance, the continuous 30-minute Rival soak, the non-QA checksum manifest, the dependency audit, and installed-Chrome production smoke now pass for `rc.2`. It is still **not release-ready**: the deliberately changed race compositions need explicit owner acceptance, the complete browser/physical-device matrix remains open, and the candidate is not tied to an immutable source commit/tag. The authoritative status lives in `QA_REPORT.md` and `LAUNCH_READINESS.md`.
 
 ## Run and verify
 
@@ -37,7 +37,7 @@ Use `npm run assets:build` only when intentionally regenerating the checked-in G
 - Four-lane racing with throttle, turbo heat, cooling, wheelies, airborne pitch, landings, terrain, hazards, crashes, and asymmetric rider collisions.
 - Route-following and pursuing AI with Easy, Standard, and Expert decision profiles.
 - Interactive first-play tutorial, immediate retry/restart, results/coaching, and persistent personal bests.
-- Keyboard, remappable controls, standard gamepad support, vibration where available, touch controls, and mirrored touch layout.
+- Keyboard controls with arrow-cluster lane defaults, full remapping, standard gamepad support, vibration where available, touch controls, and mirrored touch layout.
 - Local 3D editor with 25 modules, 50-action undo/redo, validation, 1–9 laps, examples, safe JSON interchange, library persistence, thumbnails, and test play.
 - Reduced motion/shake, high contrast, colorblind-safe signals, captions, UI scale, and separate master/music/SFX volume controls.
 - No account, payments, ads, tracking, public sharing, or server dependency.
@@ -60,4 +60,4 @@ The game uses strict TypeScript, Vite, React for application UI, direct Three.js
 
 ## Identity and legal hygiene
 
-Only **RIVET RIDGE RALLY** is approved shipped branding. The local workspace folder name contains a legacy third-party working-name reference; it is outside shipped relative paths and production bytes, but the owner must rename the folder before public CI logs, support exports, or source maps can reveal absolute paths. The owner must also select the repository's top-level product license and complete final legal, trademark, and trade-dress review.
+Only **RIVET RIDGE RALLY** is approved shipped branding. The local workspace was renamed to a neutral product-title directory on 2026-07-14. Keep public CI logs, support exports, and source maps free of legacy third-party working names and absolute local paths. The owner must also select the repository's top-level product license and complete final legal, trademark, and trade-dress review.

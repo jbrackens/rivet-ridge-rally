@@ -1,0 +1,2 @@
+# Preserve the pinned third-party license byte-for-byte across platforms.
+public/assets/transcoders/basis/LICENSE.txt -text -diff

@@ -53,6 +53,8 @@ Current pinned output snapshot:
 
 The same KTX2 bytes are embedded in the GLB and emitted standalone for inspection. Meshopt reduces the GLB from 22,076 bytes to 15,172 bytes (31.3%). `npm run build` runs `assets:verify` automatically before TypeScript and Vite compilation.
 
+The pinned Apache-2.0 license keeps its upstream CRLF bytes. A path-specific `-text -diff` Git attribute prevents checkout-time line-ending conversion from changing its recorded size or hash.
+
 The generated manifest records byte sizes, SHA-256 hashes, formats, and tool licenses. Rebuilding twice on the same supported toolchain should produce identical hashes. Basis encoding is not promised to be byte-identical across different operating systems or encoder/WASM versions, so the package and lockfile remain pinned.
 
 `assets:verify` performs four independent checks:

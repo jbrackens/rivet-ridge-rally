@@ -137,6 +137,14 @@ interface LegacyVersionedRecord {
   createdAt?: number;
 }
 
+interface LegacySettingsRecord extends LegacyVersionedRecord {
+  value?: {
+    controls?: {
+      keyBindings?: Record<string, string>;
+    };
+  };
+}
+
 function ensureTimestamp(
   record: LegacyVersionedRecord,
   field: "updatedAt" | "createdAt",
@@ -176,6 +184,17 @@ async function migrateToVersion3(transaction: Transaction): Promise<void> {
   ]);
 }
 
+async function migrateToVersion4(transaction: Transaction): Promise<void> {
+  const migratedAt = Date.now();
+  await transaction.table<LegacySettingsRecord, string>("settings").toCollection().modify((record) => {
+    const keyBindings = record.value?.controls?.keyBindings;
+    if (keyBindings?.laneLeft !== "KeyA" || keyBindings.laneRight !== "KeyD") return;
+    keyBindings.laneLeft = "ArrowLeft";
+    keyBindings.laneRight = "ArrowRight";
+    record.updatedAt = migratedAt;
+  });
+}
+
 const defaultTrackProgress = (): TrackProgress => ({
   soloQualified: false,
   rivalUnlocked: false,
@@ -205,8 +224,8 @@ export const DEFAULT_SETTINGS: GameSettings = {
     keyBindings: {
       throttle: "KeyW",
       turbo: "ShiftLeft",
-      laneLeft: "KeyA",
-      laneRight: "KeyD",
+      laneLeft: "ArrowLeft",
+      laneRight: "ArrowRight",
       pitchUp: "ArrowUp",
       pitchDown: "ArrowDown",
       recover: "Space",
@@ -315,6 +334,13 @@ class GameDatabase extends Dexie {
       replays: "id,schemaVersion,trackId,createdAt",
       quarantine: "++key,kind,createdAt",
     }).upgrade(migrateToVersion3);
+    this.version(4).stores({
+      settings: "id,schemaVersion,updatedAt",
+      progress: "id,schemaVersion,updatedAt",
+      customTracks: "id,schemaVersion,name,updatedAt",
+      replays: "id,schemaVersion,trackId,createdAt",
+      quarantine: "++key,kind,createdAt",
+    }).upgrade(migrateToVersion4);
   }
 }
 

@@ -98,7 +98,7 @@ const restartTimesMs = [];
 const droppedSimulationAttempts = [];
 let completedRaces = 0;
 let timedOutRaces = 0;
-let direction = "a";
+let direction = "ArrowLeft";
 let workloadStartedAt = null;
 let workloadEndedAt = null;
 let harnessStage = "server-check";
@@ -214,7 +214,7 @@ try {
           const hud = parseHud(await page.getByLabel("Performance metrics").textContent().catch(() => null));
           const heap = await heapEvidence(session);
           const input = await measureInputResponsiveness(page, direction).catch((error) => ({ error: error instanceof Error ? error.message : String(error) }));
-          direction = direction === "a" ? "d" : "a";
+          direction = direction === "ArrowLeft" ? "ArrowRight" : "ArrowLeft";
           const cumulativeDroppedMs = observeDroppedSimulation(hud);
           samples.push({
             elapsedMs: Math.round(nodePerformance.now() - startedAt),

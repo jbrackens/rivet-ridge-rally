@@ -1,6 +1,6 @@
 # RIVET RIDGE RALLY — Operations Runbook
 
-**Candidate:** `1.0.0-rc.1`
+**Candidate:** `1.0.0-rc.2` working candidate
 
 **Application model:** static Vite site with same-origin assets and an offline service worker
 
@@ -9,6 +9,14 @@
 **Deploy, support, and incident owners:** owner assignment required
 
 This runbook covers the code-owned release procedure. Hosting credentials, DNS/TLS, a public support address, retention policy, and final legal approval are external owner actions.
+
+## Current qualification status
+
+`1.0.0-rc.2` is **not qualified for deployment**. The annotated `v1.0.0-rc.1` source, artifact, and evidence remain immutable historical records and must not be rebuilt or relabeled as evidence for the changed candidate.
+
+The documented `npm run assets:build` pipeline normalized only `public/assets/transcoders/basis/LICENSE.txt` from a 9,141-byte LF variant to the already-inventoried output copied from pinned TypeScript: 9,197 bytes with SHA-256 `a7d00bfd54525bc694b6e32f64c7ebcf5e6b7ae3657be5cc12767bce74654a47`. The repository marks that one pinned file `-text -diff` so Git preserves its exact upstream bytes across platforms. No GLB, KTX2, or asset-manifest content changed. `npm run assets:verify` now passes.
+
+The final normal `npm run build` passed asset verification, strict typechecking, Vite production compilation, and notice generation. `dist/THIRD_PARTY_NOTICES.txt` is 38,475 bytes with SHA-256 `c959caf9bfbb3d9b051921453e8a19132c1b40fec2ef3f3db41676d3492f84a1`. The headed local performance measurement passed its desktop and emulated-phone targets, the continuous 30-minute Rival soak passed all automated release criteria, `npm audit` found 0 vulnerabilities, the final non-QA manifest records 21 files / 4,689,233 bytes with aggregate SHA-256 `6a55c00ea36debe543ab946dee06dc5fa73cf8a13d45b047aec399469c9931a3`, and installed Google Chrome 150 passed the production/offline smoke. Before any `rc.2` deployment, complete explicit visual acceptance, the final cross-browser/physical-device matrix, and immutable-source checks described below.
 
 ## Operating model
 
@@ -52,7 +60,14 @@ The command exits unsuccessfully unless the visible version and absence of the Q
 
 ## Performance qualification
 
-The harness accepts optional headed mode and output paths:
+Build the QA-only performance candidate and serve it on the harness's isolated port first:
+
+```sh
+VITE_QA_MODE=1 npm run build
+npm run preview -- --host 127.0.0.1 --port 4373
+```
+
+In another shell, run the measurement and soak. After they finish, stop the QA preview and run the normal `npm run build` again before generating the release manifest or production smoke evidence.
 
 ```sh
 npm run perf:measure -- --headed --output artifacts/performance/final-headed-measurement.json
@@ -122,7 +137,7 @@ Configure the host as follows and verify actual response headers:
 - GLB, KTX2, WASM, JS, JSON, PNG, SVG, TXT, and manifest files: correct MIME type and compression where applicable;
 - old fingerprinted assets: retain through the rollback and service-worker transition window.
 
-Service worker cache `rivet-ridge-rally-shell-v7` precaches the shell, stable bike GLB, and stable Basis transcoders, discovers hashed entry assets, and cache-fills same-origin runtime chunks. Activation deletes only older caches with the app-owned `rivet-ridge-rally-` prefix, never unrelated origin caches. Navigation can fall back to cached `index.html`; non-GET and cross-origin requests are ignored. A changed cache name forces the next version's installation. During rollback, preserve both generations' assets: clients may keep an older active worker until reload/activation. If a worker is corrupt, clear site storage or unregister it, reload online, and confirm the expected visible version.
+Service worker cache `rivet-ridge-rally-shell-v8` precaches the shell, stable bike GLB, and stable Basis transcoders, discovers hashed entry assets, and cache-fills same-origin runtime chunks. The `v8` cache generation ensures existing installs fetch the `rc.2` controls, tutorial, and renderer instead of continuing to serve the historical `rc.1` shell. Activation deletes only older caches with the app-owned `rivet-ridge-rally-` prefix, never unrelated origin caches. Navigation can fall back to cached `index.html`; non-GET and cross-origin requests are ignored. A changed cache name forces the next version's installation. During rollback, preserve both generations' assets: clients may keep an older active worker until reload/activation. If a worker is corrupt, clear site storage or unregister it, reload online, and confirm the expected visible version.
 
 ## Rollback
 
@@ -136,7 +151,7 @@ Rollback triggers include boot failure, widespread asset 404s, mixed-version cac
 6. Record impact, versions, hashes, UTC duration, user guidance, and follow-up defect.
 7. Fix forward under a new version/build identity.
 
-IndexedDB migrations require special care: schema v3 is forward-migrated in place. Before rolling back across any future schema change, prove the retained build safely reads the migrated database or shows a non-destructive incompatibility message. Never use rollback code that silently deletes local progress or tracks.
+IndexedDB migrations require special care: schema v4 is forward-migrated in place, including a targeted update of the exact legacy default lane-key pair while preserving custom remaps. Before rolling back across this or any future schema change, prove the retained build safely reads the migrated database or shows a non-destructive incompatibility message. Never use rollback code that silently deletes local progress or tracks.
 
 ## Support and incidents
 

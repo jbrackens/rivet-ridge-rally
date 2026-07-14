@@ -119,7 +119,7 @@ try {
     profileEvidence.heaps.push({ stage: "after-restart", ...await heapEvidence(session) });
     await returnToTitleFromRace(page);
     await startQaRace(page, "rival");
-    await page.keyboard.press("d");
+    await page.keyboard.press("ArrowRight");
     await page.keyboard.down("w");
     await page.keyboard.down("Shift");
     await page.keyboard.down("Space");

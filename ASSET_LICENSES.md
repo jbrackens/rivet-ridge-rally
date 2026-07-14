@@ -67,7 +67,7 @@ The GLB and KTX2 files listed below are the only standalone model/texture format
 | `public/assets/transcoders/basis/basis_transcoder.js` | Runtime Basis Universal transcoder wrapper copied from Three.js 0.185.1 examples | 57,529 | `8478b5b6d6b74e7d3082b89f6417321d8d1dc0307f2b30d4484bb11b441696a1` | Apache-2.0 |
 | `public/assets/transcoders/basis/basis_transcoder.wasm` | Runtime Basis Universal transcoder copied from Three.js 0.185.1 examples | 527,333 | `6cf17dc889352c42e9acf8897107978d127005fe3386c36a0e3845e27967630a` | Apache-2.0 |
 | `public/assets/transcoders/basis/README.md` | Upstream Three.js Basis usage/provenance README | 1,388 | `a578df416c1e0852e9c36a1cf91b4d28d91a251294f87ce610a3bc7ca4df15e0` | Documentation distributed with transcoder |
-| `public/assets/transcoders/basis/LICENSE.txt` | Full Apache License 2.0 text | 9,197 | `a7d00bfd54525bc694b6e32f64c7ebcf5e6b7ae3657be5cc12767bce74654a47` | Apache-2.0 license text |
+| `public/assets/transcoders/basis/LICENSE.txt` | Full Apache License 2.0 text; exact upstream bytes preserved by the repository's `-text -diff` attribute | 9,197 | `a7d00bfd54525bc694b6e32f64c7ebcf5e6b7ae3657be5cc12767bce74654a47` | Apache-2.0 license text |
 | `public/assets/transcoders/basis/NOTICE.txt` | Reproducibly generated readable copy of upstream Basis attribution | 917 | `42beeb6710c933778e30f62886e0790ebba120debbb0545ab46c7292d3e5a061` | Apache-2.0 §4(d) NOTICE |
 | **Generated public pipeline total** | All eight files above | **617,141** | — | Mixed original project asset / Apache-2.0 runtime component |
 

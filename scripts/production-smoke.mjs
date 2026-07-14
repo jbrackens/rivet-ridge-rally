@@ -64,7 +64,7 @@ try {
   runtime = await page.evaluate(() => ({
     title: document.title,
     qaApiPresent: Object.prototype.hasOwnProperty.call(window, "__RRR_QA__"),
-    versionPresent: (document.body.textContent ?? "").includes("v1.0.0-rc.1"),
+    versionPresent: (document.body.textContent ?? "").includes("v1.0.0-rc.2"),
   }));
   if (runtime.title !== "Rivet Ridge Rally" || runtime.qaApiPresent || !runtime.versionPresent) {
     throw new Error("Production title, version, or QA-marker contract failed.");

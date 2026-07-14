@@ -1,6 +1,6 @@
 {
   "name": "rivet-ridge-rally",
-  "version": "1.0.0-rc.1",
+  "version": "1.0.0-rc.2",
   "private": true,
   "type": "module",
   "engines": {
@@ -21,6 +21,7 @@
     "test": "vitest run",
     "test:coverage": "vitest run --coverage",
     "test:e2e": "playwright test",
+    "visual:capture": "node scripts/capture-visual-review.mjs",
     "build": "npm run typecheck && vite build && npm run notices:build",
     "preview": "vite preview",
     "audit": "npm audit --audit-level=high"

@@ -84,9 +84,9 @@ export class InputManager {
   sample(): SimulationInput {
     const gamepad = this.sampleGamepad();
     const binding = this.settings.keyBindings;
-    const keyboardLane: LaneChange = this.keys.has(binding.laneLeft ?? "KeyA")
+    const keyboardLane: LaneChange = this.keys.has(binding.laneLeft ?? "ArrowLeft")
       ? -1
-      : this.keys.has(binding.laneRight ?? "KeyD")
+      : this.keys.has(binding.laneRight ?? "ArrowRight")
         ? 1
         : 0;
     const keyboardPitch = this.keys.has(binding.pitchUp ?? "ArrowUp")

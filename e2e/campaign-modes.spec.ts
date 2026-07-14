@@ -5,6 +5,13 @@ async function onboard(page: import("@playwright/test").Page): Promise<void> {
   await page.getByRole("button", { name: "Skip training" }).click();
 }
 
+async function unlockCampaign(page: import("@playwright/test").Page): Promise<void> {
+  await page.evaluate(() => {
+    if (!window.__RRR_QA__) throw new Error("Campaign qualification requires a VITE_QA_MODE=1 build.");
+    window.__RRR_QA__.unlockCampaign();
+  });
+}
+
 function displayedTimeMs(value: string): number {
   const [minutes = "0", remainder = "0"] = value.split(":");
   const [seconds = "0", hundredths = "0"] = remainder.split(".");
@@ -21,6 +28,41 @@ const LAUNCH_TRACKS = [
 
 type LaunchMode = "practice" | "solo" | "rival" | "mastery";
 
+async function startTrack(
+  page: import("@playwright/test").Page,
+  trackId: string,
+  raceMode: LaunchMode,
+): Promise<void> {
+  await page.evaluate(
+    ({ nextTrackId, nextRaceMode }) => {
+      if (!window.__RRR_QA__) throw new Error("Campaign qualification requires a VITE_QA_MODE=1 build.");
+      window.__RRR_QA__.startTrack(nextTrackId, nextRaceMode);
+    },
+    { nextTrackId: trackId, nextRaceMode: raceMode },
+  );
+}
+
+async function attachRaceHealth(
+  page: import("@playwright/test").Page,
+  testInfo: import("@playwright/test").TestInfo,
+): Promise<void> {
+  const snapshot = await page.evaluate(() => ({
+    capturedAt: new Date().toISOString(),
+    visibilityState: document.visibilityState,
+    title: document.title,
+    url: window.location.href,
+    qaApiPresent: Boolean(window.__RRR_QA__),
+    lifecycle: window.__RRR_QA__?.lifecycle() ?? null,
+    raceClock: document.querySelector(".timer-block strong")?.textContent ?? null,
+    pauseDialogVisible: Boolean(document.querySelector('.pause-overlay[role="dialog"]')),
+    resultsVisible: Boolean(document.querySelector(".results-screen")),
+  }));
+  await testInfo.attach("race-health.json", {
+    body: JSON.stringify(snapshot, null, 2),
+    contentType: "application/json",
+  });
+}
+
 async function rideUntilResults(
   page: import("@playwright/test").Page,
   chooseSummitSafeLane = false,
@@ -28,7 +70,7 @@ async function rideUntilResults(
   await page.keyboard.down("w");
   await page.keyboard.down("Space");
   for (let cycle = 0; cycle < 14; cycle += 1) {
-    if (chooseSummitSafeLane && cycle === 2) await page.keyboard.press("d");
+    if (chooseSummitSafeLane && cycle === 2) await page.keyboard.press("ArrowRight");
     await page.keyboard.down("Shift");
     await page.waitForTimeout(520);
     await page.keyboard.up("Shift");
@@ -46,55 +88,56 @@ test.beforeEach(async ({ browserName }, testInfo) => {
   test.skip(browserName !== "chromium" || testInfo.project.name !== "chromium", "Campaign mode matrix runs once in Chromium");
 });
 
-test("every launch track completes each applicable race mode", async ({ page }) => {
-  test.setTimeout(360_000);
-  await onboard(page);
-  await page.evaluate(() => window.__RRR_QA__?.unlockCampaign());
+const modesByTrack = (trackId: string): readonly LaunchMode[] => trackId === "summit-showdown"
+  ? ["practice", "solo", "rival", "mastery"]
+  : ["practice", "solo", "rival"];
 
-  const modesByTrack = (trackId: string): readonly LaunchMode[] => trackId === "summit-showdown"
-    ? ["practice", "solo", "rival", "mastery"]
-    : ["practice", "solo", "rival"];
-
+test.describe("launch track and mode matrix", () => {
   for (const track of LAUNCH_TRACKS) {
     for (const mode of modesByTrack(track.id)) {
-      await test.step(`${track.name} · ${mode}`, async () => {
-        await page.evaluate(
-          ({ trackId, raceMode }) => window.__RRR_QA__?.startTrack(trackId, raceMode),
-          { trackId: track.id, raceMode: mode },
-        );
+      test(`${track.name} completes ${mode}`, async ({ page }, testInfo) => {
+        test.setTimeout(90_000);
+        await onboard(page);
+        await unlockCampaign(page);
 
-        await expect(page.getByLabel(`Live 3D race on ${track.name}`)).toBeVisible();
-        const accessibleMode = mode === "practice" ? "Practice" : mode === "solo" ? "Solo" : mode;
-        await expect(page.getByRole("heading", { name: `${track.name} ${accessibleMode} race` })).toBeVisible();
+        try {
+          await startTrack(page, track.id, mode);
+          await expect(page.getByLabel(`Live 3D race on ${track.name}`)).toBeVisible();
+          const accessibleMode = mode === "practice" ? "Practice" : mode === "solo" ? "Solo" : mode;
+          await expect(page.getByRole("heading", { name: `${track.name} ${accessibleMode} race` })).toBeVisible();
 
-        if (mode === "practice") {
-          await expect(page.locator(".position-block > strong")).toHaveText("Practice");
-          await expect(page.locator(".target-hud > strong")).toHaveText("Free ride");
-        } else if (mode === "solo") {
-          await expect(page.locator(".position-block > strong")).toHaveText("Solo");
-          await expect(page.locator(".target-hud small")).toContainText("Saved best");
-        } else {
-          await expect(page.locator(".position-block > span")).toHaveText("Position");
-          await expect(page.locator(".position-block > strong")).toHaveText(/[1-6] \/ 6/);
-        }
-
-        await rideUntilResults(page, track.id === "summit-showdown");
-        await expect(page.getByText("Lap 1", { exact: true })).toBeVisible();
-        await expect(page.getByText("Lap 2", { exact: true })).toBeVisible();
-        await expect(page.getByText("Crashes", { exact: true })).toBeVisible();
-        await expect(page.getByText("Overheats", { exact: true })).toBeVisible();
-
-        if (mode === "practice") {
-          await expect(page.locator(".result-grid > div").filter({ hasText: "Target gap" })).toContainText("Free ride");
-        } else if (mode === "solo") {
-          await expect(page.getByText("Saved best before run", { exact: true })).toBeVisible();
-          await expect(page.getByText("Best time", { exact: true })).toBeVisible();
-        } else {
-          const classification = page.getByRole("table", { name: "Official 6-rider classification" });
-          await expect(classification.locator("tbody tr")).toHaveCount(6);
-          if (mode === "mastery") {
-            await expect(page.locator(".results-screen header > p")).toContainText("Summit Mastery");
+          if (mode === "practice") {
+            await expect(page.locator(".position-block > strong")).toHaveText("Practice");
+            await expect(page.locator(".target-hud > strong")).toHaveText("Free ride");
+          } else if (mode === "solo") {
+            await expect(page.locator(".position-block > strong")).toHaveText("Solo");
+            await expect(page.locator(".target-hud small")).toContainText("Saved best");
+          } else {
+            await expect(page.locator(".position-block > span")).toHaveText("Position");
+            await expect(page.locator(".position-block > strong")).toHaveText(/[1-6] \/ 6/);
           }
+
+          await rideUntilResults(page, track.id === "summit-showdown");
+          await expect(page.getByText("Lap 1", { exact: true })).toBeVisible();
+          await expect(page.getByText("Lap 2", { exact: true })).toBeVisible();
+          await expect(page.getByText("Crashes", { exact: true })).toBeVisible();
+          await expect(page.getByText("Overheats", { exact: true })).toBeVisible();
+
+          if (mode === "practice") {
+            await expect(page.locator(".result-grid > div").filter({ hasText: "Target gap" })).toContainText("Free ride");
+          } else if (mode === "solo") {
+            await expect(page.getByText("Saved best before run", { exact: true })).toBeVisible();
+            await expect(page.getByText("Best time", { exact: true })).toBeVisible();
+          } else {
+            const classification = page.getByRole("table", { name: "Official 6-rider classification" });
+            await expect(classification.locator("tbody tr")).toHaveCount(6);
+            if (mode === "mastery") {
+              await expect(page.locator(".results-screen header > p")).toContainText("Summit Mastery");
+            }
+          }
+        } catch (error) {
+          await attachRaceHealth(page, testInfo);
+          throw error;
         }
       });
     }
@@ -143,7 +186,7 @@ test("Solo qualification unlocks Rival and Rival completes with a six-rider fiel
 test("Summit Mastery clears a tier, escalates its goal, and increases hot-start heat", async ({ page }) => {
   test.setTimeout(60_000);
   await onboard(page);
-  await page.evaluate(() => window.__RRR_QA__?.unlockCampaign());
+  await unlockCampaign(page);
   await page.getByRole("button", { name: /^Summit Showdown/ }).click();
   await page.getByRole("button", { name: "Ride", exact: true }).click();
   const mastery = page.getByRole("button", { name: /^04 Summit Mastery/ });

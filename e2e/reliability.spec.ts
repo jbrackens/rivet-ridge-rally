@@ -61,8 +61,9 @@ test.describe("compressed model network fallback", () => {
     await expect(page.getByText("Compressed bike unavailable — safe built-in model active")).toBeVisible({ timeout: 10_000 });
     expect(modelRequests).toEqual(["http://127.0.0.1:4173/assets/3d/festival-trail-bike.glb"]);
 
+    await page.getByRole("button", { name: "Start lesson 1" }).click();
     await page.keyboard.down("w");
-    await expect(page.getByRole("heading", { name: "Turbo and heat" })).toBeVisible({ timeout: 10_000 });
+    await expect(page.getByRole("heading", { name: "Coast to slow" })).toBeVisible({ timeout: 10_000 });
     await page.keyboard.up("w");
   });
 });
