@@ -17,19 +17,35 @@ test("standard-layout gamepad input completes a browser race", async ({ page }, 
     };
     Object.defineProperty(navigator, "getGamepads", { configurable: true, value: () => [pad] });
     Object.defineProperty(window, "__QA_GAMEPAD_BUTTONS__", { value: buttons });
+    Object.defineProperty(window, "__QA_GAMEPAD__", { value: pad });
   });
 
   await page.goto("/?qa-fast-race=1");
   await page.getByRole("button", { name: "Skip training" }).click();
   await page.getByRole("button", { name: "Ride", exact: true }).click();
   await page.getByRole("button", { name: /Practice/ }).click();
+  await expect(page.locator(".game-shell")).toHaveAttribute(
+    "data-race-gate-phase",
+    "racing",
+    { timeout: 15_000 },
+  );
   await page.evaluate(() => {
     const buttons = (window as Window & { __QA_GAMEPAD_BUTTONS__: Array<{ pressed: boolean; touched: boolean; value: number }> }).__QA_GAMEPAD_BUTTONS__;
     if (buttons[9]) Object.assign(buttons[9], { pressed: true, touched: true, value: 1 });
   });
   await expect(page.getByRole("dialog", { name: "Race paused" })).toBeVisible();
+  await expect(page.locator(".input-device")).toHaveText("Gamepad controls");
+  await expect(page.locator(".race-hint")).toContainText("Start pause");
   await page.evaluate(() => {
+    const pad = (window as Window & { __QA_GAMEPAD__: { connected: boolean } }).__QA_GAMEPAD__;
+    pad.connected = false;
+  });
+  await expect(page.locator(".input-device")).toHaveText("Keyboard controls");
+  await expect(page.locator(".race-hint")).toContainText("W ride");
+  await page.evaluate(() => {
+    const pad = (window as Window & { __QA_GAMEPAD__: { connected: boolean } }).__QA_GAMEPAD__;
     const buttons = (window as Window & { __QA_GAMEPAD_BUTTONS__: Array<{ pressed: boolean; touched: boolean; value: number }> }).__QA_GAMEPAD_BUTTONS__;
+    pad.connected = true;
     if (buttons[9]) Object.assign(buttons[9], { pressed: false, touched: false, value: 0 });
   });
   await page.waitForTimeout(100);
@@ -44,7 +60,7 @@ test("standard-layout gamepad input completes a browser race", async ({ page }, 
     if (buttons[0]) Object.assign(buttons[0], { pressed: true, touched: true, value: 1 });
   });
 
-  await expect(page.getByText("Gamepad controls", { exact: true })).toBeVisible({ timeout: 10_000 });
+  await expect(page.locator(".input-device")).toHaveText("Gamepad controls", { timeout: 10_000 });
   await expect(page.locator(".race-hint")).toContainText("Start pause");
   await expect(page.getByRole("button", { name: "Retry now" })).toBeVisible({ timeout: 30_000 });
   await expect(page.getByText("Lap 1", { exact: true })).toBeVisible();

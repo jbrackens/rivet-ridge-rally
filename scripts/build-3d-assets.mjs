@@ -19,7 +19,9 @@ import {
   Euler,
   IcosahedronGeometry,
   Quaternion,
+  TorusGeometry,
 } from "three";
+import { mergeGeometries } from "three/examples/jsm/utils/BufferGeometryUtils.js";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const MODEL_DIR = path.join(ROOT, "public/assets/3d");
@@ -135,6 +137,13 @@ function colorFactor(hex) {
   return [color.r, color.g, color.b, 1];
 }
 
+function mergeGeometryParts(name, geometries) {
+  const merged = mergeGeometries(geometries, false);
+  for (const geometry of geometries) geometry.dispose();
+  assert(merged, `Could not merge ${name} geometry`);
+  return merged;
+}
+
 function createBikeDocument(ktx2Bytes) {
   const document = new Document();
   const buffer = document.createBuffer("FestivalTrailBikeBuffer");
@@ -159,6 +168,7 @@ function createBikeDocument(ktx2Bytes) {
   const teal = material("FestivalTeal", 0x22cfcc, 0.58);
   const coral = material("FestivalCoral", 0xf15f50, 0.62);
   const navy = material("FestivalNavy", 0x061c32, 0.72);
+  const cream = material("FestivalCream", 0xf7eddb, 0.66);
   const rubber = material("TireRubber", 0x15191d, 0.96);
   const metal = material("BrushedMetal", 0x7e8990, 0.34, 0.72);
   const plate = document
@@ -209,20 +219,51 @@ function createBikeDocument(ktx2Bytes) {
   const boxNavy = meshFromGeometry("BoxNavy", new BoxGeometry(1, 1, 1), navy);
   const boxMetal = meshFromGeometry("BoxMetal", new BoxGeometry(1, 1, 1), metal);
   const boxPlate = meshFromGeometry("BoxPlate", new BoxGeometry(1, 1, 1), plate);
+  const rearFenderMesh = meshFromGeometry(
+    "RearFenderShell",
+    new BoxGeometry(1, 1, 1),
+    coral,
+  );
   const tireMesh = meshFromGeometry(
     "Tire",
-    new CylinderGeometry(0.52, 0.52, 0.25, 12, 1, false),
+    new TorusGeometry(0.4, 0.12, 6, 14),
     rubber,
   );
+  const treadRingGeometry = mergeGeometryParts(
+    "14-block tread ring",
+    Array.from({ length: 14 }, (_, index) => {
+      const angle = (index / 14) * Math.PI * 2;
+      const geometry = new BoxGeometry(0.34, 0.13, 0.19);
+      geometry.rotateX(angle);
+      geometry.translate(0, Math.cos(angle) * 0.53, Math.sin(angle) * 0.53);
+      return geometry;
+    }),
+  );
+  const treadRingMesh = meshFromGeometry("TreadRing14", treadRingGeometry, rubber);
   const hubMesh = meshFromGeometry(
     "WheelHub",
-    new CylinderGeometry(0.17, 0.17, 0.32, 10, 1, false),
+    new CylinderGeometry(0.18, 0.18, 0.3, 10, 1, false),
     metal,
   );
-  const exhaustMesh = meshFromGeometry(
-    "Exhaust",
-    new CylinderGeometry(0.11, 0.16, 0.7, 8, 1, false),
+  const brakeDiscMesh = meshFromGeometry(
+    "BrakeDisc",
+    new CylinderGeometry(0.26, 0.26, 0.035, 12, 1, false),
     metal,
+  );
+  const tankMesh = meshFromGeometry(
+    "TankShell",
+    new IcosahedronGeometry(0.5, 1),
+    coral,
+  );
+  const exhaustMesh = meshFromGeometry(
+    "ExhaustCanister",
+    new CylinderGeometry(0.11, 0.145, 0.72, 10, 1, false),
+    metal,
+  );
+  const exhaustTipMesh = meshFromGeometry(
+    "ExhaustTip",
+    new CylinderGeometry(0.075, 0.12, 0.18, 10, 1, false),
+    navy,
   );
   const headlightMesh = meshFromGeometry(
     "Headlight",
@@ -238,20 +279,37 @@ function createBikeDocument(ktx2Bytes) {
       const quaternion = new Quaternion().setFromEuler(new Euler(...options.rotation));
       node.setRotation([quaternion.x, quaternion.y, quaternion.z, quaternion.w]);
     }
-    bike.addChild(node);
+    (options.parent ?? bike).addChild(node);
     return node;
   }
 
   for (const z of [-0.98, 0.98]) {
     const suffix = z < 0 ? "Front" : "Rear";
-    addPart(`${suffix}Tire`, tireMesh, { translation: [0, 0.52, z], rotation: [0, 0, Math.PI / 2] });
-    addPart(`${suffix}Hub`, hubMesh, { translation: [0, 0.52, z], rotation: [0, 0, Math.PI / 2] });
+    const wheel = document.createNode(`${suffix}Tire`).setTranslation([0, 0.52, z]);
+    bike.addChild(wheel);
+    addPart(`${suffix}TireRing`, tireMesh, {
+      parent: wheel,
+      rotation: [0, Math.PI / 2, 0],
+    });
+    addPart(`${suffix}Hub`, hubMesh, {
+      parent: wheel,
+      rotation: [0, 0, Math.PI / 2],
+    });
+    addPart(`${suffix}BrakeDisc`, brakeDiscMesh, {
+      parent: wheel,
+      translation: [0.17, 0, 0],
+      rotation: [0, 0, Math.PI / 2],
+    });
+    addPart(`${suffix}TreadRing`, treadRingMesh, { parent: wheel })
+      .setExtras({ blockCount: 14 });
   }
 
   addPart("MainFrame", boxTeal, { translation: [0, 0.82, 0.05], scale: [0.28, 0.24, 1.32], rotation: [-0.06, 0, 0] });
-  addPart("Tank", boxCoral, { translation: [0, 1.03, -0.22], scale: [0.68, 0.48, 0.68], rotation: [-0.08, 0, 0] });
-  addPart("Seat", boxNavy, { translation: [0, 1.19, 0.52], scale: [0.56, 0.18, 0.78], rotation: [0.04, 0, 0] });
-  addPart("RearFender", boxCoral, { translation: [0, 1.04, 0.92], scale: [0.55, 0.12, 0.82], rotation: [0.18, 0, 0] });
+  addPart("Tank", tankMesh, { translation: [0, 1.03, -0.22], scale: [0.66, 0.48, 0.78], rotation: [-0.08, 0, 0] });
+  addPart("Seat", boxNavy, { translation: [0, 1.19, 0.45], scale: [0.48, 0.16, 0.62], rotation: [0.04, 0, 0] });
+  addPart("RearFender", rearFenderMesh, { translation: [0, 1.08, 1], scale: [0.5, 0.09, 0.7], rotation: [0.16, 0, 0] });
+  addPart("LeftSidePanel", boxCoral, { translation: [-0.34, 0.93, 0.3], scale: [0.08, 0.4, 0.76], rotation: [-0.08, 0.06, 0] });
+  addPart("RightSidePanel", boxCoral, { translation: [0.34, 0.93, 0.3], scale: [0.08, 0.4, 0.76], rotation: [-0.08, -0.06, 0] });
   addPart("FrontFender", boxTeal, { translation: [0, 0.99, -0.94], scale: [0.62, 0.11, 0.74], rotation: [-0.16, 0, 0] });
   addPart("NumberPlate", boxPlate, { translation: [0, 1.27, -0.74], scale: [0.7, 0.62, 0.08], rotation: [-0.16, 0, 0] });
   addPart("Headlight", headlightMesh, { translation: [0, 1.2, -0.84], scale: [1, 0.7, 0.45] });
@@ -272,9 +330,47 @@ function createBikeDocument(ktx2Bytes) {
     });
   }
 
-  addPart("Engine", boxNavy, { translation: [0, 0.7, 0.18], scale: [0.64, 0.52, 0.58] });
+  addPart("Engine", boxNavy, { translation: [0, 0.64, 0.12], scale: [0.5, 0.42, 0.5] });
   addPart("EngineGuard", boxMetal, { translation: [0, 0.48, 0.1], scale: [0.72, 0.1, 0.66] });
-  addPart("Exhaust", exhaustMesh, { translation: [0.43, 0.84, 0.61], rotation: [Math.PI / 2, 0, 0] });
+  addPart("ExhaustCanister", exhaustMesh, { translation: [0.45, 0.86, 0.72], rotation: [Math.PI / 2, 0, -0.04] });
+  addPart("ExhaustTip", exhaustTipMesh, { translation: [0.45, 0.86, 1.14], rotation: [Math.PI / 2, 0, -0.04] });
+
+  const rearNumberAssembly = document
+    .createNode("RearNumberAssembly")
+    .setTranslation([0, 1.18, 1.34]);
+  const rearNumberRotation = new Quaternion().setFromEuler(new Euler(0.08, 0, 0));
+  rearNumberAssembly.setRotation([
+    rearNumberRotation.x,
+    rearNumberRotation.y,
+    rearNumberRotation.z,
+    rearNumberRotation.w,
+  ]);
+  bike.addChild(rearNumberAssembly);
+  addPart("RearNumberPanel", boxPlate, {
+    parent: rearNumberAssembly,
+    scale: [0.72, 0.5, 0.08],
+  });
+
+  const rearDigitSegments = [
+    ["Top", 0, 0.16, 0.18, 0.052],
+    ["UpperRight", 0.065, 0.08, 0.052, 0.15],
+    ["Middle", 0, 0, 0.18, 0.052],
+    ["LowerLeft", -0.065, -0.08, 0.052, 0.15],
+    ["Bottom", 0, -0.16, 0.18, 0.052],
+  ];
+  const rearNumberGeometry = mergeGeometryParts(
+    "rear number 22",
+    [["Left", -0.15], ["Right", 0.15]].flatMap(([, centerX]) =>
+      rearDigitSegments.map(([, offsetX, offsetY, width, height]) => {
+        const geometry = new BoxGeometry(width, height, 0.035);
+        geometry.translate(centerX + offsetX, offsetY, 0.06);
+        return geometry;
+      }),
+    ),
+  );
+  const rearNumberMesh = meshFromGeometry("RearNumber22Segments", rearNumberGeometry, cream);
+  addPart("RearNumber22", rearNumberMesh, { parent: rearNumberAssembly })
+    .setExtras({ glyph: "22", segmentCount: 10 });
 
   document.getRoot().setExtras({
     assetSource: "Original procedural project asset",

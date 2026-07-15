@@ -115,6 +115,56 @@ describe("campaign progression", () => {
     });
   });
 
+  it("preserves standing-PB lap and checkpoint splits until a faster Solo run replaces them", () => {
+    const firstLapTimes = [64_000, 66_000];
+    const firstSplitTimes = [20_000, 42_000, 64_000, 86_000, 108_000, 130_000];
+    const slowerLapTimes = [66_000, 68_000];
+    const slowerSplitTimes = [21_000, 43_000, 66_000, 89_000, 111_000, 134_000];
+    const fasterLapTimes = [61_000, 63_000];
+    const fasterSplitTimes = [19_000, 40_000, 61_000, 81_000, 102_000, 124_000];
+
+    const first = applyRaceResult(progress(), raceResult("solo", "canyon-kickoff", {
+      finishTimeMs: 130_000,
+      lapTimesMs: firstLapTimes,
+      splitTimesMs: firstSplitTimes,
+    }));
+    expect(first.tracks["canyon-kickoff"]).toMatchObject({
+      bestSoloMs: 130_000,
+      bestSoloLapTimesMs: firstLapTimes,
+      bestSoloSplitTimesMs: firstSplitTimes,
+    });
+
+    const preparedSlower = prepareRaceResult(first, raceResult("solo", "canyon-kickoff", {
+      finishTimeMs: 134_000,
+      lapTimesMs: slowerLapTimes,
+      splitTimesMs: slowerSplitTimes,
+    }));
+    expect(preparedSlower).toMatchObject({
+      personalBest: false,
+      previousBestMs: 130_000,
+      previousBestLapTimesMs: firstLapTimes,
+      previousBestSplitTimesMs: firstSplitTimes,
+    });
+
+    const afterSlower = applyRaceResult(first, preparedSlower);
+    expect(afterSlower.tracks["canyon-kickoff"]).toMatchObject({
+      bestSoloMs: 130_000,
+      bestSoloLapTimesMs: firstLapTimes,
+      bestSoloSplitTimesMs: firstSplitTimes,
+    });
+
+    const afterFaster = applyRaceResult(afterSlower, raceResult("solo", "canyon-kickoff", {
+      finishTimeMs: 124_000,
+      lapTimesMs: fasterLapTimes,
+      splitTimesMs: fasterSplitTimes,
+    }));
+    expect(afterFaster.tracks["canyon-kickoff"]).toMatchObject({
+      bestSoloMs: 124_000,
+      bestSoloLapTimesMs: fasterLapTimes,
+      bestSoloSplitTimesMs: fasterSplitTimes,
+    });
+  });
+
   it("uses the official player classification for position and field size", () => {
     const result = prepareRaceResult(progress(), raceResult("rival", "canyon-kickoff", {
       position: 1,

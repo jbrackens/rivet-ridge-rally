@@ -1,5 +1,5 @@
 import type { Difficulty } from "../../app/types";
-import type { LaneIndex, ObstacleKind, TrackObstacle } from "../content/tracks";
+import type { LaneIndex, ObstacleKind } from "../content/tracks";
 import {
   type RaceSimulation,
   type BikePhase,
@@ -217,8 +217,14 @@ interface AiLaneDecision {
   readonly playerProgress: number;
   readonly heat: number;
   readonly profile: AiDifficultyProfile;
-  readonly aheadObstacle?: TrackObstacle | undefined;
-  readonly aheadCooling?: TrackObstacle | undefined;
+  readonly aheadObstacle?: AiLaneObstacle | undefined;
+  readonly aheadObstacleAvoidable?: boolean | undefined;
+  readonly aheadCooling?: AiLaneObstacle | undefined;
+}
+
+interface AiLaneObstacle {
+  readonly kind: ObstacleKind;
+  readonly lanes: readonly LaneIndex[];
 }
 
 export function chooseAiLane(decision: AiLaneDecision): LaneIndex {
@@ -239,7 +245,11 @@ export function chooseAiLane(decision: AiLaneDecision): LaneIndex {
     ] ?? decision.currentLane;
   }
 
-  if (decision.aheadObstacle && getObstaclePolicy(decision.aheadObstacle.kind).avoidable) {
+  if (
+    decision.aheadObstacle
+    && (decision.aheadObstacleAvoidable
+      ?? getObstaclePolicy(decision.aheadObstacle.kind).avoidable)
+  ) {
     return ([0, 1, 2, 3] as const).find(
       (lane) => !decision.aheadObstacle?.lanes.includes(lane),
     ) ?? decision.currentLane;
@@ -303,6 +313,43 @@ export function getAiPitchControl(decision: AiPitchDecision): number {
 
 export type RiderCollisionOutcome = "player-crashes" | "pursuer-crashes" | null;
 
+export type RiderPairCollisionOutcome = "first-rider-crashes" | "second-rider-crashes" | null;
+
+const RIDER_PAIR_FORGIVENESS_GAP = 1.75;
+
+interface RiderPairCollision {
+  readonly sameLane: boolean;
+  /** Signed second-rider progress minus first-rider progress. */
+  readonly gap: number;
+  readonly firstSpeed: number;
+  readonly secondSpeed: number;
+  readonly firstPhase: BikePhase;
+  readonly secondPhase: BikePhase;
+}
+
+export function resolveRiderPairCollision(
+  contact: RiderPairCollision,
+): RiderPairCollisionOutcome {
+  if (!contact.sameLane || contact.firstPhase !== "grounded" || contact.secondPhase !== "grounded") {
+    return null;
+  }
+  if (
+    contact.gap > 0
+    && contact.gap < RIDER_PAIR_FORGIVENESS_GAP
+    && contact.firstSpeed > contact.secondSpeed + 0.5
+  ) {
+    return "first-rider-crashes";
+  }
+  if (
+    contact.gap < 0
+    && contact.gap > -RIDER_PAIR_FORGIVENESS_GAP
+    && contact.secondSpeed > contact.firstSpeed + 0.5
+  ) {
+    return "second-rider-crashes";
+  }
+  return null;
+}
+
 interface RiderCollision {
   readonly sameLane: boolean;
   readonly gap: number;
@@ -314,18 +361,16 @@ interface RiderCollision {
 }
 
 export function resolveRiderCollision(contact: RiderCollision): RiderCollisionOutcome {
-  if (!contact.sameLane || contact.playerPhase !== "grounded" || contact.aiPhase !== "grounded") {
-    return null;
-  }
-  if (contact.gap > 0 && contact.gap < 1.75 && contact.playerSpeed > contact.aiSpeed + 0.5) {
-    return "player-crashes";
-  }
-  if (
-    contact.gap < 0
-    && contact.gap > -1.65
-    && contact.behavior === "pursuer"
-    && contact.aiSpeed > contact.playerSpeed + 0.5
-  ) {
+  const outcome = resolveRiderPairCollision({
+    sameLane: contact.sameLane,
+    gap: contact.gap,
+    firstSpeed: contact.playerSpeed,
+    secondSpeed: contact.aiSpeed,
+    firstPhase: contact.playerPhase,
+    secondPhase: contact.aiPhase,
+  });
+  if (outcome === "first-rider-crashes") return "player-crashes";
+  if (outcome === "second-rider-crashes" && contact.behavior === "pursuer") {
     return "pursuer-crashes";
   }
   return null;

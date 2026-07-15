@@ -52,6 +52,8 @@ export interface TrackProgress {
   soloQualified: boolean;
   rivalUnlocked: boolean;
   bestSoloMs?: number | undefined;
+  bestSoloLapTimesMs?: number[] | undefined;
+  bestSoloSplitTimesMs?: number[] | undefined;
   bestRivalPosition?: number | undefined;
   masteryLevel: number;
 }
@@ -83,6 +85,7 @@ export interface RaceClassificationEntry {
 export interface RaceResult {
   mode: RaceMode;
   trackId: TrackId;
+  trackName?: string | undefined;
   finishTimeMs: number;
   position: number;
   fieldSize: number;
@@ -92,6 +95,8 @@ export interface RaceResult {
   targetMs?: number | undefined;
   personalBest: boolean;
   previousBestMs?: number | undefined;
+  previousBestLapTimesMs?: readonly number[] | undefined;
+  previousBestSplitTimesMs?: readonly number[] | undefined;
   bestTimeMs?: number | undefined;
   classification: readonly RaceClassificationEntry[];
   crashes: number;

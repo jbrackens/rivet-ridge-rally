@@ -75,10 +75,20 @@ export interface AuthoredTrackPiece extends AuthoredPlacementTransform {
   readonly kind: AuthoredTrackPieceKind;
 }
 
+export interface AuthoredCenterlineAnchor {
+  /** Distance from the authored start grid along the scalar race route. */
+  readonly distance: number;
+  /** Presentation-only offset across the route, in metres. */
+  readonly lateralOffset: number;
+  /** Presentation-only height above the scalar race route, in metres. */
+  readonly elevation: number;
+}
+
 export interface AuthoredCourseDefinition {
   readonly start: AuthoredRaceGate;
   readonly checkpoints: readonly AuthoredRaceGate[];
   readonly finish: AuthoredRaceGate;
+  readonly centerline: readonly AuthoredCenterlineAnchor[];
   readonly trackPieces: readonly AuthoredTrackPiece[];
 }
 

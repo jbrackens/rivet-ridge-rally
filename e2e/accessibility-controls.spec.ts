@@ -73,6 +73,7 @@ test("keyboard-only menus reach a race and Escape freezes then resumes it", asyn
   test.setTimeout(60_000);
   await completeOnboarding(page);
   const pressTab = () => page.keyboard.press(testInfo.project.name === "webkit" ? "Alt+Tab" : "Tab");
+  const pressReverseTab = () => page.keyboard.press(testInfo.project.name === "webkit" ? "Alt+Shift+Tab" : "Shift+Tab");
 
   await clearFocus(page);
   await tabTo(page.getByRole("button", { name: "Ride", exact: true }), pressTab);
@@ -106,11 +107,19 @@ test("keyboard-only menus reach a race and Escape freezes then resumes it", asyn
   await expect(page.getByRole("button", { name: /Practice/ })).toBeFocused();
   await page.keyboard.press("Enter");
 
-  await expect(page.getByLabel("Live 3D race on Canyon Kickoff")).toBeVisible();
+  const canvas = page.getByLabel("Live 3D race on Canyon Kickoff");
+  await expect(canvas).toBeVisible();
   const clock = page.locator(".timing-block > strong");
   await expect(clock).not.toHaveText("00:00.00");
+  await canvas.focus();
   await page.keyboard.press("Escape");
   await expect(page.getByRole("dialog", { name: "Race paused" })).toBeVisible();
+  const resume = page.getByRole("button", { name: "Resume", exact: true });
+  await expect(resume).toBeFocused();
+  await pressReverseTab();
+  await expect(page.getByRole("button", { name: "Festival menu" })).toBeFocused();
+  await pressTab();
+  await expect(resume).toBeFocused();
   await expect(page.locator(".game-shell")).toHaveAttribute("data-paused", "true");
   const frozenTime = await clock.textContent();
   expect(frozenTime).not.toBeNull();
@@ -122,10 +131,12 @@ test("keyboard-only menus reach a race and Escape freezes then resumes it", asyn
   await page.getByRole("slider", { name: "master volume" }).fill("0.4");
   await page.keyboard.press("Escape");
   await expect(page.getByRole("dialog", { name: "Race paused" })).toBeVisible();
+  await expect(resume).toBeFocused();
   await expect(clock).toHaveText(frozenTime ?? "");
 
   await page.keyboard.press("Escape");
   await expect(page.getByRole("dialog", { name: "Race paused" })).toHaveCount(0);
+  await expect(canvas).toBeFocused();
   await expect(page.locator(".game-shell")).toHaveAttribute("data-paused", "false");
   await expect.poll(() => clock.textContent()).not.toBe(frozenTime);
 });
@@ -141,13 +152,23 @@ test("keyboard remapping rejects conflicts and the accepted binding completes a 
   const throttle = bindings.locator("div").filter({ hasText: /^throttle/ }).getByRole("button");
   const turbo = bindings.locator("div").filter({ hasText: /^turbo/ }).getByRole("button");
   const pause = bindings.locator("div").filter({ hasText: /^pause/ }).getByRole("button");
+  await expect(throttle).toHaveAccessibleName("Remap Ride, currently W");
+  await expect(turbo).toHaveAccessibleName("Remap Turbo, currently Left Shift");
+  await expect(pause).toHaveAccessibleName("Remap Pause, currently Esc");
+  await expect(bindings.getByRole("button", { name: /^Remap Lane left, currently/ })).toBeVisible();
   await throttle.click();
+  await expect(throttle).toHaveAccessibleName("Choose a key for Ride");
+  await throttle.press("Tab");
+  await expect(page.getByRole("alert")).toHaveText("Tab is reserved for menu, browser, or system controls. Choose another key.");
+  await expect(throttle).toHaveText("Press a key…");
+  await expect(throttle).toBeFocused();
   await throttle.press("q");
   await expect(throttle).toHaveText("Q");
+  await expect(throttle).toHaveAccessibleName("Remap Ride, currently Q");
 
   await turbo.click();
   await turbo.press("q");
-  await expect(page.getByRole("alert")).toHaveText("Q is already assigned to throttle. Choose another key.");
+  await expect(page.getByRole("alert")).toHaveText("Q is already assigned to Ride. Choose another key.");
   await expect(turbo).toHaveText("Press a key…");
   await turbo.press("e");
   await expect(turbo).toHaveText("E");
@@ -158,6 +179,11 @@ test("keyboard remapping rejects conflicts and the accepted binding completes a 
   await page.getByRole("button", { name: "Done", exact: true }).click();
   await page.getByRole("button", { name: "Ride", exact: true }).click();
   await page.getByRole("button", { name: /Practice/ }).click();
+  await expect(page.locator(".game-shell")).toHaveAttribute(
+    "data-race-gate-phase",
+    "racing",
+    { timeout: 15_000 },
+  );
   await page.keyboard.press("p");
   await expect(page.getByRole("dialog", { name: "Race paused" })).toBeVisible();
   await page.keyboard.press("p");
@@ -174,7 +200,15 @@ test("accessibility and volume controls apply immediately and persist", async ({
   await completeOnboarding(page);
   await page.getByRole("button", { name: "Settings", exact: true }).click();
 
-  await page.getByRole("checkbox", { name: /^Reduced motion/ }).check();
+  const reducedMotion = page.getByRole("checkbox", { name: /^Reduced motion/ });
+  const reducedMotionTrack = reducedMotion.locator("xpath=following-sibling::*[contains(@class, 'toggle-track')]");
+  await reducedMotion.focus();
+  await page.keyboard.press(testInfo.project.name === "webkit" ? "Alt+Tab" : "Tab");
+  await page.keyboard.press(testInfo.project.name === "webkit" ? "Alt+Shift+Tab" : "Shift+Tab");
+  await expect(reducedMotion).toBeFocused();
+  await expect.poll(() => reducedMotionTrack.evaluate((element) => getComputedStyle(element).outlineStyle)).toBe("solid");
+  await expect.poll(() => reducedMotionTrack.evaluate((element) => getComputedStyle(element).outlineWidth)).toBe("3px");
+  await reducedMotion.check();
   await page.getByRole("checkbox", { name: /^Reduced screen shake/ }).check();
   await page.getByRole("checkbox", { name: /^High contrast/ }).check();
   await page.getByRole("checkbox", { name: /^Gameplay captions/ }).uncheck();
@@ -239,10 +273,9 @@ test("captions and critical race state have visible non-color labels", async ({ 
   await page.keyboard.down("w");
   await page.keyboard.down("Shift");
   await page.keyboard.down("Space");
-  await expect(page.locator(".caption-cue")).toContainText(
-    /Checkpoint|Cooling|landing|Barrier|Heat|Overheated/,
-    { timeout: 10_000 },
-  );
+  await expect(heat).toHaveAccessibleName(/Heat \d+ percent, overheated/, { timeout: 10_000 });
+  await expect(page.locator(".caption-cue")).toContainText("controls return at 35% heat");
+  await expect(page.locator(".race-hint")).toHaveText("Controls return when heat cools to 35%");
   await page.keyboard.up("w");
   await page.keyboard.up("Shift");
   await page.keyboard.up("Space");
@@ -264,6 +297,11 @@ test("renderer accessibility cues toggle live and fixed-step caps report dropped
   await expect(canvas).toHaveAttribute("data-track-guide-count", "5");
   await expect(canvas).toHaveAttribute("data-cooling-cue-shape", "snowflake");
   await expect.poll(async () => Number(await canvas.getAttribute("data-cooling-snowflake-count"))).toBeGreaterThan(0);
+  await expect(page.locator(".game-shell")).toHaveAttribute(
+    "data-race-gate-phase",
+    "racing",
+    { timeout: 15_000 },
+  );
 
   await page.keyboard.press("Escape");
   await page.getByRole("button", { name: "Settings", exact: true }).click();
@@ -300,6 +338,9 @@ test("mirrored touch controls swap sides without losing accessible labels", asyn
   const controls = page.getByLabel("Touch race controls");
   await expect(controls).toBeVisible();
   await expect(controls).toHaveClass(/mirrored/);
+  await expect(controls).toHaveAttribute("data-touch-icon-set", "rally-pictograms-v1");
+  await expect(controls.locator("[data-touch-icon]")).toHaveCount(6);
+  await expect(controls.locator("[data-touch-icon] svg[aria-hidden='true']")).toHaveCount(6);
   await expect.poll(() => controls.evaluate((element) => getComputedStyle(element).flexDirection)).toBe("row-reverse");
   await expect(page.getByRole("button", { name: "Move one lane left" })).toBeVisible();
   await expect(page.getByRole("button", { name: "Move one lane right" })).toBeVisible();
@@ -318,6 +359,194 @@ test("mirrored touch controls swap sides without losing accessible labels", asyn
   await expect(page.getByRole("dialog", { name: "Race paused" })).toBeVisible();
   await page.getByRole("button", { name: "Resume", exact: true }).click();
   await expect(page.getByRole("dialog", { name: "Race paused" })).toHaveCount(0);
+});
+
+test("320px through 780px race HUD and controls remain separated at 140% UI scale", async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== "chromium", "Single-browser narrow geometry gate");
+  await page.setViewportSize({ width: 320, height: 640 });
+  await completeOnboarding(page);
+  await page.getByRole("button", { name: "Settings", exact: true }).click();
+  await page.getByRole("slider", { name: /^UI scale/ }).fill("1.4");
+  await page.getByRole("button", { name: "Done", exact: true }).click();
+  await page.getByRole("button", { name: "Ride", exact: true }).click();
+  await page.getByRole("button", { name: /Practice/ }).click();
+  await expect(page.locator(".game-shell")).toHaveAttribute(
+    "data-race-gate-phase",
+    "racing",
+    { timeout: 15_000 },
+  );
+
+  const assertSeparated = async () => {
+    const viewport = await page.evaluate(() => ({
+      width: window.innerWidth,
+      height: window.innerHeight,
+    }));
+    const steering = await page.locator(".touch-steering").boundingBox();
+    const throttle = await page.locator(".touch-throttle").boundingBox();
+    const heat = await page.getByRole("meter", { name: /^Heat \d+ percent/ }).boundingBox();
+    const position = await page.locator(".position-block").boundingBox();
+    const timing = await page.locator(".timing-block").boundingBox();
+    const pause = await page.getByRole("button", { name: "Pause race" }).boundingBox();
+    const target = await page.locator(".target-hud").boundingBox();
+    expect(steering).not.toBeNull();
+    expect(throttle).not.toBeNull();
+    expect(heat).not.toBeNull();
+    expect(position).not.toBeNull();
+    expect(timing).not.toBeNull();
+    expect(pause).not.toBeNull();
+    expect(target).not.toBeNull();
+    for (const bounds of [steering, throttle, heat, position, timing, pause, target]) {
+      expect(bounds?.x ?? -1).toBeGreaterThanOrEqual(0);
+      expect((bounds?.x ?? 0) + (bounds?.width ?? viewport.width + 1)).toBeLessThanOrEqual(viewport.width);
+      expect(bounds?.y ?? -1).toBeGreaterThanOrEqual(0);
+      expect((bounds?.y ?? 0) + (bounds?.height ?? viewport.height + 1)).toBeLessThanOrEqual(viewport.height);
+    }
+    const overlaps = (first: NonNullable<typeof steering>, second: NonNullable<typeof steering>) => !(
+      first.x + first.width <= second.x
+      || second.x + second.width <= first.x
+      || first.y + first.height <= second.y
+      || second.y + second.height <= first.y
+    );
+    expect(overlaps(steering!, heat!)).toBe(false);
+    expect(overlaps(throttle!, heat!)).toBe(false);
+    expect(overlaps(position!, timing!)).toBe(false);
+    expect(overlaps(timing!, pause!)).toBe(false);
+    expect(overlaps(timing!, target!)).toBe(false);
+    if (viewport.width === 320) {
+      const [runFontSize, timingFontSize, targetFontSize] = await Promise.all([
+        page.locator(".position-block strong").evaluate((element) => Number.parseFloat(getComputedStyle(element).fontSize)),
+        page.locator(".timing-block strong").evaluate((element) => Number.parseFloat(getComputedStyle(element).fontSize)),
+        page.locator(".target-hud strong").evaluate((element) => Number.parseFloat(getComputedStyle(element).fontSize)),
+      ]);
+      expect(runFontSize).toBeGreaterThanOrEqual(15);
+      expect(timingFontSize).toBeGreaterThanOrEqual(33);
+      expect(targetFontSize).toBeGreaterThanOrEqual(18);
+    }
+    for (const button of await page.getByLabel("Touch race controls").getByRole("button").all()) {
+      const bounds = await button.boundingBox();
+      expect(bounds?.width ?? 0).toBeGreaterThanOrEqual(44);
+      expect(bounds?.height ?? 0).toBeGreaterThanOrEqual(44);
+    }
+  };
+
+  for (const width of [320, 621, 780]) {
+    await page.setViewportSize({ width, height: 640 });
+    await assertSeparated();
+  }
+  await page.getByRole("button", { name: "Pause race" }).click();
+  await page.getByRole("button", { name: "Settings", exact: true }).click();
+  await page.getByRole("button", { name: "play", exact: true }).click();
+  await page.getByRole("checkbox", { name: /^Mirror touch controls/ }).check();
+  await page.getByRole("button", { name: "Done", exact: true }).click();
+  await page.getByRole("button", { name: "Resume", exact: true }).click();
+  await expect(page.getByLabel("Touch race controls")).toHaveClass(/mirrored/);
+  for (const width of [320, 621, 780]) {
+    await page.setViewportSize({ width, height: 640 });
+    await assertSeparated();
+  }
+});
+
+test("short-phone pause dialog stays safe, scrollable, and touch operable at 140% UI scale", async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== "chromium", "Single-browser pause geometry gate");
+  await page.setViewportSize({ width: 320, height: 568 });
+  await completeOnboarding(page);
+  await page.getByRole("button", { name: "Settings", exact: true }).click();
+  await page.getByRole("slider", { name: /^UI scale/ }).fill("1.4");
+  await page.getByRole("button", { name: "Done", exact: true }).click();
+  await page.getByRole("button", { name: "Ride", exact: true }).click();
+  await page.getByRole("button", { name: /Practice/ }).click();
+  await expect(page.locator(".game-shell")).toHaveAttribute(
+    "data-race-gate-phase",
+    "racing",
+    { timeout: 15_000 },
+  );
+  await page.getByRole("button", { name: "Pause race" }).click();
+
+  const dialog = page.getByRole("dialog", { name: "Race paused" });
+  await expect(dialog).toBeVisible();
+  const geometry = await dialog.evaluate((element) => {
+    const bounds = element.getBoundingClientRect();
+    return {
+      top: bounds.top,
+      right: bounds.right,
+      bottom: bounds.bottom,
+      left: bounds.left,
+      overflowY: getComputedStyle(element).overflowY,
+    };
+  });
+  expect(geometry.top).toBeGreaterThanOrEqual(0);
+  expect(geometry.left).toBeGreaterThanOrEqual(0);
+  expect(geometry.right).toBeLessThanOrEqual(320);
+  expect(geometry.bottom).toBeLessThanOrEqual(568);
+  expect(geometry.overflowY).toBe("auto");
+  for (const button of await dialog.getByRole("button").all()) {
+    const bounds = await button.boundingBox();
+    expect(bounds?.height ?? 0).toBeGreaterThanOrEqual(44);
+  }
+});
+
+test("short-phone tutorial retains a touch-scrollable action area at 140% UI scale", async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== "chromium", "Single-browser tutorial geometry gate");
+  await page.setViewportSize({ width: 320, height: 568 });
+  await page.goto("/?qa-fast-race=1");
+  const tutorial = page.getByLabel("Rider school lesson");
+  await expect(tutorial).toBeVisible({ timeout: 15_000 });
+  await page.locator("html").evaluate((element) => element.style.setProperty("--ui-scale", "1.4"));
+
+  const geometry = await tutorial.evaluate((element) => {
+    const bounds = element.getBoundingClientRect();
+    const style = getComputedStyle(element);
+    element.scrollTop = element.scrollHeight;
+    return {
+      top: bounds.top,
+      bottom: bounds.bottom,
+      height: bounds.height,
+      clientHeight: element.clientHeight,
+      scrollHeight: element.scrollHeight,
+      scrollTop: element.scrollTop,
+      touchAction: style.touchAction,
+      overscrollBehavior: style.overscrollBehavior,
+    };
+  });
+  expect(geometry.top).toBeGreaterThanOrEqual(0);
+  expect(geometry.bottom).toBeLessThanOrEqual(568);
+  expect(geometry.height).toBeGreaterThanOrEqual(128);
+  expect(geometry.scrollHeight).toBeGreaterThan(geometry.clientHeight);
+  expect(geometry.scrollTop).toBeGreaterThan(0);
+  expect(geometry.touchAction).toBe("pan-y");
+  expect(geometry.overscrollBehavior).toBe("contain");
+  const startLesson = tutorial.getByRole("button", { name: "Start lesson 1" });
+  await startLesson.scrollIntoViewIfNeeded();
+  await expect(startLesson).toBeVisible();
+  await startLesson.click();
+
+  const lessonProgress = tutorial.getByRole("list", { name: /Lesson progress/ });
+  await lessonProgress.scrollIntoViewIfNeeded();
+  await expect(lessonProgress).toBeVisible();
+  await expect(lessonProgress.getByRole("listitem")).toHaveCount(12);
+  const progressGeometry = await lessonProgress.evaluate((element) => {
+    return {
+      clientWidth: element.clientWidth,
+      scrollWidth: element.scrollWidth,
+      markers: Array.from(element.children, (marker) => ({
+        clientWidth: marker.clientWidth,
+        scrollWidth: marker.scrollWidth,
+      })),
+    };
+  });
+  expect(progressGeometry.scrollWidth).toBeLessThanOrEqual(progressGeometry.clientWidth);
+  expect(progressGeometry.markers.every((marker) => (
+    marker.clientWidth >= 12
+    && marker.scrollWidth <= marker.clientWidth
+  ))).toBe(true);
+  for (const actionName of ["Retry this lesson", "Skip training"]) {
+    const action = tutorial.getByRole("button", { name: actionName, exact: true });
+    await action.scrollIntoViewIfNeeded();
+    await expect(action).toBeVisible();
+    const bounds = await action.boundingBox();
+    expect(bounds?.width ?? 0).toBeGreaterThanOrEqual(44);
+    expect(bounds?.height ?? 0).toBeGreaterThanOrEqual(44);
+  }
 });
 
 test("primary menus fit 16:9, ultrawide, tablet, and narrow viewports", async ({ page }, testInfo) => {

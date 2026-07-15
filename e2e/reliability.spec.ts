@@ -1,6 +1,9 @@
 import { expect, test, type Page } from "@playwright/test";
 
-function observeUnexpectedFailures(page: Page): () => void {
+function observeUnexpectedFailures(
+  page: Page,
+  allowedRequestFailure: (request: import("@playwright/test").Request) => boolean = () => false,
+): () => void {
   const consoleErrors: string[] = [];
   const pageErrors: string[] = [];
   const requestFailures: string[] = [];
@@ -10,6 +13,7 @@ function observeUnexpectedFailures(page: Page): () => void {
   });
   page.on("pageerror", (error) => pageErrors.push(error.message));
   page.on("requestfailed", (request) => {
+    if (allowedRequestFailure(request)) return;
     requestFailures.push(`${request.method()} ${request.url()} ${request.failure()?.errorText ?? "failed"}`);
   });
   page.on("response", (response) => {
@@ -44,8 +48,30 @@ test("unsupported WebGL presents recovery and menu paths instead of crashing", a
   await expect(page.getByRole("button", { name: "Ride", exact: true })).toBeVisible();
 });
 
-test.describe("compressed model network fallback", () => {
+test.describe("production asset network fallbacks", () => {
   test.use({ serviceWorkers: "block" });
+
+  test("a failed canyon panorama request keeps the tutorial playable", async ({ page }, testInfo) => {
+    test.skip(testInfo.project.name !== "chromium", "Environment fallback gate runs once in Chromium");
+    const panoramaRequests: string[] = [];
+    await page.route("**/assets/art/canyon-festival-panorama.png", async (route) => {
+      panoramaRequests.push(route.request().url());
+      await route.abort("failed");
+    });
+
+    await page.goto("/");
+    const canvas = page.getByLabel("Live 3D race on Canyon Kickoff");
+    await expect(canvas).toBeVisible();
+    await expect(canvas).toHaveAttribute("data-environment-asset", "fallback", { timeout: 10_000 });
+    expect(panoramaRequests).toEqual([
+      "http://127.0.0.1:4173/assets/art/canyon-festival-panorama.png",
+    ]);
+
+    await page.getByRole("button", { name: "Start lesson 1" }).click();
+    await page.keyboard.down("w");
+    await expect(page.getByRole("heading", { name: "Coast to slow" })).toBeVisible({ timeout: 10_000 });
+    await page.keyboard.up("w");
+  });
 
   test("a failed same-origin compressed model request keeps the playable fallback", async ({ page }, testInfo) => {
     test.skip(testInfo.project.name !== "chromium", "Asset fallback gate runs once in Chromium");
@@ -65,6 +91,41 @@ test.describe("compressed model network fallback", () => {
     await page.keyboard.down("w");
     await expect(page.getByRole("heading", { name: "Coast to slow" })).toBeVisible({ timeout: 10_000 });
     await page.keyboard.up("w");
+  });
+
+  test("a stalled compressed model request reaches the fallback and starts the race", async ({ page }, testInfo) => {
+    test.skip(testInfo.project.name !== "chromium", "Asset deadline gate runs once in Chromium");
+    test.setTimeout(30_000);
+    let abortedModelRequests = 0;
+    const assertCleanRuntime = observeUnexpectedFailures(
+      page,
+      (request) => request.url().endsWith("/assets/3d/festival-trail-bike.glb"),
+    );
+    page.on("requestfailed", (request) => {
+      if (request.url().endsWith("/assets/3d/festival-trail-bike.glb")) abortedModelRequests += 1;
+    });
+    await page.goto("/?qa-fast-race=1");
+    const canvas = page.getByLabel("Live 3D race on Canyon Kickoff");
+    await expect(canvas).toHaveAttribute("data-bike-asset", "ready", { timeout: 10_000 });
+
+    // Install the stall only after the tutorial model has settled, so the
+    // observed abort belongs to the subsequent Practice engine deadline.
+    await page.route("**/assets/3d/festival-trail-bike.glb", async (route) => {
+      await new Promise((resolve) => setTimeout(resolve, 6_250));
+      await route.continue().catch(() => undefined);
+    });
+
+    await page.getByRole("button", { name: "Skip training" }).click();
+    await page.getByRole("button", { name: "Ride", exact: true }).click();
+    await page.getByRole("button", { name: /^03 Practice/ }).click();
+
+    await expect(canvas).toHaveAttribute("data-bike-asset", "fallback", { timeout: 10_000 });
+    await expect(page.locator(".timing-block > strong")).toHaveText("00:00.00");
+    await expect(page.getByLabel("Go. Ride now.")).toBeVisible({ timeout: 10_000 });
+    await expect(page.locator(".game-shell")).toHaveAttribute("data-race-gate-phase", "racing");
+    await expect(canvas).toHaveAttribute("data-bike-asset", "fallback");
+    expect(abortedModelRequests).toBe(1);
+    assertCleanRuntime();
   });
 });
 
@@ -123,6 +184,13 @@ test("unavailable IndexedDB discloses session mode while a race remains playable
   });
 
   await page.goto("/?qa-fast-race=1");
+  await expect(page.getByRole("heading", { name: "Rider school" })).toBeVisible();
+  const tutorialNotice = page.getByRole("alert");
+  await expect(tutorialNotice).toContainText("Device saving unavailable");
+  await expect(tutorialNotice).toContainText("Rider School remains playable in session mode");
+  await expect(page.getByRole("button", { name: "Skip training" })).toBeVisible();
+  await page.getByRole("button", { name: "Skip training" }).click();
+
   await expect(page.getByRole("button", { name: "Ride", exact: true })).toBeVisible();
   const notice = page.getByRole("alert");
   await expect(notice.getByRole("heading", { name: "Device saving unavailable" })).toBeVisible();
@@ -138,6 +206,48 @@ test("unavailable IndexedDB discloses session mode while a race remains playable
   await page.getByRole("button", { name: "Ride", exact: true }).click();
   await page.getByRole("button", { name: /^03 Practice/ }).click();
   await expect(page.getByLabel("Live 3D race on Canyon Kickoff")).toBeVisible();
+  assertCleanRuntime();
+});
+
+test("session-mode Track Builder restores its unsaved draft and history after Test Ride", async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== "chromium", "IndexedDB editor fallback runs once in Chromium");
+  const assertCleanRuntime = observeUnexpectedFailures(page);
+  await page.addInitScript(() => {
+    Object.defineProperty(window, "indexedDB", {
+      configurable: true,
+      value: undefined,
+    });
+  });
+
+  await page.goto("/");
+  await page.getByRole("button", { name: "Skip training" }).click();
+  await page.getByRole("button", { name: "Track Builder", exact: true }).click();
+  const persistenceNotice = page.getByRole("alert");
+  await expect(persistenceNotice).toContainText("Editing and test rides still work this session");
+  await expect(persistenceNotice).toContainText("Use Export for a valid draft");
+
+  await page.getByLabel(/Interactive 3D track build camera/).click({ position: { x: 430, y: 330 } });
+  await page.getByRole("button", { name: "terrain", exact: true }).click();
+  const mudPatch = page.getByRole("button", { name: /^Mud Patch/ });
+  await mudPatch.click();
+  await page.getByLabel("Track name").fill("Session Workshop");
+  await expect(page.getByText("2 / 50 actions", { exact: true })).toBeVisible();
+
+  await page.getByRole("button", { name: "Test Ride", exact: true }).click();
+  const race = page.getByLabel("Live 3D race on Session Workshop");
+  await expect(race).toBeVisible();
+  await expect(page.locator(".game-shell")).toHaveAttribute("data-race-gate-phase", "racing", { timeout: 15_000 });
+  await race.press("Escape");
+  await page.getByRole("button", { name: "Return to Track Builder", exact: true }).click();
+
+  await expect(page.getByLabel("Track name")).toHaveValue("Session Workshop");
+  await expect(page.getByText("4 modules", { exact: true })).toBeVisible();
+  await expect(page.getByText("2 / 50 actions", { exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: "terrain", exact: true })).toHaveClass(/active/);
+  await expect(page.getByRole("button", { name: /^Mud Patch/ })).toHaveClass(/active/);
+  await expect(page.getByLabel("Lane")).toBeVisible();
+  await expect(page.getByRole("alert")).toContainText("Use Export for a valid draft");
+  await expect(page.getByRole("button", { name: "Export", exact: true })).toBeVisible();
   assertCleanRuntime();
 });
 

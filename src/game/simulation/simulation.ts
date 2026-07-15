@@ -4,6 +4,7 @@ import {
   LANE_POSITIONS,
   NEUTRAL_INPUT,
   type BikeState,
+  type CrashCause,
   type LaneChange,
   type LaneIndex,
   type RaceState,
@@ -22,6 +23,8 @@ const PHYSICS = Object.freeze({
   coastDeceleration: 10,
   surfaceDeceleration: 24,
   laneTransitionSpeed: 12,
+  standardHeatPerSecond: 8,
+  standardHeatCeiling: 62,
   turboHeatPerSecond: 42,
   passiveCoolingPerSecond: 14,
   overheatCoolingPerSecond: 20,
@@ -89,6 +92,7 @@ function createBikeState(
     wheelie: false,
     recoveryProgress: 0,
     lastLanding: null,
+    crashCause: null,
     surface: "dirt",
   };
 }
@@ -257,13 +261,14 @@ export class RaceSimulation {
   }
 
   /** Collision systems can use this for rider or obstacle impacts. */
-  forceCrash(): void {
+  forceCrash(cause: CrashCause = "external"): void {
     const bike = this.stateValue.bike;
     if (bike.phase === "crashed" || bike.phase === "recovering") {
       return;
     }
 
     bike.phase = "crashed";
+    bike.crashCause = cause;
     bike.speed = 0;
     bike.height = 0;
     bike.verticalVelocity = 0;
@@ -348,6 +353,15 @@ export class RaceSimulation {
 
     if (input.turbo && canUseTurbo) {
       bike.heat += PHYSICS.turboHeatPerSecond * FIXED_DT;
+    } else if (input.throttle && canUseTurbo && surface !== "cooling") {
+      const standardHeatRate = bike.heat < PHYSICS.standardHeatCeiling
+        ? PHYSICS.standardHeatPerSecond
+        : PHYSICS.passiveCoolingPerSecond;
+      bike.heat = approach(
+        bike.heat,
+        PHYSICS.standardHeatCeiling,
+        standardHeatRate * FIXED_DT,
+      );
     } else {
       const coolingRate = bike.overheated
         ? PHYSICS.overheatCoolingPerSecond
@@ -391,6 +405,7 @@ export class RaceSimulation {
 
       if (bike.recoveryProgress >= 1) {
         bike.phase = "recovering";
+        bike.crashCause = null;
         bike.recoveryProgress = 0;
         this.recoverLatch = false;
       }
@@ -474,7 +489,7 @@ export class RaceSimulation {
     if (bike.wheelie && normalizedPitch > 0) {
       this.wheelieSeconds += FIXED_DT;
       if (this.wheelieSeconds >= this.wheelieCrashSeconds) {
-        this.forceCrash();
+        this.forceCrash("wheelie-timeout");
       }
     } else {
       this.wheelieSeconds = 0;
@@ -539,7 +554,7 @@ export class RaceSimulation {
       bike.pitch *= 0.2;
     } else {
       bike.lastLanding = "crash";
-      this.forceCrash();
+      this.forceCrash("landing");
     }
   }
 }

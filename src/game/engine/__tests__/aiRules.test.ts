@@ -18,6 +18,7 @@ import {
   getAiPitchControl,
   getObstaclePolicy,
   resolveRiderCollision,
+  resolveRiderPairCollision,
 } from "../aiRules";
 
 const throttle: SimulationInput = {
@@ -205,6 +206,65 @@ describe("AI behavior and collision policy", () => {
       playerPhase: "airborne",
       aiPhase: "grounded",
       behavior: "route",
+    })).toBeNull();
+  });
+
+  it("applies the same rear-impact rule between rival riders", () => {
+    expect(resolveRiderPairCollision({
+      sameLane: true,
+      gap: 1,
+      firstSpeed: 14,
+      secondSpeed: 12,
+      firstPhase: "grounded",
+      secondPhase: "grounded",
+    })).toBe("first-rider-crashes");
+    expect(resolveRiderPairCollision({
+      sameLane: true,
+      gap: -1,
+      firstSpeed: 12,
+      secondSpeed: 14,
+      firstPhase: "grounded",
+      secondPhase: "grounded",
+    })).toBe("second-rider-crashes");
+    expect(resolveRiderPairCollision({
+      sameLane: true,
+      gap: 1.7,
+      firstSpeed: 14,
+      secondSpeed: 12,
+      firstPhase: "grounded",
+      secondPhase: "grounded",
+    })).toBe("first-rider-crashes");
+    expect(resolveRiderPairCollision({
+      sameLane: true,
+      gap: -1.7,
+      firstSpeed: 12,
+      secondSpeed: 14,
+      firstPhase: "grounded",
+      secondPhase: "grounded",
+    })).toBe("second-rider-crashes");
+    expect(resolveRiderPairCollision({
+      sameLane: false,
+      gap: 1,
+      firstSpeed: 14,
+      secondSpeed: 12,
+      firstPhase: "grounded",
+      secondPhase: "grounded",
+    })).toBeNull();
+    expect(resolveRiderPairCollision({
+      sameLane: true,
+      gap: 1.8,
+      firstSpeed: 14,
+      secondSpeed: 12,
+      firstPhase: "grounded",
+      secondPhase: "grounded",
+    })).toBeNull();
+    expect(resolveRiderPairCollision({
+      sameLane: true,
+      gap: 1,
+      firstSpeed: 14,
+      secondSpeed: 12,
+      firstPhase: "airborne",
+      secondPhase: "grounded",
     })).toBeNull();
   });
 });

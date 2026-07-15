@@ -38,15 +38,15 @@ export class AudioManager {
     this.settings = settings;
   }
 
-  async unlock(): Promise<void> {
+  async unlock(): Promise<boolean> {
     if (!this.context) {
-      if (typeof AudioContext === "undefined") return;
+      if (typeof AudioContext === "undefined") return false;
       try {
         this.context = new AudioContext();
         startLifecycleResource("audioContexts");
       } catch {
         this.context = null;
-        return;
+        return false;
       }
       this.master = this.context.createGain();
       this.master.gain.value = this.paused ? 0 : this.settings.master;
@@ -58,7 +58,15 @@ export class AudioManager {
       this.musicBus.connect(this.master);
       this.master.connect(this.context.destination);
     }
-    if (!this.paused && this.context.state === "suspended") await this.context.resume();
+    const context = this.context;
+    if (context.state !== "running") {
+      try {
+        await context.resume();
+      } catch {
+        return false;
+      }
+    }
+    return this.context === context && context.state === "running";
   }
 
   updateSettings(settings: AudioSettings): void {
@@ -73,7 +81,7 @@ export class AudioManager {
   startEngine(): void {
     const context = this.context;
     const sfxBus = this.sfxBus;
-    if (!context || !sfxBus || this.engineOscillator) return;
+    if (!context || context.state !== "running" || !sfxBus || this.engineOscillator) return;
     const oscillator = context.createOscillator();
     const gain = context.createGain();
     const filter = context.createBiquadFilter();
@@ -180,7 +188,12 @@ export class AudioManager {
   }
 
   private startMusicTimer(): void {
-    if (this.paused || !this.engineOscillator || this.musicTimer !== null) return;
+    if (
+      this.paused
+      || this.context?.state !== "running"
+      || !this.engineOscillator
+      || this.musicTimer !== null
+    ) return;
     this.playMusicPulse();
     this.musicTimer = window.setInterval(() => this.playMusicPulse(), 620);
     startLifecycleResource("audioIntervals");
@@ -234,7 +247,7 @@ export class AudioManager {
   private playMusicPulse(): void {
     const context = this.context;
     const musicBus = this.musicBus;
-    if (!context || !musicBus || this.settings.music <= 0) return;
+    if (!context || context.state !== "running" || !musicBus || this.settings.music <= 0) return;
     const notes = [110, 146.83, 164.81, 130.81, 196, 164.81, 146.83, 123.47];
     const now = context.currentTime;
     const oscillator = context.createOscillator();

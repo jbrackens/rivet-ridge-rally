@@ -8,10 +8,22 @@ import { getLifecycleDiagnostics } from "./game/qa/lifecycleDiagnostics";
 import "./styles.css";
 
 const root = document.getElementById("root");
+const OFFLINE_CACHE_NAME = "rivet-ridge-rally-shell-v30";
+const OFFLINE_READINESS_EVENT = "rivet-ridge-rally:offline-readiness-change";
+const OFFLINE_PREPARATION_TIMEOUT_MS = 20_000;
+
+interface OfflineCacheAcknowledgement {
+  cacheName?: string;
+  ok?: boolean;
+}
 
 if (!root) {
   throw new Error("Application root is missing.");
 }
+
+window.__RRR_BUILD__ = Object.freeze({ ...__RRR_BUILD_IDENTITY__ });
+document.documentElement.dataset.buildCommit = window.__RRR_BUILD__.commit;
+document.documentElement.dataset.buildDirty = String(window.__RRR_BUILD__.dirty);
 
 createRoot(root).render(<App />);
 
@@ -36,24 +48,32 @@ if (import.meta.env.VITE_QA_MODE === "1") {
 }
 
 if (import.meta.env.PROD && "serviceWorker" in navigator) {
+  navigator.serviceWorker.addEventListener("controllerchange", clearOfflineReadiness);
   window.addEventListener("load", () => {
     void prepareOfflineShell().catch(() => undefined);
   });
 }
 
+function clearOfflineReadiness(): void {
+  delete document.documentElement.dataset.offlineReady;
+  delete document.documentElement.dataset.offlineCache;
+  window.dispatchEvent(new Event(OFFLINE_READINESS_EVENT));
+}
+
 async function prepareOfflineShell(): Promise<void> {
+  clearOfflineReadiness();
+
   const registration = await navigator.serviceWorker.register("/sw.js");
-  const readyRegistration = await navigator.serviceWorker.ready;
-  const worker = readyRegistration.active ?? registration.active;
-  if (!worker) return;
+  registration.waiting?.postMessage({ type: "SKIP_WAITING" });
 
   // Warm route chunks only after the initial screen has loaded. They remain
   // lazy for startup, while an installed offline shell can still open races
   // and the local track builder on a later disconnected visit.
-  await Promise.allSettled([
+  const routeChunks = await Promise.allSettled([
     import("./ui/game/GameView"),
     import("./ui/editor/TrackEditorScreen"),
   ]);
+  if (routeChunks.some((result) => result.status === "rejected")) return;
 
   const resourceUrls = performance.getEntriesByType("resource")
     .map((entry) => entry.name)
@@ -63,31 +83,104 @@ async function prepareOfflineShell(): Promise<void> {
     new URL("/index.html", window.location.origin).href,
   );
 
-  const channel = new MessageChannel();
-  const acknowledged = new Promise<boolean>((resolve) => {
-    const timeout = window.setTimeout(() => resolve(false), 10_000);
-    channel.port1.onmessage = (event: MessageEvent<{ ok?: boolean }>) => {
+  if (!(await cacheWithCurrentGeneration(registration, [...new Set(resourceUrls)]))) return;
+
+  document.documentElement.dataset.offlineCache = OFFLINE_CACHE_NAME;
+  document.documentElement.dataset.offlineReady = "true";
+  window.dispatchEvent(new Event(OFFLINE_READINESS_EVENT));
+}
+
+async function cacheWithCurrentGeneration(
+  registration: ServiceWorkerRegistration,
+  resourceUrls: string[],
+): Promise<boolean> {
+  const deadline = Date.now() + OFFLINE_PREPARATION_TIMEOUT_MS;
+  let worker = navigator.serviceWorker.controller;
+
+  // Upgrades can begin under the previous controller. Its acknowledgement is
+  // rejected by cache identity, then retried after the controller changes.
+  while (Date.now() < deadline) {
+    if (!worker) {
+      worker = await waitForDifferentController(null, deadline - Date.now());
+      if (!worker) return false;
+    }
+
+    const acknowledgement = await requestRuntimeCache(
+      worker,
+      resourceUrls,
+      Math.min(10_000, Math.max(1, deadline - Date.now())),
+    );
+    if (acknowledgement?.cacheName === OFFLINE_CACHE_NAME) {
+      if (navigator.serviceWorker.controller !== worker) {
+        worker = navigator.serviceWorker.controller;
+        continue;
+      }
+      return acknowledgement.ok === true;
+    }
+
+    registration.waiting?.postMessage({ type: "SKIP_WAITING" });
+    worker = await waitForDifferentController(worker, deadline - Date.now());
+    if (!worker) return false;
+  }
+
+  return false;
+}
+
+function requestRuntimeCache(
+  worker: ServiceWorker,
+  resourceUrls: string[],
+  timeoutMs: number,
+): Promise<OfflineCacheAcknowledgement | null> {
+  return new Promise((resolve) => {
+    const channel = new MessageChannel();
+    let settled = false;
+    let timeout = 0;
+    const finish = (value: OfflineCacheAcknowledgement | null) => {
+      if (settled) return;
+      settled = true;
       window.clearTimeout(timeout);
-      resolve(event.data?.ok === true);
+      channel.port1.close();
+      resolve(value);
     };
+    timeout = window.setTimeout(() => finish(null), timeoutMs);
+    channel.port1.onmessage = (event: MessageEvent<OfflineCacheAcknowledgement>) => finish(event.data);
+    channel.port1.onmessageerror = () => finish(null);
+
+    try {
+      worker.postMessage(
+        { type: "CACHE_RUNTIME_RESOURCES", urls: resourceUrls },
+        [channel.port2],
+      );
+    } catch {
+      finish(null);
+    }
   });
+}
 
-  worker.postMessage(
-    { type: "CACHE_RUNTIME_RESOURCES", urls: [...new Set(resourceUrls)] },
-    [channel.port2],
-  );
+function waitForDifferentController(
+  previous: ServiceWorker | null,
+  timeoutMs: number,
+): Promise<ServiceWorker | null> {
+  const current = navigator.serviceWorker.controller;
+  if (current && current !== previous) return Promise.resolve(current);
+  if (timeoutMs <= 0) return Promise.resolve(null);
 
-  if (!(await acknowledged)) return;
-  if (!navigator.serviceWorker.controller) {
-    await new Promise<void>((resolve) => {
-      const timeout = window.setTimeout(resolve, 10_000);
-      navigator.serviceWorker.addEventListener("controllerchange", () => {
-        window.clearTimeout(timeout);
-        resolve();
-      }, { once: true });
-    });
-  }
-  if (navigator.serviceWorker.controller) {
-    document.documentElement.dataset.offlineReady = "true";
-  }
+  return new Promise((resolve) => {
+    let settled = false;
+    let timeout = 0;
+    const finish = (value: ServiceWorker | null) => {
+      if (settled) return;
+      settled = true;
+      window.clearTimeout(timeout);
+      navigator.serviceWorker.removeEventListener("controllerchange", onControllerChange);
+      resolve(value);
+    };
+    const onControllerChange = () => {
+      const controller = navigator.serviceWorker.controller;
+      if (controller && controller !== previous) finish(controller);
+    };
+    timeout = window.setTimeout(() => finish(null), timeoutMs);
+    navigator.serviceWorker.addEventListener("controllerchange", onControllerChange);
+    onControllerChange();
+  });
 }

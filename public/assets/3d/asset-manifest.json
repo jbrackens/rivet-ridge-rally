@@ -8,9 +8,9 @@
   "compression": {
     "geometry": "EXT_meshopt_compression (required, high/filter mode)",
     "quantization": "KHR_mesh_quantization (required)",
-    "uncompressedGlbBytes": 22076,
-    "compressedGlbBytes": 15172,
-    "glbReductionPercent": 31.3,
+    "uncompressedGlbBytes": 54868,
+    "compressedGlbBytes": 29132,
+    "glbReductionPercent": 46.9,
     "texture": "KTX2 ETC1S with BasisLZ supercompression, sRGB transfer, and 8 mip levels",
     "textureDimensions": [
       128,
@@ -77,8 +77,8 @@
   "files": [
     {
       "path": "public/assets/3d/festival-trail-bike.glb",
-      "bytes": 15172,
-      "sha256": "a748123dff38f90dbd29c476244cbffe8fe93d7c8a20de909e6c040af52d2123"
+      "bytes": 29132,
+      "sha256": "8668d05f42f3b8303c0825b8d4aa4b9c66a8ef64acba18f2df70b69f9a8f595b"
     },
     {
       "path": "public/assets/3d/festival-bike-albedo.ktx2",

@@ -121,6 +121,11 @@ async function startPractice(page: Page, path = "/?qa-fast-race=1"): Promise<voi
   await page.getByRole("button", { name: "Ride", exact: true }).click();
   await page.getByRole("button", { name: /Practice/ }).click();
   await expect(page.getByLabel("Live 3D race on Canyon Kickoff")).toBeVisible();
+  await expect(page.locator(".game-shell")).toHaveAttribute(
+    "data-race-gate-phase",
+    "racing",
+    { timeout: 15_000 },
+  );
   await expect.poll(async () => (await lifecycle(page)).active.gameEngines).toBe(1);
   await expect.poll(() => page.getByLabel("Performance metrics").textContent()).toMatch(/[1-9]\d* draws/);
 }
@@ -236,6 +241,12 @@ test("visibility loss pauses and safely suspends simulation, held input, and rac
 
   await setSyntheticVisibility(page, true);
   await expect(page.getByRole("dialog", { name: "Race paused" })).toBeVisible();
+  await page.evaluate(() => window.dispatchEvent(new KeyboardEvent("keydown", {
+    bubbles: true,
+    code: "Escape",
+    repeat: true,
+  })));
+  await expect(page.getByRole("dialog", { name: "Race paused" })).toBeVisible();
   await expect(page.locator(".game-shell")).toHaveAttribute("data-paused", "true");
   await expect.poll(async () => {
     const snapshot = await lifecycle(page);
@@ -270,6 +281,85 @@ test("visibility loss pauses and safely suspends simulation, held input, and rac
   assertNoFailures();
 });
 
+test("device-storage recovery in paused Settings preserves the live race attempt", async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== "chromium", "IndexedDB recovery lifecycle gate runs once in Chromium");
+  await page.addInitScript(() => {
+    const originalPut = IDBObjectStore.prototype.put;
+    Object.defineProperty(IDBObjectStore.prototype, "put", {
+      configurable: true,
+      value(this: IDBObjectStore, ...args: unknown[]) {
+        const controlledWindow = window as typeof window & { __rrrFailPersistenceWrites?: boolean };
+        if (controlledWindow.__rrrFailPersistenceWrites) {
+          throw new DOMException("QA storage quota reached.", "QuotaExceededError");
+        }
+        return Reflect.apply(originalPut, this, args) as IDBRequest<IDBValidKey>;
+      },
+    });
+  });
+  const assertNoFailures = observeLifecycleFailures(page);
+  await startPractice(page);
+  await expect.poll(() => raceTimeMs(page)).toBeGreaterThan(200);
+  const beforeRecovery = await lifecycle(page);
+
+  await page.keyboard.press("Escape");
+  await page.getByRole("button", { name: "Settings", exact: true }).click();
+  await page.evaluate(() => {
+    (window as typeof window & { __rrrFailPersistenceWrites?: boolean }).__rrrFailPersistenceWrites = true;
+  });
+  await page.getByLabel("High contrast").check();
+  await expect(page.getByRole("alert").getByRole("heading", { name: "Device storage is full" })).toBeVisible();
+
+  await page.evaluate(() => {
+    (window as typeof window & { __rrrFailPersistenceWrites?: boolean }).__rrrFailPersistenceWrites = false;
+  });
+  await page.getByRole("alert").getByRole("button", { name: "Retry device saving" }).click();
+  await expect(page.getByRole("alert")).toHaveCount(0);
+  const afterRecovery = await lifecycle(page);
+  expect({
+    gameEngineStarts: afterRecovery.started.gameEngines,
+    gameEngines: afterRecovery.active.gameEngines,
+    webglContexts: afterRecovery.active.webglContexts,
+    engineRenderLoops: afterRecovery.active.engineRenderLoops,
+  }).toEqual({
+    gameEngineStarts: beforeRecovery.started.gameEngines,
+    gameEngines: 1,
+    webglContexts: 1,
+    engineRenderLoops: 1,
+  });
+
+  await page.getByRole("button", { name: "Done", exact: true }).click();
+  await expect(page.getByRole("dialog", { name: "Race paused" })).toBeVisible();
+  const pausedAt = await raceTimeMs(page);
+  await page.getByRole("button", { name: "Resume", exact: true }).click();
+  await expect.poll(() => raceTimeMs(page)).toBeGreaterThan(pausedAt);
+  assertNoFailures();
+});
+
+test("visibility loss pauses the tutorial and defers a cleared lesson", async ({ page }, testInfo) => {
+  test.skip(!desktopLifecycleProject(testInfo.project.name), "Desktop Chromium/WebKit lifecycle gate");
+  await installVisibilityControl(page);
+  const assertNoFailures = observeLifecycleFailures(page);
+  await page.goto("/");
+  await expect(page.getByRole("heading", { name: "Rider school" })).toBeVisible({ timeout: 15_000 });
+  await page.getByRole("button", { name: "Start lesson 1" }).click();
+
+  await page.keyboard.down("w");
+  await expect(page.getByText("Lesson cleared", { exact: true })).toBeVisible({ timeout: 10_000 });
+  await setSyntheticVisibility(page, true);
+  await page.keyboard.up("w");
+
+  await expect(page.getByRole("dialog", { name: "Training paused" })).toBeVisible();
+  await expect(page.locator(".game-shell")).toHaveAttribute("data-paused", "true");
+  await page.waitForTimeout(700);
+  await setSyntheticVisibility(page, false);
+  await expect(page.getByRole("dialog", { name: "Training paused" })).toBeVisible();
+
+  await page.getByRole("button", { name: "Resume lesson" }).click();
+  await expect(page.getByRole("heading", { name: "Ride and read the HUD" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Coast to slow" })).toBeVisible({ timeout: 2_000 });
+  assertNoFailures();
+});
+
 test("twenty immediate restarts reuse one WebGL context and retain one engine lifecycle", async ({ page }, testInfo) => {
   test.skip(!desktopLifecycleProject(testInfo.project.name), "Desktop Chromium/WebKit lifecycle gate");
   test.setTimeout(180_000);
@@ -300,6 +390,11 @@ test("twenty immediate restarts reuse one WebGL context and retain one engine li
 
   for (let restart = 1; restart <= 20; restart += 1) {
     await test.step(`restart ${restart} of 20`, async () => {
+      await expect(page.locator(".game-shell")).toHaveAttribute(
+        "data-race-gate-phase",
+        "racing",
+        { timeout: 15_000 },
+      );
       await page.keyboard.press("Escape");
       await expect(page.getByRole("dialog", { name: "Race paused" })).toBeVisible();
       await page.getByRole("button", { name: "Restart now" }).click();

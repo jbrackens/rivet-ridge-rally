@@ -1,7 +1,17 @@
 import { describe, expect, it } from "vitest";
 
 import { EXAMPLE_TRACKS } from "../examples";
-import { validateCustomTrack } from "../validation";
+import {
+  CUSTOM_TRACK_MODULE_LIMIT,
+  CUSTOM_TRACK_ROUTE_ELEVATION_LIMIT,
+  CUSTOM_TRACK_ROUTE_LATERAL_LIMIT,
+  CUSTOM_TRACK_ROUTE_MAX_GRADE_DEGREES,
+  CUSTOM_TRACK_ROUTE_MAX_YAW_DEGREES,
+  CUSTOM_TRACK_ROUTE_MIN_RADIUS,
+  validateCustomTrack,
+  validateCustomTrackPlacement,
+  validateLegacyCustomTrack,
+} from "../validation";
 import type { CustomTrackData, CustomTrackModule } from "../../persistence/database";
 
 function cloneExample(): CustomTrackData {
@@ -38,6 +48,30 @@ function minimalTrack(modules: CustomTrackModule[] = []): CustomTrackData {
   return track;
 }
 
+function boundedTrack(modules: CustomTrackModule[] = []): CustomTrackData {
+  const track = cloneExample();
+  track.modules = [
+    placement("bounded-start", "start-grid", 0, 20),
+    placement("bounded-checkpoint", "checkpoint", 0, 60),
+    placement("bounded-finish", "finish-arch", 0, 100),
+    ...modules,
+  ];
+  return track;
+}
+
+function trackWithModuleCount(moduleCount: number): CustomTrackData {
+  const track = cloneExample();
+  const checkpointCount = moduleCount - 2;
+  track.modules = [
+    placement("boundary-start", "start-grid", 0, 0),
+    ...Array.from({ length: checkpointCount }, (_, index) => (
+      placement(`boundary-checkpoint-${index + 1}`, "checkpoint", 0, index + 1)
+    )),
+    placement("boundary-finish", "finish-arch", 0, checkpointCount + 1),
+  ];
+  return track;
+}
+
 describe("custom track validation", () => {
   it("accepts every bundled editor example", () => {
     for (const track of EXAMPLE_TRACKS) {
@@ -45,6 +79,60 @@ describe("custom track validation", () => {
         valid: true,
         errors: [],
       });
+    }
+  });
+
+  it("ships schema-v2 examples with safe nonzero checkpoint route anchors", () => {
+    for (const track of EXAMPLE_TRACKS) {
+      expect(track.schemaVersion).toBe(2);
+      expect(track.modules.filter((module) => (
+        module.moduleId !== "checkpoint" && module.routeAnchor !== undefined
+      ))).toEqual([]);
+      const checkpoints = track.modules
+        .filter((module) => module.moduleId === "checkpoint")
+        .sort((first, second) => first.gridPosition - second.gridPosition);
+      expect(checkpoints.length).toBeGreaterThan(0);
+      const checkpointAnchors = checkpoints.map((checkpoint) => {
+        const anchor = checkpoint.routeAnchor;
+        if (!anchor) throw new Error(`${track.name} checkpoint ${checkpoint.id} needs a route anchor.`);
+        expect(anchor.lateralOffset).not.toBe(0);
+        expect(anchor.lateralOffset).toBeGreaterThanOrEqual(-CUSTOM_TRACK_ROUTE_LATERAL_LIMIT);
+        expect(anchor.lateralOffset).toBeLessThanOrEqual(CUSTOM_TRACK_ROUTE_LATERAL_LIMIT);
+        expect(anchor.elevation).toBeGreaterThan(0);
+        expect(anchor.elevation).toBeLessThanOrEqual(CUSTOM_TRACK_ROUTE_ELEVATION_LIMIT);
+        return { distance: checkpoint.gridPosition, ...anchor };
+      });
+      const start = findModule(track, "start-grid");
+      const finish = findModule(track, "finish-arch");
+      const routeAnchors = [
+        { distance: start.gridPosition, lateralOffset: 0, elevation: 0 },
+        ...checkpointAnchors,
+        { distance: finish.gridPosition, lateralOffset: 0, elevation: 0 },
+      ];
+      for (let index = 1; index < routeAnchors.length; index += 1) {
+        const previous = routeAnchors[index - 1];
+        const current = routeAnchors[index];
+        if (!previous || !current) throw new Error("Expected an adjacent route-anchor pair.");
+        const distance = current.distance - previous.distance;
+        const lateralDelta = Math.abs(current.lateralOffset - previous.lateralOffset);
+        const lateralDerivative = 1.875 * lateralDelta / distance;
+        const elevationDerivative = 1.875 * Math.abs(current.elevation - previous.elevation) / distance;
+        const lateralCurvature = (10 / Math.sqrt(3)) * lateralDelta / distance ** 2;
+        const elevationCurvature = (10 / Math.sqrt(3))
+          * Math.abs(current.elevation - previous.elevation) / distance ** 2;
+        const longitudinalDerivative = Math.sqrt(
+          1 - lateralDerivative ** 2 - elevationDerivative ** 2,
+        );
+        expect(Math.atan2(lateralDerivative, longitudinalDerivative)).toBeLessThanOrEqual(
+          CUSTOM_TRACK_ROUTE_MAX_YAW_DEGREES * Math.PI / 180,
+        );
+        expect(elevationDerivative).toBeLessThanOrEqual(Math.sin(
+          CUSTOM_TRACK_ROUTE_MAX_GRADE_DEGREES * Math.PI / 180,
+        ));
+        expect(lateralDerivative ** 2 + elevationDerivative ** 2).toBeLessThan(1);
+        expect(lateralCurvature).toBeLessThanOrEqual(1 / CUSTOM_TRACK_ROUTE_MIN_RADIUS);
+        expect(elevationCurvature).toBeLessThanOrEqual(1 / CUSTOM_TRACK_ROUTE_MIN_RADIUS);
+      }
     }
   });
 
@@ -137,6 +225,98 @@ describe("custom track validation", () => {
     );
   });
 
+  it.each([
+    ["start", placement("offset-start", "barrier-offset", 0, 22, 90)],
+    ["finish", placement("offset-finish", "barrier-offset", 0, 98, 270)],
+    ["start", placement("chain-start", "jump-chain", 0, 24, 180)],
+  ] as const)("rejects a rotated multi-part footprint crossing the %s marker", (_boundary, module) => {
+    const result = validateCustomTrack(boundedTrack([module]));
+
+    expect(result.valid).toBe(false);
+    expect(result.errors).toContain(
+      `${module.moduleId === "jump-chain" ? "Jump Chain" : "Offset Barriers"} (${module.id}) extends outside the start-to-finish route. Move its full footprint between the route markers.`,
+    );
+  });
+
+  it("accepts rotated multi-part footprints wholly inside the route markers", () => {
+    const result = validateCustomTrack(boundedTrack([
+      placement("safe-offset-start", "barrier-offset", 0, 23, 90),
+      placement("safe-offset-finish", "barrier-offset", 0, 97, 270),
+    ]));
+
+    expect(result).toMatchObject({ valid: true, errors: [] });
+  });
+
+  it("keeps a former center-contained v1 footprint editable but requires a v2 repair", () => {
+    const track = boundedTrack([
+      placement("legacy-offset-start", "barrier-offset", 0, 22, 90),
+    ]);
+
+    expect(validateLegacyCustomTrack(track)).toMatchObject({ valid: true, errors: [] });
+    expect(validateCustomTrack(track)).toMatchObject({ valid: false });
+  });
+
+  it("accepts bounded checkpoint-authored turns and rises", () => {
+    const track = cloneExample();
+    const checkpoints = track.modules.filter((module) => module.moduleId === "checkpoint");
+    if (checkpoints[0]) checkpoints[0].routeAnchor = { lateralOffset: 4, elevation: 3 };
+    if (checkpoints[1]) checkpoints[1].routeAnchor = { lateralOffset: -3, elevation: 2 };
+
+    expect(validateCustomTrack(track)).toMatchObject({ valid: true, errors: [] });
+  });
+
+  it("rejects route anchors outside the authored corridor", () => {
+    const track = cloneExample();
+    const checkpoint = track.modules.find((module) => module.moduleId === "checkpoint");
+    if (!checkpoint) throw new Error("Expected checkpoint fixture.");
+    checkpoint.routeAnchor = { lateralOffset: 17, elevation: 13 };
+
+    const result = validateCustomTrack(track);
+
+    expect(result.valid).toBe(false);
+    expect(result.errors).toContain(
+      `Checkpoint (${checkpoint.id}) has an invalid route anchor. Keep Route turn within ±16 m and Route rise from 0–12 m.`,
+    );
+  });
+
+  it("rejects a checkpoint centerline segment that bends too sharply", () => {
+    const track = boundedTrack();
+    const checkpoint = track.modules.find((module) => module.moduleId === "checkpoint");
+    if (!checkpoint) throw new Error("Expected checkpoint fixture.");
+    checkpoint.routeAnchor = { lateralOffset: 16, elevation: 0 };
+
+    const result = validateCustomTrack(track);
+
+    expect(result.valid).toBe(false);
+    expect(result.errors.some((error) => error.includes("turns or rises too sharply"))).toBe(true);
+  });
+
+  it("keeps the rendered yaw within 12 degrees when a segment also rises", () => {
+    const track = boundedTrack();
+    const checkpoint = track.modules.find((module) => module.moduleId === "checkpoint");
+    if (!checkpoint) throw new Error("Expected checkpoint fixture.");
+    checkpoint.routeAnchor = { lateralOffset: 4.4, elevation: 3.5 };
+
+    const result = validateCustomTrack(track);
+
+    expect(result.valid).toBe(false);
+    expect(result.errors.some((error) => error.includes("turns or rises too sharply"))).toBe(true);
+  });
+
+  it("rejects route shaping metadata on a non-checkpoint module", () => {
+    const track = cloneExample();
+    const obstacle = track.modules.find((module) => module.moduleId === "bump-row");
+    if (!obstacle) throw new Error("Expected obstacle fixture.");
+    obstacle.routeAnchor = { lateralOffset: 1, elevation: 1 };
+
+    const result = validateCustomTrack(track);
+
+    expect(result.valid).toBe(false);
+    expect(result.errors).toContain(
+      `${obstacle.moduleId} (${obstacle.id}) cannot shape the route. Route turn and rise belong only to checkpoints.`,
+    );
+  });
+
   it.each([0, 2.5, 6, Number.NaN])("rejects an invalid difficulty estimate of %s", (difficultyEstimate) => {
     const track = cloneExample();
     track.difficultyEstimate = difficultyEstimate;
@@ -145,6 +325,38 @@ describe("custom track validation", () => {
 
     expect(result.valid).toBe(false);
     expect(result.errors).toContain("Declare a whole-number difficulty estimate from 1 through 5.");
+  });
+
+  it("rejects a blank track name", () => {
+    const track = cloneExample();
+    track.name = "   ";
+
+    const result = validateCustomTrack(track);
+
+    expect(result.valid).toBe(false);
+    expect(result.errors).toContain("Enter a track name.");
+  });
+
+  it("accepts the 42-character name boundary and rejects longer names", () => {
+    const track = cloneExample();
+    track.name = "R".repeat(42);
+    expect(validateCustomTrack(track).valid).toBe(true);
+
+    track.name = "R".repeat(43);
+    const result = validateCustomTrack(track);
+    expect(result.valid).toBe(false);
+    expect(result.errors).toContain("Keep the track name to 42 characters or fewer.");
+  });
+
+  it("accepts the shared module limit and rejects one module over it", () => {
+    expect(validateCustomTrack(trackWithModuleCount(CUSTOM_TRACK_MODULE_LIMIT))).toMatchObject({
+      valid: true,
+      errors: [],
+    });
+
+    const result = validateCustomTrack(trackWithModuleCount(CUSTOM_TRACK_MODULE_LIMIT + 1));
+    expect(result.valid).toBe(false);
+    expect(result.errors).toContain(`Keep the track to ${CUSTOM_TRACK_MODULE_LIMIT} modules or fewer.`);
   });
 
   it("rejects modules that this editor version does not support", () => {
@@ -162,5 +374,61 @@ describe("custom track validation", () => {
 
     expect(result.valid).toBe(false);
     expect(result.errors).toContain("Module “future-loop” is not supported by this version.");
+  });
+});
+
+describe("editor placement preview validation", () => {
+  it("rejects a new placement at the shared module limit", () => {
+    const track = trackWithModuleCount(CUSTOM_TRACK_MODULE_LIMIT);
+    const candidate = placement("overflow", "bump-single", 3, 250, 0, 10);
+
+    expect(validateCustomTrackPlacement(track, candidate)).toEqual({
+      valid: false,
+      errors: [`The track has reached the ${CUSTOM_TRACK_MODULE_LIMIT}-module safety limit.`],
+    });
+  });
+
+  it("accepts a bounded placement between the route markers", () => {
+    const track = minimalTrack();
+    const candidate = placement("preview", "ramp-medium", 1, 70);
+
+    expect(validateCustomTrackPlacement(track, candidate)).toEqual({
+      valid: true,
+      errors: [],
+    });
+  });
+
+  it.each([
+    ["start", placement("preview-start", "barrier-offset", 0, 22, 90)],
+    ["finish", placement("preview-finish", "barrier-offset", 0, 98, 270)],
+  ] as const)("rejects a rotated multi-part preview crossing the %s marker", (_boundary, candidate) => {
+    const result = validateCustomTrackPlacement(boundedTrack(), candidate);
+
+    expect(result.valid).toBe(false);
+    expect(result.errors).toContain(
+      `Offset Barriers (${candidate.id}) extends outside the start-to-finish route. Move its full footprint between the route markers.`,
+    );
+  });
+
+  it("reports overlap before a placement is committed", () => {
+    const track = minimalTrack([
+      placement("existing-ramp", "ramp-medium", 0, 30),
+    ]);
+    const candidate = placement("preview", "bump-single", 0, 32);
+
+    const result = validateCustomTrackPlacement(track, candidate);
+
+    expect(result.valid).toBe(false);
+    expect(result.errors.some((error) => error.includes("overlaps Medium Ramp"))).toBe(true);
+  });
+
+  it("reports duplicate race markers before a placement is committed", () => {
+    const track = minimalTrack();
+    const candidate = placement("preview", "start-grid", 0, 10);
+
+    const result = validateCustomTrackPlacement(track, candidate);
+
+    expect(result.valid).toBe(false);
+    expect(result.errors).toContain("A Start Grid already exists. Select the existing grid instead.");
   });
 });

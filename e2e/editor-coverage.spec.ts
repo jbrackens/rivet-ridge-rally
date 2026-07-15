@@ -51,7 +51,7 @@ function allModuleTrack() {
     { id: "all-finish", moduleId: "finish-arch", lane: 0, gridPosition: 820, rotation: 180, height: 1 },
   );
   return {
-    schemaVersion: 1,
+    schemaVersion: 2,
     id: "all-modules-circuit",
     name: "All Modules Circuit",
     laps: 2,
@@ -110,6 +110,153 @@ test("orbiting and zooming the 3D build camera never places a module", async ({ 
   await page.mouse.wheel(0, 240);
   await expect(page.getByText("3 modules", { exact: true })).toBeVisible();
   await expect(page.getByText("0 / 50 actions", { exact: true })).toBeVisible();
+});
+
+test("placed modules can be selected, edited, and focused across the full route bounds", async ({ page }) => {
+  const placedModule = page.getByLabel("Placed module");
+  const checkpointOption = placedModule.locator("option").filter({ hasText: "Checkpoint · lane 1 · 48 m" });
+  const checkpointId = await checkpointOption.getAttribute("value");
+  if (!checkpointId) throw new Error("The default checkpoint option is required.");
+
+  await placedModule.selectOption(checkpointId);
+  await expect(page.getByLabel("Position")).toHaveValue("48");
+  const canvas = page.getByLabel(/Interactive 3D track build camera/);
+  await expect(canvas).toHaveAttribute("data-route-view-position", "48");
+
+  await page.getByLabel("Position").fill("52");
+  await expect(canvas).toHaveAttribute("data-route-view-position", "52");
+  await page.getByRole("button", { name: "Delete", exact: true }).click();
+  await expect(page.getByText("2 modules", { exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "Undo", exact: true }).click();
+  await expect(page.getByText("3 modules", { exact: true })).toBeVisible();
+
+  const routeView = page.getByLabel("Route view position");
+  await expect(routeView).toHaveAttribute("max", "20000");
+  await routeView.fill("20000");
+  await expect(canvas).toHaveAttribute("data-route-view-position", "20000");
+  await expect(canvas).toHaveAttribute("data-route-guide-range", /^\d+-20000$/);
+  await expect(page.locator(".editor-route-navigation output")).toContainText("20,000 m / 20,000 m");
+  await expect(page.locator(".editor-route-navigation output")).toContainText("Authored 0–96 m");
+
+  await page.getByRole("button", { name: "Fit route", exact: true }).click();
+  await expect(canvas).toHaveAttribute("data-route-view-mode", "overview");
+});
+
+test("checkpoint route controls are bounded, undoable, and checkpoint-only", async ({ page }) => {
+  const placedModule = page.getByLabel("Placed module");
+  const checkpointOption = placedModule.locator("option").filter({ hasText: "Checkpoint · lane 1 · 48 m" });
+  const checkpointId = await checkpointOption.getAttribute("value");
+  if (!checkpointId) throw new Error("The default checkpoint option is required.");
+  await placedModule.selectOption(checkpointId);
+
+  const routeTurn = page.getByLabel("Route turn");
+  const routeRise = page.getByLabel("Route rise");
+  await expect(routeTurn).toHaveAttribute("min", "-16");
+  await expect(routeTurn).toHaveAttribute("max", "16");
+  await expect(routeRise).toHaveAttribute("min", "0");
+  await expect(routeRise).toHaveAttribute("max", "12");
+  await expect(routeTurn).toHaveValue("-3");
+  await expect(routeRise).toHaveValue("2");
+
+  await routeTurn.fill("24");
+  await expect(routeTurn).toHaveValue("16");
+  await routeRise.fill("20");
+  await expect(routeRise).toHaveValue("12");
+
+  const undo = page.getByRole("button", { name: "Undo" });
+  await undo.click();
+  await expect(routeTurn).toHaveValue("16");
+  await expect(routeRise).toHaveValue("2");
+  await undo.click();
+  await expect(routeTurn).toHaveValue("-3");
+
+  const redo = page.getByRole("button", { name: "Redo" });
+  await redo.click();
+  await expect(routeTurn).toHaveValue("16");
+  await expect(routeRise).toHaveValue("2");
+  await redo.click();
+  await expect(routeRise).toHaveValue("12");
+
+  const startOption = placedModule.locator("option").filter({ hasText: "Start Grid · lane 1 · 0 m" });
+  const startId = await startOption.getAttribute("value");
+  if (!startId) throw new Error("The default start-grid option is required.");
+  await placedModule.selectOption(startId);
+  await expect(page.getByLabel("Route turn")).toHaveCount(0);
+  await expect(page.getByLabel("Route rise")).toHaveCount(0);
+});
+
+test("pointer placement preview announces valid and invalid candidates without color alone", async ({ page }) => {
+  const canvas = page.getByLabel(/Interactive 3D track build camera/);
+  const bounds = await canvas.boundingBox();
+  if (!bounds) throw new Error("Editor canvas bounds are required.");
+  const pointer = { x: bounds.x + bounds.width * 0.5, y: bounds.y + bounds.height * 0.5 };
+
+  await page.mouse.move(pointer.x, pointer.y);
+  await expect(page.getByText("✓ Valid placement", { exact: true })).toBeVisible();
+
+  await page.getByRole("button", { name: "race", exact: true }).click();
+  await page.locator(".module-rail").getByRole("button", { name: /^Start Grid(?:\s|$)/ }).click();
+  await page.mouse.move(pointer.x + 1, pointer.y);
+  await expect(page.getByText("! Invalid placement", { exact: true })).toBeVisible();
+  await expect(page.locator(".editor-placement-preview")).toContainText("already exists");
+});
+
+test("damaged local tracks missing an index key are preserved and available as portable recovery packages", async ({ page }) => {
+  await page.evaluate(async () => {
+    const database = await new Promise<IDBDatabase>((resolve, reject) => {
+      const request = indexedDB.open("rivet-ridge-rally");
+      request.onsuccess = () => resolve(request.result);
+      request.onerror = () => reject(request.error);
+    });
+    await new Promise<void>((resolve, reject) => {
+      const transaction = database.transaction("customTracks", "readwrite");
+      transaction.objectStore("customTracks").put({
+        schemaVersion: 1,
+        id: "damaged-circuit",
+        name: "Damaged Circuit",
+        laps: 2,
+        difficultyEstimate: 2,
+        modules: [],
+        createdAt: Date.now(),
+      });
+      transaction.oncomplete = () => resolve();
+      transaction.onerror = () => reject(transaction.error);
+    });
+    database.close();
+  });
+
+  await page.getByRole("button", { name: "Back to festival menu" }).click();
+  await page.getByRole("button", { name: "Track Builder", exact: true }).click();
+  await page.getByRole("button", { name: "Library", exact: true }).click();
+
+  const recovery = page.getByLabel("Recovered track data");
+  await expect(recovery).toContainText("Damaged Circuit");
+  await expect(recovery).toContainText("Preserved in local quarantine");
+  const downloadPromise = page.waitForEvent("download");
+  await recovery.getByRole("button", { name: "Download recovery package" }).click();
+  const download = await downloadPromise;
+  expect(download.suggestedFilename()).toBe("damaged-circuit.recovery.json");
+
+  const preservation = await page.evaluate(async () => {
+    const database = await new Promise<IDBDatabase>((resolve, reject) => {
+      const request = indexedDB.open("rivet-ridge-rally");
+      request.onsuccess = () => resolve(request.result);
+      request.onerror = () => reject(request.error);
+    });
+    const result = await new Promise<{ active: boolean; quarantined: number }>((resolve, reject) => {
+      const transaction = database.transaction(["customTracks", "quarantine"], "readonly");
+      const activeRequest = transaction.objectStore("customTracks").get("damaged-circuit");
+      const quarantineRequest = transaction.objectStore("quarantine").index("kind").count("custom-track");
+      transaction.oncomplete = () => resolve({
+        active: activeRequest.result !== undefined,
+        quarantined: quarantineRequest.result,
+      });
+      transaction.onerror = () => reject(transaction.error);
+    });
+    database.close();
+    return result;
+  });
+  expect(preservation).toEqual({ active: false, quarantined: 1 });
 });
 
 test("undo and redo preserve the full 50-action history", async ({ page }) => {
@@ -182,6 +329,55 @@ test("lap values one through nine start races with the selected lap contract", a
   }
 });
 
+test("Rider School ignores the previous editor Test Ride course", async ({ page }) => {
+  await page.getByRole("button", { name: "Test Ride", exact: true }).click();
+  const customRace = page.getByLabel("Live 3D race on Canyon Workshop");
+  await expect(customRace).toBeVisible();
+  await expect(customRace).toHaveAttribute("data-environment-asset", "not-applicable");
+  await expect(customRace).toHaveAttribute("data-cooling-gate-venue-pocket-count", "0");
+  await expect(customRace).toHaveAttribute("data-cooling-gate-venue-style", "alternating-only");
+  await expect(customRace).toHaveAttribute("data-cooling-gate-watchtower-count", "0");
+  await expect(customRace).toHaveAttribute("data-cooling-gate-watchtower-style", "none");
+  await expect(customRace).toHaveAttribute("data-cooling-gate-watchtower-spectator-count", "0");
+  await expect(customRace).toHaveAttribute("data-festival-pocket-style", "flat");
+  await expect(customRace).toHaveAttribute("data-festival-pocket-tier-count", "0");
+  await expect(customRace).toHaveAttribute("data-festival-pocket-tier-rows", "0");
+  await expect(customRace).toHaveAttribute("data-course-edge-safety-style", "authored-excluded");
+  await expect(customRace).toHaveAttribute("data-start-grid-style", "authored-excluded");
+  await expect(customRace).toHaveAttribute("data-start-grid-stencil-count", "0");
+  await expect(customRace).toHaveAttribute("data-start-grid-batch-count", "0");
+  await expect(customRace).toHaveAttribute("data-course-edge-safety-batch-count", "0");
+  await expect(customRace).toHaveAttribute("data-course-edge-safety-block-count", "0");
+  await expect(page.locator(".game-shell")).toHaveAttribute("data-race-gate-phase", "racing", { timeout: 15_000 });
+  await customRace.press("Escape");
+  await page.getByRole("button", { name: "Festival menu", exact: true }).click();
+
+  await page.getByRole("button", { name: "Rider School", exact: true }).click();
+  await expect(page.getByRole("heading", { name: "Rider school" })).toBeVisible();
+  const tutorialRace = page.getByLabel("Live 3D race on Canyon Kickoff");
+  await expect(tutorialRace).toBeVisible();
+  await expect(tutorialRace).toHaveAttribute("data-cooling-gate-venue-pocket-count", "2");
+  await expect(tutorialRace).toHaveAttribute("data-cooling-gate-venue-style", "bilateral");
+  await expect(tutorialRace).toHaveAttribute("data-cooling-gate-watchtower-count", "2");
+  await expect(tutorialRace).toHaveAttribute(
+    "data-cooling-gate-watchtower-style",
+    "staffed-elevated",
+  );
+  await expect(tutorialRace).toHaveAttribute(
+    "data-cooling-gate-watchtower-spectator-count",
+    /^(4|6|8)$/,
+  );
+  await expect(tutorialRace).toHaveAttribute("data-festival-pocket-style", "tiered-canyon");
+  await expect(tutorialRace).toHaveAttribute("data-festival-pocket-tier-count", /^[1-9]\d*$/);
+  await expect(tutorialRace).toHaveAttribute("data-festival-pocket-tier-rows", /^[2-4]$/);
+  await expect(tutorialRace).toHaveAttribute("data-course-edge-safety-style", "continuous-canyon");
+  await expect(tutorialRace).toHaveAttribute("data-start-grid-style", "numbered-four-lane");
+  await expect(tutorialRace).toHaveAttribute("data-start-grid-stencil-count", "4");
+  await expect(tutorialRace).toHaveAttribute("data-start-grid-batch-count", "2");
+  await expect(tutorialRace).toHaveAttribute("data-course-edge-safety-batch-count", "1");
+  await expect(page.getByLabel("Live 3D race on Canyon Workshop")).toHaveCount(0);
+});
+
 test("narrow editor keeps Save and Test Ride reachable", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   const save = page.getByRole("button", { name: "Save", exact: true });
@@ -235,6 +431,23 @@ test("a valid track saves, survives reload, and exports safe JSON", async ({ pag
   await expect(page.getByLabel("Laps")).toHaveValue("7");
 });
 
+test("import keeps a maximum-length source name valid when creating its local copy", async ({ page }) => {
+  const example = EXAMPLE_TRACKS[0];
+  if (!example) throw new Error("An editor example is required for the name-boundary fixture.");
+  const sourceName = "R".repeat(42);
+
+  await page.locator('input[type="file"]').setInputFiles(filePayload("maximum-name.json", {
+    ...example,
+    name: sourceName,
+  }));
+
+  await expect(page.locator("footer.editor-status output")).toHaveText("Track imported as a safe local copy.");
+  await expect(page.getByLabel("Track name")).toHaveValue(`${"R".repeat(37)} Copy`);
+  await expect(page.getByText("✓ Route complete", { exact: true }).first()).toBeVisible();
+  await page.getByRole("button", { name: "Save", exact: true }).click();
+  await expect(page.locator("footer.editor-status output")).toHaveText("Track saved locally.");
+});
+
 test("a valid saved circuit containing every module completes its authored gates and laps", async ({ page }) => {
   test.setTimeout(120_000);
   await page.locator('input[type="file"]').setInputFiles(filePayload("all-modules.json", allModuleTrack()));
@@ -266,6 +479,9 @@ test("a valid saved circuit containing every module completes its authored gates
   await expect(splits.nth(4)).toContainText("Lap 1 · CP 5");
   await expect(splits.nth(5)).toContainText("Lap 2 · CP 1");
   await expect(splits.nth(9)).toContainText("Lap 2 · CP 5");
+  await page.getByRole("button", { name: "Return to Track Builder", exact: true }).click();
+  await expect(page.getByLabel("Track name")).toHaveValue("All Modules Circuit Copy");
+  await expect(page.getByText(`${allModuleTrack().modules.length} modules`, { exact: true })).toBeVisible();
 });
 
 test("all three bundled editor examples complete test rides", async ({ page }) => {
@@ -308,7 +524,7 @@ test("UI import rejects corrupt, oversized, incompatible, invalid, and external-
 
   await input.setInputFiles(filePayload("incompatible.json", {
     ...example,
-    schemaVersion: 2,
+    schemaVersion: 3,
   }));
   await expect(status).toContainText("Track file is incompatible or invalid:");
 

@@ -1,6 +1,10 @@
+import { execFile } from "node:child_process";
+import { createHash } from "node:crypto";
 import { readdir, readFile, stat, mkdir, writeFile } from "node:fs/promises";
-import { dirname, relative, resolve } from "node:path";
+import { cpus, release as osRelease, totalmem, type as osType, version as osVersion } from "node:os";
+import { dirname, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
+import { promisify } from "node:util";
 import { gzipSync } from "node:zlib";
 import { performance as nodePerformance } from "node:perf_hooks";
 
@@ -8,6 +12,30 @@ const SCRIPT_DIRECTORY = dirname(fileURLToPath(import.meta.url));
 
 export const REPO_ROOT = resolve(SCRIPT_DIRECTORY, "../..");
 export const DEFAULT_BASE_URL = "http://127.0.0.1:4373";
+const execFileAsync = promisify(execFile);
+
+function sha256(contents) {
+  return createHash("sha256").update(contents).digest("hex");
+}
+
+function normalizeCandidateBaseURL(value) {
+  let parsed;
+  try {
+    parsed = new URL(value);
+  } catch {
+    throw new Error("Performance candidate base URL is invalid.");
+  }
+  if (!["http:", "https:"].includes(parsed.protocol)) {
+    throw new Error("Performance candidate base URL must use HTTP or HTTPS.");
+  }
+  if (parsed.username || parsed.password) {
+    throw new Error("Performance candidate base URL must not contain credentials.");
+  }
+  if (parsed.pathname !== "/" || parsed.search || parsed.hash) {
+    throw new Error("Performance candidate base URL must be the root of a dedicated origin.");
+  }
+  return parsed.href;
+}
 
 export function readOption(argumentsList, name, fallback) {
   const index = argumentsList.indexOf(`--${name}`);
@@ -86,18 +114,188 @@ export async function builtAssetEvidence() {
   for (const absolutePath of files) {
     const [fileStat, contents] = await Promise.all([stat(absolutePath), readFile(absolutePath)]);
     evidence.push({
-      path: relative(distDirectory, absolutePath),
+      path: relative(distDirectory, absolutePath).split(sep).join("/"),
       bytes: fileStat.size,
       gzipBytes: gzipSync(contents, { level: 9 }).byteLength,
+      sha256: sha256(contents),
     });
   }
+  const aggregate = createHash("sha256");
+  for (const record of evidence) aggregate.update(`${record.sha256}  ${record.path}\n`);
   return {
     directory: "dist",
     fileCount: evidence.length,
     totalBytes: evidence.reduce((sum, file) => sum + file.bytes, 0),
     totalGzipBytes: evidence.reduce((sum, file) => sum + file.gzipBytes, 0),
+    aggregateSha256: aggregate.digest("hex"),
     files: evidence,
   };
+}
+
+async function git(argumentsList) {
+  const { stdout } = await execFileAsync("git", argumentsList, {
+    cwd: REPO_ROOT,
+    encoding: "utf8",
+    maxBuffer: 4 * 1024 * 1024,
+  });
+  return stdout.trim();
+}
+
+export async function sourceIdentityEvidence() {
+  const packageJson = JSON.parse(await readFile(resolve(REPO_ROOT, "package.json"), "utf8"));
+  const [commit, statusText, tagsText] = await Promise.all([
+    git(["rev-parse", "HEAD^{commit}"]),
+    git(["status", "--porcelain=v1", "--untracked-files=all"]),
+    git(["tag", "--points-at", "HEAD"]),
+  ]);
+  const tagsAtCommit = tagsText ? tagsText.split("\n").filter(Boolean).toSorted() : [];
+  const expectedTag = `v${packageJson.version}`;
+  const expectedTagAtCommit = tagsAtCommit.includes(expectedTag);
+  const expectedTagObjectType = expectedTagAtCommit
+    ? await git(["cat-file", "-t", `refs/tags/${expectedTag}`])
+    : null;
+  const dirtyEntries = statusText ? statusText.split("\n").filter(Boolean) : [];
+  return {
+    commit,
+    packageVersion: packageJson.version,
+    expectedTag,
+    tagsAtCommit,
+    expectedTagAtCommit,
+    expectedTagObjectType,
+    expectedTagAnnotated: expectedTagObjectType === "tag",
+    dirty: dirtyEntries.length > 0,
+    dirtyEntryCount: dirtyEntries.length,
+  };
+}
+
+export async function verifyServedBuild(
+  localBuild,
+  baseURL,
+  { fetchImpl = globalThis.fetch, timeoutMs = 15_000 } = {},
+) {
+  if (!localBuild || !Array.isArray(localBuild.files) || localBuild.files.length === 0) {
+    throw new Error("Performance candidate local build inventory is unavailable.");
+  }
+  if (typeof fetchImpl !== "function") throw new Error("Performance candidate fetch implementation is unavailable.");
+  if (!Number.isFinite(timeoutMs) || timeoutMs <= 0) throw new Error("Performance candidate fetch timeout is invalid.");
+  const normalizedBaseURL = normalizeCandidateBaseURL(baseURL);
+  const rootURL = new URL(normalizedBaseURL);
+  const files = await Promise.all(localBuild.files.map(async (record) => {
+    const target = new URL(record.path, rootURL);
+    let response;
+    try {
+      response = await fetchImpl(target, {
+        cache: "no-store",
+        redirect: "follow",
+        headers: { "cache-control": "no-cache", pragma: "no-cache" },
+        signal: AbortSignal.timeout(timeoutMs),
+      });
+    } catch {
+      throw new Error(`Performance candidate file is not reachable: ${record.path}`);
+    }
+    if (!response.ok) {
+      throw new Error(`Performance candidate returned HTTP ${response.status}: ${record.path}`);
+    }
+    const finalURL = new URL(response.url || target.href);
+    if (finalURL.origin !== rootURL.origin) {
+      throw new Error(`Performance candidate file left the dedicated origin: ${record.path}`);
+    }
+    const contents = Buffer.from(await response.arrayBuffer());
+    const actualSha256 = sha256(contents);
+    if (contents.length !== record.bytes || actualSha256 !== record.sha256) {
+      throw new Error(`Served performance candidate differs from local dist: ${record.path}`);
+    }
+    return { path: record.path, bytes: contents.length, sha256: actualSha256 };
+  }));
+
+  const aggregate = createHash("sha256");
+  for (const record of files) aggregate.update(`${record.sha256}  ${record.path}\n`);
+  const aggregateSha256 = aggregate.digest("hex");
+  if (aggregateSha256 !== localBuild.aggregateSha256) {
+    throw new Error("Served performance candidate aggregate differs from local dist.");
+  }
+
+  const indexRecord = localBuild.files.find((record) => record.path === "index.html");
+  if (!indexRecord) throw new Error("Performance candidate local build has no index.html.");
+  const entrypointResponse = await fetchImpl(rootURL, {
+    cache: "no-store",
+    redirect: "follow",
+    headers: { "cache-control": "no-cache", pragma: "no-cache" },
+    signal: AbortSignal.timeout(timeoutMs),
+  });
+  if (!entrypointResponse.ok) {
+    throw new Error(`Performance candidate entrypoint returned HTTP ${entrypointResponse.status}.`);
+  }
+  const finalEntrypointURL = new URL(entrypointResponse.url || normalizedBaseURL);
+  if (finalEntrypointURL.origin !== rootURL.origin) {
+    throw new Error("Performance candidate entrypoint left the dedicated origin.");
+  }
+  const entrypointContents = Buffer.from(await entrypointResponse.arrayBuffer());
+  const entrypointSha256 = sha256(entrypointContents);
+  if (entrypointContents.length !== indexRecord.bytes || entrypointSha256 !== indexRecord.sha256) {
+    throw new Error("Served performance candidate entrypoint differs from local dist/index.html.");
+  }
+
+  return {
+    verified: true,
+    baseURL: normalizedBaseURL,
+    origin: rootURL.origin,
+    fileCount: files.length,
+    totalBytes: files.reduce((sum, record) => sum + record.bytes, 0),
+    aggregateSha256,
+    entrypoint: {
+      requestedURL: normalizedBaseURL,
+      finalURL: finalEntrypointURL.href,
+      bytes: entrypointContents.length,
+      sha256: entrypointSha256,
+    },
+    files,
+  };
+}
+
+export function hostEvidence() {
+  const processors = cpus();
+  return {
+    node: process.version,
+    platform: process.platform,
+    architecture: process.arch,
+    os: { type: osType(), release: osRelease(), version: osVersion() },
+    cpu: { model: processors[0]?.model ?? null, logicalCores: processors.length },
+    totalMemoryBytes: totalmem(),
+  };
+}
+
+export async function browserDeviceEvidence(page) {
+  return page.evaluate(() => {
+    const canvas = document.createElement("canvas");
+    const gl = canvas.getContext("webgl2") ?? canvas.getContext("webgl");
+    const debugInfo = gl?.getExtension("WEBGL_debug_renderer_info") ?? null;
+    return {
+      userAgent: navigator.userAgent,
+      browserPlatform: navigator.platform,
+      languages: [...navigator.languages],
+      hardwareConcurrency: navigator.hardwareConcurrency ?? null,
+      deviceMemoryGiB: navigator.deviceMemory ?? null,
+      viewport: { width: window.innerWidth, height: window.innerHeight },
+      screen: {
+        width: window.screen.width,
+        height: window.screen.height,
+        colorDepth: window.screen.colorDepth,
+        pixelDepth: window.screen.pixelDepth,
+      },
+      devicePixelRatio: window.devicePixelRatio,
+      pointer: {
+        coarse: matchMedia("(pointer: coarse)").matches,
+        hover: matchMedia("(hover: hover)").matches,
+      },
+      webgl: gl ? {
+        version: gl.getParameter(gl.VERSION),
+        shadingLanguageVersion: gl.getParameter(gl.SHADING_LANGUAGE_VERSION),
+        vendor: debugInfo ? gl.getParameter(debugInfo.UNMASKED_VENDOR_WEBGL) : gl.getParameter(gl.VENDOR),
+        renderer: debugInfo ? gl.getParameter(debugInfo.UNMASKED_RENDERER_WEBGL) : gl.getParameter(gl.RENDERER),
+      } : null,
+    };
+  });
 }
 
 export function collectPageMessages(page) {
@@ -111,11 +309,44 @@ export function collectPageMessages(page) {
   return messages;
 }
 
+export function collectNetworkFailures(page, startedAt = nodePerformance.now()) {
+  const failedRequests = [];
+  const httpErrorResponses = [];
+  page.on("requestfailed", (request) => {
+    failedRequests.push({
+      elapsedMs: Math.round(nodePerformance.now() - startedAt),
+      method: request.method(),
+      resourceType: request.resourceType(),
+      url: request.url(),
+      errorText: request.failure()?.errorText ?? "unknown",
+    });
+  });
+  page.on("response", (response) => {
+    if (response.status() < 400) return;
+    const request = response.request();
+    httpErrorResponses.push({
+      elapsedMs: Math.round(nodePerformance.now() - startedAt),
+      method: request.method(),
+      resourceType: request.resourceType(),
+      url: response.url(),
+      status: response.status(),
+      statusText: response.statusText(),
+    });
+  });
+  return { failedRequests, httpErrorResponses };
+}
+
 export async function openShell(page, baseURL) {
   const startedAt = nodePerformance.now();
   const target = new URL(baseURL);
   target.searchParams.set("qa-fast-race", "1");
   const response = await page.goto(target.href, { waitUntil: "load", timeout: 30_000 });
+  if (!response?.ok()) {
+    throw new Error(`Performance shell returned HTTP ${response?.status() ?? "unknown"}.`);
+  }
+  if (new URL(response.url()).origin !== target.origin) {
+    throw new Error("Performance shell navigation left the dedicated origin.");
+  }
   await page.waitForFunction(() => Array.from(document.querySelectorAll("button")).some((button) =>
     ["Ride", "Skip training"].includes(button.textContent?.trim() ?? "")), undefined, { timeout: 20_000 });
   const skip = page.getByRole("button", { name: "Skip training" });
@@ -124,6 +355,27 @@ export async function openShell(page, baseURL) {
   return {
     status: response?.status() ?? null,
     shellReadyMs: round(nodePerformance.now() - startedAt),
+  };
+}
+
+export async function setExplicitQuality(page, quality) {
+  if (!["low", "medium", "high"].includes(quality)) {
+    throw new Error("Performance quality must be low, medium, or high; auto is not admissible evidence.");
+  }
+  await page.getByRole("button", { name: "Settings", exact: true }).click();
+  await page.getByRole("heading", { name: "Settings", exact: true }).waitFor({ state: "visible", timeout: 10_000 });
+  await page.getByRole("button", { name: "play", exact: true }).click();
+  const qualitySelect = page.locator("label.select-row", { hasText: "Quality" }).locator("select");
+  await qualitySelect.selectOption(quality);
+  const selected = await qualitySelect.inputValue();
+  if (selected !== quality) throw new Error(`Performance quality did not persist in the active session: ${selected}.`);
+  await page.getByRole("button", { name: "Done", exact: true }).click();
+  await page.getByRole("button", { name: "Ride", exact: true }).waitFor({ state: "visible", timeout: 10_000 });
+  return {
+    requested: quality,
+    selected,
+    effective: quality,
+    effectiveDerivation: "explicit-non-auto-renderer-preset",
   };
 }
 

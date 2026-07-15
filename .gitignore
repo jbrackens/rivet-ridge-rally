@@ -6,8 +6,9 @@ playwright-report/
 test-results/
 artifacts/performance/screenshots/
 artifacts/performance/latest-production-race.png
+/artifacts/candidate-evidence/
 artifacts/visual-review/
-artifacts/release-manifest 2.json
+/artifacts/release-manifest.json
 *.tsbuildinfo
 .env
 .env.*

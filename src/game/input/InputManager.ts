@@ -6,6 +6,7 @@ import {
   startLifecycleResource,
   stopLifecycleResource,
 } from "../qa/lifecycleDiagnostics";
+import { firstConnectedGamepad } from "./gamepad";
 
 export type InputDevice = "keyboard" | "gamepad" | "touch";
 
@@ -17,7 +18,15 @@ interface TouchState {
   recover: boolean;
 }
 
-const BUTTON_EPSILON = 0.25;
+const LANE_AXIS_THRESHOLD = 0.55;
+const PITCH_AXIS_THRESHOLD = 0.2;
+const THROTTLE_TRIGGER_THRESHOLD = 0.2;
+const TURBO_TRIGGER_THRESHOLD = 0.35;
+
+export function isInteractiveInputTarget(target: EventTarget | null): boolean {
+  return target instanceof Element
+    && target.closest("button, input, select, textarea, [contenteditable]:not([contenteditable='false'])") !== null;
+}
 
 export class InputManager {
   private readonly keys = new Set<string>();
@@ -29,18 +38,21 @@ export class InputManager {
     pitch: 0,
     recover: false,
   };
-  private device: InputDevice = "keyboard";
+  private device: InputDevice;
+  private fallbackDevice: Exclude<InputDevice, "gamepad">;
   private connected = false;
 
-  constructor(settings: ControlSettings) {
+  constructor(settings: ControlSettings, initialDevice: InputDevice = "keyboard") {
     this.settings = settings;
+    this.device = initialDevice;
+    this.fallbackDevice = initialDevice === "touch" ? "touch" : "keyboard";
   }
 
   connect(): void {
     if (this.connected) return;
     window.addEventListener("keydown", this.handleKeyDown, { passive: false });
     window.addEventListener("keyup", this.handleKeyUp, { passive: false });
-    window.addEventListener("blur", this.clearKeys);
+    window.addEventListener("blur", this.clearInputState);
     this.connected = true;
     startLifecycleResource("inputListenerGroups");
     this.updateHeldInputCount();
@@ -50,7 +62,7 @@ export class InputManager {
     if (!this.connected) return;
     window.removeEventListener("keydown", this.handleKeyDown);
     window.removeEventListener("keyup", this.handleKeyUp);
-    window.removeEventListener("blur", this.clearKeys);
+    window.removeEventListener("blur", this.clearInputState);
     this.clearInputState();
     this.connected = false;
     stopLifecycleResource("inputListenerGroups");
@@ -69,8 +81,13 @@ export class InputManager {
     this.settings = settings;
   }
 
+  markGamepadCommand(): void {
+    if (firstConnectedGamepad()) this.device = "gamepad";
+  }
+
   setTouchControl(control: keyof TouchState, value: boolean | number): void {
     this.device = "touch";
+    this.fallbackDevice = "touch";
     if (control === "laneChange") {
       this.touch.laneChange = value === -1 || value === 1 ? value : 0;
     } else if (control === "pitch") {
@@ -82,7 +99,6 @@ export class InputManager {
   }
 
   sample(): SimulationInput {
-    const gamepad = this.sampleGamepad();
     const binding = this.settings.keyBindings;
     const keyboardLane: LaneChange = this.keys.has(binding.laneLeft ?? "ArrowLeft")
       ? -1
@@ -94,8 +110,18 @@ export class InputManager {
       : this.keys.has(binding.pitchDown ?? "ArrowDown")
         ? -1
         : 0;
-
-    if (gamepad) return gamepad;
+    const keyboardInput: SimulationInput = {
+      throttle: this.keys.has(binding.throttle ?? "KeyW"),
+      turbo: this.keys.has(binding.turbo ?? "ShiftLeft"),
+      laneChange: keyboardLane,
+      pitch: keyboardPitch,
+      recover: this.keys.has(binding.recover ?? "Space"),
+    };
+    const keyboardActive = keyboardInput.throttle
+      || keyboardInput.turbo
+      || keyboardInput.laneChange !== 0
+      || keyboardInput.pitch !== 0
+      || keyboardInput.recover;
 
     const touchActive =
       this.touch.throttle ||
@@ -103,37 +129,61 @@ export class InputManager {
       this.touch.laneChange !== 0 ||
       this.touch.pitch !== 0 ||
       this.touch.recover;
-    if (touchActive || this.device === "touch") {
+    if (touchActive) {
+      this.device = "touch";
       return { ...this.touch };
     }
 
-    return {
-      throttle: this.keys.has(binding.throttle ?? "KeyW"),
-      turbo: this.keys.has(binding.turbo ?? "ShiftLeft"),
-      laneChange: keyboardLane,
-      pitch: keyboardPitch,
-      recover: this.keys.has(binding.recover ?? "Space"),
-    };
+    const connectedPad = firstConnectedGamepad();
+    if (!connectedPad && this.device === "gamepad") this.device = this.fallbackDevice;
+    const gamepad = connectedPad ? this.sampleGamepad(connectedPad) : null;
+    if (gamepad) return gamepad;
+
+    if (keyboardActive) {
+      this.device = "keyboard";
+      this.fallbackDevice = "keyboard";
+      return keyboardInput;
+    }
+
+    if (this.device === "touch") return { ...this.touch };
+    return keyboardInput;
   }
 
   async warnOverheat(): Promise<void> {
     if (!this.settings.vibration) return;
-    const pad = navigator.getGamepads?.()[0];
+    const pad = firstConnectedGamepad();
     const actuator = pad?.vibrationActuator;
     if (!actuator) return;
-    await actuator.playEffect("dual-rumble", {
-      duration: 120,
-      strongMagnitude: 0.25,
-      weakMagnitude: 0.55,
-    });
+    try {
+      await actuator.playEffect("dual-rumble", {
+        duration: 120,
+        strongMagnitude: 0.25,
+        weakMagnitude: 0.55,
+      });
+    } catch {
+      // Haptics are optional and some connected pads reject unsupported effects.
+    }
   }
 
   private readonly handleKeyDown = (event: KeyboardEvent): void => {
-    if (["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", "Space"].includes(event.code)) {
+    if (isInteractiveInputTarget(event.target)) return;
+    const binding = this.settings.keyBindings;
+    const mappedGameplayKeys = [
+      binding.throttle ?? "KeyW",
+      binding.turbo ?? "ShiftLeft",
+      binding.laneLeft ?? "ArrowLeft",
+      binding.laneRight ?? "ArrowRight",
+      binding.pitchUp ?? "ArrowUp",
+      binding.pitchDown ?? "ArrowDown",
+      binding.recover ?? "Space",
+      binding.pause ?? "Escape",
+    ];
+    if (mappedGameplayKeys.includes(event.code)) {
       event.preventDefault();
     }
     this.keys.add(event.code);
     this.device = "keyboard";
+    this.fallbackDevice = "keyboard";
     this.updateHeldInputCount();
   };
 
@@ -142,12 +192,7 @@ export class InputManager {
     this.updateHeldInputCount();
   };
 
-  private readonly clearKeys = (): void => {
-    this.keys.clear();
-    this.updateHeldInputCount();
-  };
-
-  private clearInputState(): void {
+  private readonly clearInputState = (): void => {
     this.keys.clear();
     this.touch.throttle = false;
     this.touch.turbo = false;
@@ -155,7 +200,7 @@ export class InputManager {
     this.touch.pitch = 0;
     this.touch.recover = false;
     this.updateHeldInputCount();
-  }
+  };
 
   private updateHeldInputCount(): void {
     const touchInputs = Number(this.touch.throttle)
@@ -166,30 +211,35 @@ export class InputManager {
     setHeldInputCount(this.keys.size + touchInputs);
   }
 
-  private sampleGamepad(): SimulationInput | null {
-    const pad = navigator.getGamepads?.()[0];
-    if (!pad?.connected) return null;
-
+  private sampleGamepad(pad: Gamepad): SimulationInput | null {
     const axisX = pad.axes[0] ?? 0;
     const axisY = pad.axes[1] ?? 0;
     const laneChange: LaneChange =
-      pad.buttons[14]?.pressed || axisX < -0.55
+      pad.buttons[14]?.pressed || axisX < -LANE_AXIS_THRESHOLD
         ? -1
-        : pad.buttons[15]?.pressed || axisX > 0.55
+        : pad.buttons[15]?.pressed || axisX > LANE_AXIS_THRESHOLD
           ? 1
           : 0;
-    const hasInput = pad.buttons.some((button) => button.pressed || button.value > BUTTON_EPSILON)
-      || Math.abs(axisX) > 0.2
-      || Math.abs(axisY) > 0.2;
-    if (!hasInput && this.device !== "gamepad") return null;
+    const throttle = Boolean(
+      pad.buttons[0]?.pressed
+      || (pad.buttons[7]?.value ?? 0) > THROTTLE_TRIGGER_THRESHOLD,
+    );
+    const turbo = Boolean(
+      pad.buttons[1]?.pressed
+      || (pad.buttons[6]?.value ?? 0) > TURBO_TRIGGER_THRESHOLD,
+    );
+    const pitch = Math.abs(axisY) > PITCH_AXIS_THRESHOLD ? -axisY : 0;
+    const recover = Boolean(pad.buttons[0]?.pressed);
+    const hasInput = throttle || turbo || laneChange !== 0 || pitch !== 0 || recover;
+    if (!hasInput) return null;
 
     this.device = "gamepad";
     return {
-      throttle: Boolean(pad.buttons[0]?.pressed || (pad.buttons[7]?.value ?? 0) > 0.2),
-      turbo: Boolean(pad.buttons[1]?.pressed || (pad.buttons[6]?.value ?? 0) > 0.35),
+      throttle,
+      turbo,
       laneChange,
-      pitch: Math.abs(axisY) > 0.2 ? -axisY : 0,
-      recover: Boolean(pad.buttons[0]?.pressed),
+      pitch,
+      recover,
     };
   }
 }

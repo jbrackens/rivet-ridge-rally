@@ -9,6 +9,7 @@ export type LaneChange = -1 | 0 | 1;
 export type SurfaceKind = "dirt" | "grass" | "mud" | "cooling" | "ramp";
 export type BikePhase = "grounded" | "airborne" | "crashed" | "recovering";
 export type LandingQuality = "clean" | "rough" | "crash" | null;
+export type CrashCause = "wheelie-timeout" | "landing" | "obstacle" | "rider-contact" | "external";
 
 export interface SimulationInput {
   readonly throttle: boolean;
@@ -39,6 +40,7 @@ export interface BikeState {
   wheelie: boolean;
   recoveryProgress: number;
   lastLanding: LandingQuality;
+  crashCause: CrashCause | null;
   surface: SurfaceKind;
 }
 

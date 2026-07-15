@@ -15,6 +15,7 @@ const settings: ControlSettings = {
     pitchUp: "ArrowUp",
     pitchDown: "ArrowDown",
     recover: "Space",
+    pause: "Escape",
   },
 };
 
@@ -47,17 +48,32 @@ function gamepad(overrides: Partial<Gamepad> = {}): Gamepad {
 }
 
 describe("InputManager", () => {
+  it("keeps an initial touch label until a real keyboard command takes over", () => {
+    const manager = new InputManager(settings, "touch");
+    expect(manager.activeDevice).toBe("touch");
+    expect(manager.sample()).toMatchObject({ throttle: false, turbo: false });
+
+    manager.connect();
+    window.dispatchEvent(new KeyboardEvent("keydown", { code: "KeyW" }));
+    expect(manager.sample().throttle).toBe(true);
+    expect(manager.activeDevice).toBe("keyboard");
+    window.dispatchEvent(new KeyboardEvent("keyup", { code: "KeyW" }));
+    manager.disconnect();
+  });
+
   it("samples live-remapped keyboard controls and clears them on keyup", () => {
     const manager = new InputManager(settings);
     manager.connect();
-    manager.updateSettings({ ...settings, keyBindings: { ...settings.keyBindings, throttle: "KeyQ" } });
-    window.dispatchEvent(new KeyboardEvent("keydown", { code: "KeyQ" }));
+    manager.updateSettings({ ...settings, keyBindings: { ...settings.keyBindings, throttle: "PageDown" } });
+    const pageDown = new KeyboardEvent("keydown", { cancelable: true, code: "PageDown" });
+    window.dispatchEvent(pageDown);
     window.dispatchEvent(new KeyboardEvent("keydown", { code: "ArrowRight" }));
 
+    expect(pageDown.defaultPrevented).toBe(true);
     expect(manager.sample()).toMatchObject({ throttle: true, laneChange: 1 });
     expect(manager.activeDevice).toBe("keyboard");
 
-    window.dispatchEvent(new KeyboardEvent("keyup", { code: "KeyQ" }));
+    window.dispatchEvent(new KeyboardEvent("keyup", { code: "PageDown" }));
     window.dispatchEvent(new KeyboardEvent("keyup", { code: "ArrowRight" }));
     expect(manager.sample()).toMatchObject({ throttle: false, laneChange: 0 });
     manager.disconnect();
@@ -85,6 +101,43 @@ describe("InputManager", () => {
     manager.disconnect();
   });
 
+  it("does not consume gameplay keys from an interactive control", () => {
+    const manager = new InputManager(settings);
+    const retry = document.createElement("button");
+    document.body.append(retry);
+    manager.connect();
+
+    const spaceDown = new KeyboardEvent("keydown", {
+      bubbles: true,
+      cancelable: true,
+      code: "Space",
+    });
+    expect(retry.dispatchEvent(spaceDown)).toBe(true);
+    expect(spaceDown.defaultPrevented).toBe(false);
+    expect(manager.sample().recover).toBe(false);
+
+    manager.disconnect();
+    retry.remove();
+  });
+
+  it("prevents browser defaults for every configured gameplay binding only", () => {
+    const manager = new InputManager(settings);
+    manager.connect();
+
+    for (const code of Object.values(settings.keyBindings)) {
+      const keyDown = new KeyboardEvent("keydown", { cancelable: true, code });
+      window.dispatchEvent(keyDown);
+      expect(keyDown.defaultPrevented).toBe(true);
+      window.dispatchEvent(new KeyboardEvent("keyup", { code }));
+    }
+
+    const unrelatedKey = new KeyboardEvent("keydown", { cancelable: true, code: "KeyZ" });
+    window.dispatchEvent(unrelatedKey);
+    expect(unrelatedKey.defaultPrevented).toBe(false);
+    window.dispatchEvent(new KeyboardEvent("keyup", { code: "KeyZ" }));
+    manager.disconnect();
+  });
+
   it("keeps labeled touch actions independent and records the active device", () => {
     const manager = new InputManager(settings);
     manager.setTouchControl("throttle", true);
@@ -92,6 +145,27 @@ describe("InputManager", () => {
 
     expect(manager.sample()).toMatchObject({ throttle: true, pitch: -1 });
     expect(manager.activeDevice).toBe("touch");
+  });
+
+  it("clears every held touch action when the window loses focus", () => {
+    const manager = new InputManager(settings);
+    manager.connect();
+    manager.setTouchControl("throttle", true);
+    manager.setTouchControl("turbo", true);
+    manager.setTouchControl("laneChange", 1);
+    manager.setTouchControl("pitch", -1);
+    manager.setTouchControl("recover", true);
+
+    window.dispatchEvent(new Event("blur"));
+
+    expect(manager.sample()).toMatchObject({
+      throttle: false,
+      turbo: false,
+      laneChange: 0,
+      pitch: 0,
+      recover: false,
+    });
+    manager.disconnect();
   });
 
   it("maps the standard gamepad layout and analog triggers", () => {
@@ -113,6 +187,138 @@ describe("InputManager", () => {
     expect(manager.activeDevice).toBe("gamepad");
   });
 
+  it("uses the first connected gamepad even when browser slot zero is empty", () => {
+    const buttons = Array.from({ length: 17 }, () => button());
+    buttons[0] = button(true);
+    Object.defineProperty(navigator, "getGamepads", {
+      configurable: true,
+      value: () => [null, gamepad({ index: 1, buttons })],
+    });
+    const manager = new InputManager(settings);
+
+    expect(manager.sample()).toMatchObject({ throttle: true });
+    expect(manager.activeDevice).toBe("gamepad");
+  });
+
+  it("marks a gamepad command and restores keyboard prompts after disconnect", () => {
+    let connected = true;
+    const pad = gamepad();
+    Object.defineProperty(navigator, "getGamepads", {
+      configurable: true,
+      value: () => connected ? [pad] : [],
+    });
+    const manager = new InputManager(settings);
+
+    manager.markGamepadCommand();
+    expect(manager.activeDevice).toBe("gamepad");
+
+    connected = false;
+    expect(manager.sample()).toMatchObject({ throttle: false, laneChange: 0 });
+    expect(manager.activeDevice).toBe("keyboard");
+  });
+
+  it("restores the last touch prompt after a gamepad disconnects", () => {
+    let connected = true;
+    const pad = gamepad();
+    Object.defineProperty(navigator, "getGamepads", {
+      configurable: true,
+      value: () => connected ? [pad] : [],
+    });
+    const manager = new InputManager(settings, "touch");
+
+    manager.markGamepadCommand();
+    expect(manager.activeDevice).toBe("gamepad");
+
+    connected = false;
+    manager.sample();
+    expect(manager.activeDevice).toBe("touch");
+  });
+
+  it("does not let sub-command stick drift suppress keyboard or touch input", () => {
+    const buttons = Array.from({ length: 17 }, () => button());
+    buttons[6] = button(false, 0.3);
+    Object.defineProperty(navigator, "getGamepads", {
+      configurable: true,
+      value: () => [gamepad({ axes: [0.3, 0, 0, 0], buttons })],
+    });
+    const manager = new InputManager(settings);
+    manager.connect();
+
+    window.dispatchEvent(new KeyboardEvent("keydown", { code: "KeyW" }));
+    expect(manager.sample()).toMatchObject({ throttle: true, laneChange: 0 });
+    expect(manager.activeDevice).toBe("keyboard");
+    window.dispatchEvent(new KeyboardEvent("keyup", { code: "KeyW" }));
+
+    manager.setTouchControl("throttle", true);
+    expect(manager.sample()).toMatchObject({ throttle: true, laneChange: 0 });
+    expect(manager.activeDevice).toBe("touch");
+    manager.disconnect();
+  });
+
+  it("keeps held touch commands ahead of active gamepad input", () => {
+    const buttons = Array.from({ length: 17 }, () => button());
+    buttons[0] = button(true);
+    buttons[6] = button(false, 0.8);
+    buttons[7] = button(false, 0.7);
+    Object.defineProperty(navigator, "getGamepads", {
+      configurable: true,
+      value: () => [gamepad({ axes: [0.8, 0.65, 0, 0], buttons })],
+    });
+    const manager = new InputManager(settings);
+    manager.setTouchControl("throttle", true);
+    manager.setTouchControl("turbo", true);
+    manager.setTouchControl("laneChange", -1);
+    manager.setTouchControl("pitch", 0.6);
+    manager.setTouchControl("recover", true);
+
+    expect(manager.sample()).toEqual({
+      throttle: true,
+      turbo: true,
+      laneChange: -1,
+      pitch: 0.6,
+      recover: true,
+    });
+    expect(manager.activeDevice).toBe("touch");
+
+    manager.setTouchControl("throttle", false);
+    manager.setTouchControl("turbo", false);
+    manager.setTouchControl("laneChange", 0);
+    manager.setTouchControl("pitch", 0);
+    manager.setTouchControl("recover", false);
+    expect(manager.sample()).toMatchObject({ laneChange: 1, pitch: -0.65 });
+    expect(manager.activeDevice).toBe("gamepad");
+  });
+
+  it("resumes an already-held keyboard command after a touch action is released", () => {
+    const manager = new InputManager(settings);
+    manager.connect();
+
+    window.dispatchEvent(new KeyboardEvent("keydown", { code: "KeyW" }));
+    manager.setTouchControl("laneChange", 1);
+    expect(manager.sample()).toMatchObject({ throttle: false, laneChange: 1 });
+    expect(manager.activeDevice).toBe("touch");
+
+    manager.setTouchControl("laneChange", 0);
+    expect(manager.sample()).toMatchObject({ throttle: true, laneChange: 0 });
+    expect(manager.activeDevice).toBe("keyboard");
+
+    window.dispatchEvent(new KeyboardEvent("keyup", { code: "KeyW" }));
+    manager.disconnect();
+  });
+
+  it("activates gamepad throttle at the same trigger threshold used for sampling", () => {
+    const buttons = Array.from({ length: 17 }, () => button());
+    buttons[7] = button(false, 0.22);
+    Object.defineProperty(navigator, "getGamepads", {
+      configurable: true,
+      value: () => [gamepad({ buttons })],
+    });
+    const manager = new InputManager(settings);
+
+    expect(manager.sample()).toMatchObject({ throttle: true });
+    expect(manager.activeDevice).toBe("gamepad");
+  });
+
   it("uses a short optional warning pulse when a vibration actuator exists", async () => {
     const playEffect = vi.fn().mockResolvedValue("complete");
     Object.defineProperty(navigator, "getGamepads", {
@@ -124,5 +330,20 @@ describe("InputManager", () => {
     await manager.warnOverheat();
 
     expect(playEffect).toHaveBeenCalledWith("dual-rumble", expect.objectContaining({ duration: 120 }));
+  });
+
+  it("treats rejected optional vibration as a nonfatal capability failure", async () => {
+    Object.defineProperty(navigator, "getGamepads", {
+      configurable: true,
+      value: () => [gamepad({
+        vibrationActuator: {
+          playEffect: vi.fn().mockRejectedValue(new Error("unsupported")),
+          reset: vi.fn(),
+        } as unknown as GamepadHapticActuator,
+      })],
+    });
+    const manager = new InputManager(settings);
+
+    await expect(manager.warnOverheat()).resolves.toBeUndefined();
   });
 });

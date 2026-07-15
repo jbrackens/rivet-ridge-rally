@@ -1,7 +1,11 @@
 import { describe, expect, it } from "vitest";
 
 import type { CustomTrackData, CustomTrackModule } from "../../persistence/database";
-import { customTrackToDefinition } from "../toTrackDefinition";
+import {
+  CUSTOM_TRACK_PRESENTATION_FALLBACK_LENGTH,
+  customTrackToDefinition,
+  customTrackToPresentationDefinition,
+} from "../toTrackDefinition";
 import { EDITOR_MODULES } from "../modules";
 
 function placement(
@@ -11,13 +15,22 @@ function placement(
   gridPosition: number,
   rotation: CustomTrackModule["rotation"] = 0,
   height = 0,
+  routeAnchor?: CustomTrackModule["routeAnchor"],
 ): CustomTrackModule {
-  return { id, moduleId, lane, gridPosition, rotation, height };
+  return {
+    id,
+    moduleId,
+    lane,
+    gridPosition,
+    rotation,
+    height,
+    ...(routeAnchor ? { routeAnchor } : {}),
+  };
 }
 
 function customTrack(laps: number): CustomTrackData {
   return {
-    schemaVersion: 1,
+    schemaVersion: 2,
     id: "conversion-fixture",
     name: "Workshop Circuit",
     laps,
@@ -28,11 +41,17 @@ function customTrack(laps: number): CustomTrackData {
       placement("start", "start-grid", 0, 0),
       placement("straight", "straight-short", 0, 12),
       placement("curve", "curve-left", 0, 24, 90, 2),
-      placement("checkpoint", "checkpoint", 0, 40),
+      placement("checkpoint", "checkpoint", 0, 40, 0, 0, {
+        lateralOffset: -2.5,
+        elevation: 1.5,
+      }),
       placement("ramp", "ramp-large", 2, 60, 90, 1.5),
       placement("mud", "mud-wide", 2, 80),
       placement("grass", "grass-cut", 0, 90),
-      placement("checkpoint-two", "checkpoint", 0, 98, 180, 0.5),
+      placement("checkpoint-two", "checkpoint", 0, 98, 180, 0.5, {
+        lateralOffset: 3,
+        elevation: 2,
+      }),
       placement("cooling", "cooling-single", 1, 100),
       placement("barrier", "barrier-short", 0, 115),
       placement("bump", "bump-single", 2, 130),
@@ -81,6 +100,12 @@ describe("custom track conversion", () => {
         { id: "checkpoint-two", distance: 98, order: 2, rotation: 180, height: 0.5 },
       ],
       finish: { id: "finish", distance: 160, order: 3, rotation: 180, height: 1 },
+      centerline: [
+        { distance: 0, lateralOffset: 0, elevation: 0 },
+        { distance: 40, lateralOffset: -2.5, elevation: 1.5 },
+        { distance: 98, lateralOffset: 3, elevation: 2 },
+        { distance: 160, lateralOffset: 0, elevation: 0 },
+      ],
       trackPieces: [
         { id: "straight", kind: "straight", distance: 12, rotation: 0, height: 0 },
         { id: "curve", kind: "curve-left", distance: 24, rotation: 90, height: 2 },
@@ -112,7 +137,7 @@ describe("custom track conversion", () => {
       index % 3,
     ));
     const definition = customTrackToDefinition({
-      schemaVersion: 1,
+      schemaVersion: 2,
       id: "all-runtime-modules",
       name: "All Runtime Modules",
       laps: 2,
@@ -132,5 +157,38 @@ describe("custom track conversion", () => {
     ];
     expect(new Set(accountedIds)).toEqual(new Set(modules.map(({ id }) => id)));
     expect(accountedIds).toHaveLength(EDITOR_MODULES.length);
+  });
+
+  it("returns an authored all-zero route instead of throwing for an incomplete editor draft", () => {
+    const draft = customTrack(2);
+    draft.modules = draft.modules.filter((module) => module.moduleId !== "checkpoint");
+
+    const definition = customTrackToPresentationDefinition(draft);
+
+    expect(definition.courseLength).toBe(CUSTOM_TRACK_PRESENTATION_FALLBACK_LENGTH);
+    expect(definition.obstacles).toEqual([]);
+    expect(definition.authoredCourse?.centerline).toEqual([
+      { distance: 0, lateralOffset: 0, elevation: 0 },
+      {
+        distance: CUSTOM_TRACK_PRESENTATION_FALLBACK_LENGTH / 2,
+        lateralOffset: 0,
+        elevation: 0,
+      },
+      {
+        distance: CUSTOM_TRACK_PRESENTATION_FALLBACK_LENGTH,
+        lateralOffset: 0,
+        elevation: 0,
+      },
+    ]);
+  });
+
+  it("extends an incomplete editor draft fallback to its visible working range", () => {
+    const draft = customTrack(2);
+    draft.modules = draft.modules.filter((module) => module.moduleId !== "checkpoint");
+
+    const definition = customTrackToPresentationDefinition(draft, 12_048);
+
+    expect(definition.courseLength).toBe(12_048);
+    expect(definition.authoredCourse?.finish.distance).toBe(12_048);
   });
 });

@@ -24,6 +24,24 @@ test("fresh load completes a keyboard race, saves onboarding, and retries", asyn
   await page.getByRole("button", { name: "Ride", exact: true }).click();
   await page.getByRole("button", { name: /Practice/ }).click();
   await expect(page.getByLabel("Live 3D race on Canyon Kickoff")).toBeVisible();
+  await expect(page.locator(".timing-block > strong")).toHaveText("00:00.00");
+  await expect(page.getByLabel("Go. Ride now.")).toBeVisible({ timeout: 10_000 });
+  await expect(page.locator(".game-shell")).toHaveAttribute("data-race-gate-phase", "racing");
+  const raceOverlayStack = await page.evaluate(() => {
+    const pause = document.createElement("section");
+    const gate = document.createElement("section");
+    pause.className = "pause-overlay";
+    gate.className = "race-start-gate go-signal";
+    document.body.append(pause, gate);
+    const result = {
+      pause: Number(getComputedStyle(pause).zIndex),
+      gate: Number(getComputedStyle(gate).zIndex),
+    };
+    pause.remove();
+    gate.remove();
+    return result;
+  });
+  expect(raceOverlayStack.pause).toBeGreaterThan(raceOverlayStack.gate);
 
   await page.keyboard.down("w");
   await expect(page.getByRole("button", { name: "Retry now" })).toBeVisible({ timeout: 30_000 });
@@ -33,6 +51,11 @@ test("fresh load completes a keyboard race, saves onboarding, and retries", asyn
 
   await page.getByRole("button", { name: "Retry now" }).click();
   await expect(page.getByLabel("Live 3D race on Canyon Kickoff")).toBeVisible();
+  await expect(page.locator(".game-shell")).toHaveAttribute(
+    "data-race-gate-phase",
+    "racing",
+    { timeout: 15_000 },
+  );
   await page.getByLabel("Live 3D race on Canyon Kickoff").press("Escape");
   await expect(page.getByRole("dialog", { name: "Race paused" })).toBeVisible();
   await page.getByRole("button", { name: "Restart now" }).click();
@@ -81,7 +104,20 @@ test("phone and tablet layouts complete a race with labeled touch controls", asy
   await expect(page.getByRole("button", { name: "Pitch front wheel down" })).toBeVisible();
   const ride = page.getByRole("button", { name: "Ride", exact: true });
   await expect(ride).toBeVisible();
-  await expect(page.getByRole("button", { name: "Turbo", exact: true })).toBeVisible();
+  const turbo = page.getByRole("button", { name: "Turbo", exact: true });
+  await expect(turbo).toBeVisible();
+  const touchControls = page.getByLabel("Touch race controls");
+  await expect(touchControls).toHaveAttribute("data-touch-icon-set", "rally-pictograms-v1");
+  await expect(touchControls.locator("[data-touch-icon]")).toHaveCount(6);
+  for (const control of ["lane-left", "lane-right", "pitch-up", "pitch-down", "ride", "turbo"]) {
+    const button = touchControls.locator(`button[data-control="${control}"]`);
+    await expect(button.locator(`[data-touch-icon="${control}"]`)).toHaveCount(1);
+    await expect(button.locator("svg")).toHaveAttribute("focusable", "false");
+  }
+  await expect(ride).toHaveAttribute("data-control", "ride");
+  await expect(turbo).toHaveAttribute("data-control", "turbo");
+  await expect(ride.locator(".touch-control-label")).toHaveText("Ride");
+  await expect(turbo.locator(".touch-control-label")).toHaveText("Turbo");
   await expect(page.getByRole("button", { name: "Pause race" })).toBeVisible();
   await ride.dispatchEvent("pointerdown", { pointerId: 11, pointerType: "touch", isPrimary: true });
   await expect(page.getByRole("button", { name: "Retry now" })).toBeVisible({ timeout: 30_000 });
@@ -130,16 +166,36 @@ test("production shell reloads from its service-worker cache while offline", asy
       name,
       urls: (await (await caches.open(name)).keys()).map((request) => request.url),
     })));
-    return { controller: navigator.serviceWorker.controller?.scriptURL, entries };
+    return {
+      controller: navigator.serviceWorker.controller?.scriptURL,
+      offlineCache: document.documentElement.dataset.offlineCache,
+      entries,
+    };
   });
-  const cachedUrls = cacheSnapshot.entries.flatMap((entry) => entry.urls);
+  const currentCache = cacheSnapshot.entries.find((entry) => entry.name === "rivet-ridge-rally-shell-v30");
   expect(cacheSnapshot.controller).toContain("/sw.js");
+  expect(cacheSnapshot.offlineCache).toBe("rivet-ridge-rally-shell-v30");
+  expect(currentCache).toBeDefined();
+  const cachedUrls = currentCache?.urls ?? [];
   expect(cachedUrls.some((url) => /\/assets\/index-[^/]+\.js$/.test(url))).toBe(true);
   expect(cachedUrls.some((url) => /\/assets\/index-[^/]+\.css$/.test(url))).toBe(true);
+  expect(cachedUrls.some((url) => /\/assets\/GameView-[^/]+\.js$/.test(url))).toBe(true);
+  expect(cachedUrls.some((url) => /\/assets\/TrackEditorScreen-[^/]+\.js$/.test(url))).toBe(true);
+  expect(cachedUrls.some((url) => url.endsWith("/assets/art/canyon-festival-panorama.png"))).toBe(true);
   await context.setOffline(true);
+  await expect(page.getByRole("status")).toContainText("cached races remain available");
   await page.reload();
   await expect(page.getByRole("button", { name: "Ride", exact: true })).toBeVisible({ timeout: 15_000 });
-  await expect(page.getByRole("status")).toContainText("Offline mode");
+  await expect(page.getByRole("status")).toContainText("cached races remain available");
+  // Synthetic scope: this proves page-side invalidation only. Real worker
+  // install/activation/cache-transition coverage remains a separate gate.
+  await page.evaluate(() => navigator.serviceWorker.dispatchEvent(new Event("controllerchange")));
+  await expect.poll(() => page.evaluate(() => (
+    document.documentElement.dataset.offlineCache === undefined
+    && document.documentElement.dataset.offlineReady === undefined
+  ))).toBe(true);
+  await expect(page.getByRole("status")).toContainText("uncached sections may require reconnecting");
+  await expect(page.getByRole("status")).not.toContainText("cached races remain available");
   await page.getByRole("button", { name: "Ride", exact: true }).click();
   await page.getByRole("button", { name: /Practice/ }).click();
   await expect(page.getByLabel("Live 3D race on Canyon Kickoff")).toBeVisible();

@@ -129,13 +129,21 @@ describe("heat and surfaces", () => {
     expect(simulation.snapshot.bike.overheated).toBe(false);
   });
 
-  it("keeps standard throttle below the heat ceiling", () => {
+  it("builds standard throttle to a safe heat ceiling while preserving cooling", () => {
     const simulation = new RaceSimulation();
 
     simulation.advance(20, input({ throttle: true }));
-
-    expect(simulation.snapshot.bike.heat).toBe(0);
+    expect(simulation.snapshot.bike.heat).toBe(62);
     expect(simulation.snapshot.bike.overheated).toBe(false);
+
+    simulation.advance(0.5, input({ throttle: true, turbo: true }));
+    expect(simulation.snapshot.bike.heat).toBeGreaterThan(62);
+
+    simulation.advance(2, input({ throttle: true }));
+    expect(simulation.snapshot.bike.heat).toBe(62);
+
+    simulation.advance(1, neutralInput);
+    expect(simulation.snapshot.bike.heat).toBeCloseTo(48, 8);
   });
 
   it("applies an immediate cooling-zone drop and continued cooling", () => {
@@ -210,6 +218,7 @@ describe("jumping, pitch, and landing", () => {
     );
 
     expect(simulation.snapshot.bike.lastLanding).toBe("crash");
+    expect(simulation.snapshot.bike.crashCause).toBe("landing");
     expect(simulation.snapshot.bike.speed).toBe(0);
   });
 
@@ -228,9 +237,11 @@ describe("jumping, pitch, and landing", () => {
     simulation.advance(1.6, input({ throttle: true, pitch: 1 }));
 
     expect(simulation.snapshot.bike.phase).toBe("crashed");
+    expect(simulation.snapshot.bike.crashCause).toBe("wheelie-timeout");
     expect(simulation.snapshot.bike.speed).toBe(0);
     simulation.advance(0.8, input({ recover: true }));
     expect(simulation.snapshot.bike.phase).toBe("recovering");
+    expect(simulation.snapshot.bike.crashCause).toBeNull();
   });
 
   it("can extend the same wheelie rule for a finite training window", () => {
@@ -242,6 +253,7 @@ describe("jumping, pitch, and landing", () => {
     expect(simulation.snapshot.bike.wheelie).toBe(true);
     simulation.advance(1.6, input({ throttle: true, pitch: 1 }));
     expect(simulation.snapshot.bike.phase).toBe("crashed");
+    expect(simulation.snapshot.bike.crashCause).toBe("wheelie-timeout");
   });
 
   it("trades distance for lift when pitching back in the air", () => {
@@ -274,6 +286,17 @@ describe("jumping, pitch, and landing", () => {
 });
 
 describe("crash recovery", () => {
+  it("keeps the first crash cause until recovery begins", () => {
+    const simulation = new RaceSimulation();
+
+    simulation.forceCrash("obstacle");
+    simulation.forceCrash("wheelie-timeout");
+
+    expect(simulation.snapshot.bike.crashCause).toBe("obstacle");
+    simulation.advance(0.8, input({ recover: true }));
+    expect(simulation.snapshot.bike.crashCause).toBeNull();
+  });
+
   it("requires a continuous hold before recovery completes", () => {
     const simulation = new RaceSimulation();
     simulation.forceCrash();

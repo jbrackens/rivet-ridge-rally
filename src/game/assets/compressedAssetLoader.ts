@@ -1,6 +1,5 @@
 import {
-  DefaultLoadingManager,
-  type LoadingManager,
+  LoadingManager,
   type WebGLRenderer,
 } from "three";
 import {
@@ -32,7 +31,9 @@ export function createCompressedAssetLoader(
   renderer: WebGLRenderer,
   options: CompressedAssetLoaderOptions = {},
 ): CompressedAssetLoader {
-  const manager = options.manager ?? DefaultLoadingManager;
+  // Keep cancellation scoped to one race. A timeout must not abort any other
+  // application loader that happens to use Three's global default manager.
+  const manager = options.manager ?? new LoadingManager();
   const ktx2Loader = new KTX2Loader(manager)
     .setTranscoderPath(options.transcoderPath ?? BASIS_TRANSCODER_PATH)
     .setWorkerLimit(options.workerLimit ?? 2)
@@ -40,30 +41,18 @@ export function createCompressedAssetLoader(
   const gltfLoader = new GLTFLoader(manager)
     .setMeshoptDecoder(MeshoptDecoder)
     .setKTX2Loader(ktx2Loader);
-  let pendingLoads = 0;
-  let disposeRequested = false;
   let loaderDisposed = false;
-
-  const disposeWhenIdle = (): void => {
-    if (!disposeRequested || loaderDisposed || pendingLoads > 0) return;
-    loaderDisposed = true;
-    ktx2Loader.dispose();
-  };
 
   return {
     load: async (url: string) => {
-      if (disposeRequested) throw new Error("Compressed asset loader has been disposed.");
-      pendingLoads += 1;
-      try {
-        return await gltfLoader.loadAsync(url);
-      } finally {
-        pendingLoads -= 1;
-        disposeWhenIdle();
-      }
+      if (loaderDisposed) throw new Error("Compressed asset loader has been disposed.");
+      return gltfLoader.loadAsync(url);
     },
     dispose: () => {
-      disposeRequested = true;
-      disposeWhenIdle();
+      if (loaderDisposed) return;
+      loaderDisposed = true;
+      manager.abort();
+      ktx2Loader.dispose();
     },
   };
 }

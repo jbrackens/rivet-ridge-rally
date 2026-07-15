@@ -3,12 +3,13 @@
   "version": "1.0.0-rc.2",
   "private": true,
   "type": "module",
+  "packageManager": "npm@11.17.0",
   "engines": {
     "node": "^20.19.0 || ^22.13.0 || >=24.0.0"
   },
   "scripts": {
     "assets:build": "node scripts/build-3d-assets.mjs",
-    "assets:verify": "node scripts/verify-3d-assets.mjs",
+    "assets:verify": "node scripts/verify-3d-assets.mjs && node scripts/verify-production-art.mjs",
     "dev": "vite",
     "typecheck": "tsc -b --pretty false",
     "lint": "eslint .",
@@ -18,9 +19,11 @@
     "perf:soak": "node scripts/performance/soak.mjs",
     "release:manifest": "node scripts/release-manifest.mjs",
     "smoke:production": "node scripts/production-smoke.mjs",
-    "test": "vitest run",
+    "test": "vitest run && npm run test:release-manifest && npm run test:production-smoke-support",
     "test:coverage": "vitest run --coverage",
     "test:e2e": "playwright test",
+    "test:production-smoke-support": "node --test scripts/production-smoke-support.test.mjs scripts/production-smoke-flow.test.mjs scripts/service-worker-install.test.mjs",
+    "test:release-manifest": "node --test scripts/release-manifest.test.mjs",
     "visual:capture": "node scripts/capture-visual-review.mjs",
     "build": "npm run typecheck && vite build && npm run notices:build",
     "preview": "vite preview",

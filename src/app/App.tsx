@@ -44,21 +44,33 @@ class LoadBoundary extends Component<LoadBoundaryProps, { failed: boolean }> {
 function subscribeToConnectivity(callback: () => void): () => void {
   window.addEventListener("online", callback);
   window.addEventListener("offline", callback);
+  window.addEventListener("rivet-ridge-rally:offline-readiness-change", callback);
   return () => {
     window.removeEventListener("online", callback);
     window.removeEventListener("offline", callback);
+    window.removeEventListener("rivet-ridge-rally:offline-readiness-change", callback);
   };
 }
 
+function getConnectivitySnapshot(): string {
+  const connection = navigator.onLine ? "online" : "offline";
+  const cache = document.documentElement.dataset.offlineReady === "true" ? "ready" : "not-ready";
+  return `${connection}:${cache}`;
+}
+
 function ConnectivityBanner() {
-  const online = useSyncExternalStore(
+  const connectivity = useSyncExternalStore(
     subscribeToConnectivity,
-    () => navigator.onLine,
-    () => true,
+    getConnectivitySnapshot,
+    () => "online:not-ready",
   );
+  const online = connectivity.startsWith("online:");
+  const offlineReady = connectivity.endsWith(":ready");
   return online ? null : (
     <div className="offline-banner" role="status">
-      Offline mode · saved tracks and cached races remain available
+      {offlineReady
+        ? "Offline mode · saved tracks and cached races remain available"
+        : "Offline mode · uncached sections may require reconnecting"}
     </div>
   );
 }
@@ -66,28 +78,37 @@ function ConnectivityBanner() {
 function PersistenceNotice() {
   const screen = useAppStore((state) => state.screen);
   const status = useAppStore((state) => state.persistenceStatus);
+  const pendingTestRideSave = useAppStore((state) => state.pendingTestRideSave);
   const retryDevicePersistence = useAppStore((state) => state.retryDevicePersistence);
   const openSettings = useAppStore((state) => state.openSettings);
   if (status.mode !== "session" || ["boot", "race", "tutorial", "paused"].includes(screen)) return null;
 
-  const title = status.reason === "quota"
-    ? "Device storage is full"
-    : status.reason === "upgrade"
-      ? "Save upgrade needs attention"
-      : status.reason === "blocked"
-        ? "Device storage is busy"
-        : "Device saving unavailable";
+  const failedTestRideSave = pendingTestRideSave
+    && (status.operation === "custom-tracks" || status.operation === "retry")
+    ? pendingTestRideSave
+    : null;
+  const title = failedTestRideSave
+    ? "Test Ride track is not saved"
+    : status.reason === "quota"
+      ? "Device storage is full"
+      : status.reason === "upgrade"
+        ? "Save upgrade needs attention"
+        : status.reason === "blocked"
+          ? "Device storage is busy"
+          : "Device saving unavailable";
   const summary = status.reason === "upgrade"
     ? "The local rider database could not be opened after a version check. Existing data has not been deleted."
     : status.reason === "quota"
       ? "The browser rejected a write because storage is full or denied."
       : "The browser cannot currently open or write the local rider database.";
   const inEditor = screen === "editor" || screen === "custom-library";
-  const guidance = inEditor
-    ? "Editing and test rides still work this session. Use Export for a valid draft before closing this tab or resetting site data."
-    : screen === "settings"
-      ? "Changes still apply this session. Allow site storage or free space, then retry. Export accessible custom tracks first; reset site data only as a last resort because it permanently deletes local progress and tracks."
-      : "You can keep playing this session, but new progress and settings may disappear when the tab closes. Open recovery steps before resetting site data.";
+  const guidance = failedTestRideSave
+    ? `The exact “${failedTestRideSave.name}” snapshot is still held in this tab. Retry to save it, or return to Track Builder and export it before closing the tab.`
+    : inEditor
+      ? "Editing and test rides still work this session. Use Export for a valid draft before closing this tab or resetting site data."
+      : screen === "settings"
+        ? "Changes still apply this session. Allow site storage or free space, then retry. Export accessible custom tracks first; reset site data only as a last resort because it permanently deletes local progress and tracks."
+        : "You can keep playing this session, but new progress and settings may disappear when the tab closes. Open recovery steps before resetting site data.";
 
   return (
     <aside className="persistence-notice" role="alert" aria-labelledby="persistence-notice-title">
@@ -98,7 +119,7 @@ function PersistenceNotice() {
       </div>
       <div className="persistence-actions">
         <button className="button-primary" disabled={status.retrying} onClick={() => void retryDevicePersistence()}>
-          {status.retrying ? "Retrying…" : "Retry device saving"}
+          {status.retrying ? "Retrying…" : failedTestRideSave ? "Retry track saving" : "Retry device saving"}
         </button>
         {!inEditor && screen !== "settings" ? <button onClick={openSettings}>Recovery steps</button> : null}
       </div>
@@ -153,15 +174,20 @@ export function App() {
   }, [uiAudio]);
 
   const settingsOverRace = screen === "settings" && returnScreen === "paused";
-  const boundaryKey = screen === "race" || screen === "paused" || settingsOverRace ? "race-session" : screen;
+  const settingsOverTutorial = screen === "settings" && returnScreen === "tutorial";
+  const boundaryKey = screen === "tutorial" || settingsOverTutorial
+    ? "tutorial-session"
+    : screen === "race" || screen === "paused" || settingsOverRace
+      ? "race-session"
+      : screen;
   let surface;
   if (screen === "boot") surface = <BootScreen />;
   else if (screen === "title") surface = <TitleScreen />;
   else if (screen === "mode-select" || screen === "track-select") surface = <ModeScreen />;
-  else if (screen === "settings" && !settingsOverRace) surface = <SettingsScreen />;
+  else if (screen === "settings" && !settingsOverRace && !settingsOverTutorial) surface = <SettingsScreen />;
   else if (screen === "results") surface = <ResultsScreen />;
   else if (screen === "editor" || screen === "custom-library") surface = <Suspense fallback={<BootScreen />}><TrackEditorScreen /></Suspense>;
-  else if (screen === "tutorial") surface = <Suspense fallback={<BootScreen />}><GameView tutorial /></Suspense>;
+  else if (screen === "tutorial" || settingsOverTutorial) surface = <><Suspense fallback={<BootScreen />}><GameView tutorial /></Suspense>{settingsOverTutorial ? <div className="race-settings-overlay"><SettingsScreen /></div> : null}</>;
   else if (screen === "race" || screen === "paused" || settingsOverRace) surface = <><Suspense fallback={<BootScreen />}><GameView /></Suspense>{settingsOverRace ? <div className="race-settings-overlay"><SettingsScreen /></div> : null}</>;
   else surface = <TitleScreen />;
 

@@ -6,7 +6,7 @@ These instructions apply to the repository root and all descendants unless a mor
 
 The repository contains a playable RC candidate with five campaign tracks, complete race modes and progression, a fixed-step Three.js game, local IndexedDB saves, procedural audio, responsive controls/accessibility, and the 25-module 3D editor. It also contains unit, cross-browser Playwright, axe, visual-regression, persistence, failure-path, editor, tutorial, gamepad-emulation, and performance harnesses. Treat `QA_REPORT.md` and `LAUNCH_READINESS.md` as the authority for which checks have actually passed and which physical environments remain unverified.
 
-The approved shipped title is **RIVET RIDGE RALLY**. The local workspace folder name contains a prohibited third-party game name. Do not copy that local path name into package metadata, source identifiers, UI, assets, screenshots, marketing, or release artifacts. The owner should rename the local folder before public release work.
+The approved shipped title is **RIVET RIDGE RALLY**. The canonical local workspace uses the neutral `Rivet Ridge Rally` directory name; the legacy prohibited-name workspace has been retired. Do not reintroduce that legacy name into package metadata, source identifiers, UI, assets, screenshots, marketing, paths, or release artifacts.
 
 ## 2. Source of truth
 
@@ -171,4 +171,4 @@ A milestone handoff should state:
 - documentation changed;
 - the next stage gate.
 
-Commercial RC1 handoff additionally requires exact run/test/build/deploy commands, documentation paths, QA/performance results, browser/device coverage, P2-or-lower known issues, external owner actions, and a direct status supported by `LAUNCH_READINESS.md`.
+Commercial release-candidate handoff additionally requires exact run/test/build/deploy commands, documentation paths, QA/performance results, browser/device coverage, P2-or-lower known issues, external owner actions, and a direct status supported by `LAUNCH_READINESS.md`.

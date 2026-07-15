@@ -14,17 +14,33 @@ import {
   createDefaultProgress,
   loadGameData,
   retryPersistence as retryDatabasePersistence,
+  saveCustomTrack,
   saveProgress,
   saveSettings,
   subscribePersistenceFailures,
   type CustomTrackData,
   type PersistenceFailure,
 } from "../game/persistence/database";
+import type { EditorModuleCategory } from "../game/editor/modules";
 
 interface ActiveRace {
   mode: RaceMode;
   trackId: TrackId;
   customTrack?: CustomTrackData | undefined;
+}
+
+interface FinishRaceOptions {
+  raceAttempt?: number;
+  presentResults?: boolean;
+}
+
+export interface EditorSessionState {
+  track: CustomTrackData;
+  past: CustomTrackData[];
+  future: CustomTrackData[];
+  category: EditorModuleCategory;
+  selectedModuleId: string;
+  selectedPlacementId: string | null;
 }
 
 export type PersistenceStatus =
@@ -40,7 +56,10 @@ interface AppState {
   settings: GameSettings;
   progress: CampaignProgress;
   activeRace: ActiveRace | null;
+  editorSession: EditorSessionState | null;
+  pendingTestRideSave: CustomTrackData | null;
   latestResult: RaceResult | null;
+  latestResultAttempt: number | null;
   raceAttempt: number;
   hydrate: () => Promise<void>;
   navigate: (screen: AppScreen) => void;
@@ -50,10 +69,15 @@ interface AppState {
   selectTrack: (trackId: TrackId) => void;
   startRace: (mode: RaceMode, trackId?: TrackId) => void;
   startCustomRace: (track: CustomTrackData) => void;
+  setEditorSession: (session: EditorSessionState) => void;
+  saveTestRideTrack: (track: CustomTrackData) => Promise<void>;
+  clearPendingTestRideSave: (trackId: string) => void;
   pauseRace: () => void;
   resumeRace: () => void;
-  finishRace: (result: RaceResult) => void;
+  finishRace: (result: RaceResult, options?: FinishRaceOptions) => void;
+  presentRaceResult: (raceAttempt: number) => void;
   completeTutorial: () => void;
+  skipTutorial: () => void;
   retryRace: () => void;
   resetLocalProgress: () => void;
   retryDevicePersistence: () => Promise<void>;
@@ -61,6 +85,7 @@ interface AppState {
 }
 
 let hydrationStarted = false;
+let profileLoadedFromPersistence = false;
 
 export const MASTERY_TRACK_ID = "summit-showdown" satisfies TrackId;
 export const MASTERY_TIER_COUNT = 7;
@@ -69,8 +94,9 @@ function copyProgress(progress: CampaignProgress): CampaignProgress {
   return structuredClone(progress);
 }
 
-function persistInBackground(operation: Promise<unknown>): void {
-  void operation.catch(() => {
+function persistInBackground(operation: () => Promise<unknown>): void {
+  if (!profileLoadedFromPersistence) return;
+  void operation().catch(() => {
     // The database publishes failures to the shared session-mode notice before rejecting.
   });
 }
@@ -122,10 +148,13 @@ export function applyRaceResult(
   const trackProgress = progress.tracks[result.trackId];
 
   if (result.mode === "solo") {
-    trackProgress.bestSoloMs = Math.min(
-      trackProgress.bestSoloMs ?? Number.POSITIVE_INFINITY,
-      result.finishTimeMs,
-    );
+    const isPersonalBest = trackProgress.bestSoloMs === undefined
+      || result.finishTimeMs < trackProgress.bestSoloMs;
+    if (isPersonalBest) {
+      trackProgress.bestSoloMs = result.finishTimeMs;
+      trackProgress.bestSoloLapTimesMs = [...result.lapTimesMs];
+      trackProgress.bestSoloSplitTimesMs = [...result.splitTimesMs];
+    }
     if (result.finishTimeMs <= track.soloTargetMs) {
       trackProgress.soloQualified = true;
       trackProgress.rivalUnlocked = true;
@@ -167,13 +196,20 @@ export function prepareRaceResult(
 
   if (classifiedResult.mode !== "solo") return classifiedResult;
 
-  const previousBestMs = currentProgress.tracks[classifiedResult.trackId].bestSoloMs;
+  const previousTrackProgress = currentProgress.tracks[classifiedResult.trackId];
+  const previousBestMs = previousTrackProgress.bestSoloMs;
   const personalBest = previousBestMs === undefined
     || classifiedResult.finishTimeMs < previousBestMs;
   return {
     ...classifiedResult,
     personalBest,
     previousBestMs,
+    previousBestLapTimesMs: previousTrackProgress.bestSoloLapTimesMs === undefined
+      ? undefined
+      : [...previousTrackProgress.bestSoloLapTimesMs],
+    previousBestSplitTimesMs: previousTrackProgress.bestSoloSplitTimesMs === undefined
+      ? undefined
+      : [...previousTrackProgress.bestSoloSplitTimesMs],
     bestTimeMs: personalBest ? classifiedResult.finishTimeMs : previousBestMs,
   };
 }
@@ -187,7 +223,10 @@ export const useAppStore = create<AppState>((set, get) => ({
   settings: DEFAULT_SETTINGS,
   progress: createDefaultProgress(),
   activeRace: null,
+  editorSession: null,
+  pendingTestRideSave: null,
   latestResult: null,
+  latestResultAttempt: null,
   raceAttempt: 0,
 
   hydrate: async () => {
@@ -196,6 +235,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     set({ bootMessage: "Loading rider data…" });
     try {
       const { settings, progress, recovered } = await loadGameData();
+      profileLoadedFromPersistence = true;
       set({
         settings,
         progress,
@@ -205,7 +245,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     } catch {
       set({
         bootMessage: "Local storage is unavailable. Progress will last for this session.",
-        screen: "title",
+        screen: "tutorial",
       });
     }
   },
@@ -221,14 +261,14 @@ export const useAppStore = create<AppState>((set, get) => ({
 
   updateSettings: (settings) => {
     set({ settings });
-    persistInBackground(saveSettings(settings));
+    persistInBackground(() => saveSettings(settings));
   },
 
   selectTrack: (trackId) => {
     const progress = copyProgress(get().progress);
     progress.selectedTrackId = trackId;
     set({ progress });
-    persistInBackground(saveProgress(progress));
+    persistInBackground(() => saveProgress(progress));
   },
 
   startRace: (mode, trackId) => {
@@ -242,6 +282,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     set({
       activeRace: { mode, trackId: selectedTrackId },
       latestResult: null,
+      latestResultAttempt: null,
       raceAttempt: get().raceAttempt + 1,
       screen: mode === "tutorial" ? "tutorial" : "race",
     });
@@ -250,15 +291,40 @@ export const useAppStore = create<AppState>((set, get) => ({
   startCustomRace: (customTrack) => set({
     activeRace: { mode: "custom", trackId: "canyon-kickoff", customTrack },
     latestResult: null,
+    latestResultAttempt: null,
     raceAttempt: get().raceAttempt + 1,
     screen: "race",
   }),
 
+  setEditorSession: (editorSession) => set({ editorSession }),
+
+  saveTestRideTrack: async (track) => {
+    const snapshot = structuredClone(track);
+    set({ pendingTestRideSave: snapshot });
+    await saveCustomTrack(snapshot);
+    set((state) => state.pendingTestRideSave === snapshot
+      ? { pendingTestRideSave: null }
+      : state);
+  },
+
+  clearPendingTestRideSave: (trackId) => set((state) => (
+    state.pendingTestRideSave?.id === trackId
+      ? { pendingTestRideSave: null }
+      : state
+  )),
+
   pauseRace: () => set({ screen: "paused" }),
   resumeRace: () => set({ screen: "race" }),
 
-  finishRace: (result) => {
-    const currentProgress = get().progress;
+  finishRace: (result, options) => {
+    const currentState = get();
+    const resultAttempt = options?.raceAttempt ?? currentState.raceAttempt;
+    if (
+      resultAttempt !== currentState.raceAttempt
+      || currentState.latestResultAttempt === resultAttempt
+    ) return;
+
+    const currentProgress = currentState.progress;
     const preparedResult = prepareRaceResult(currentProgress, result);
     const masteryGoal = preparedResult.mode === "mastery" && preparedResult.trackId === MASTERY_TRACK_ID
       ? getMasteryGoal(currentProgress.tracks[MASTERY_TRACK_ID].masteryLevel)
@@ -272,25 +338,57 @@ export const useAppStore = create<AppState>((set, get) => ({
         }
       : preparedResult;
     const progress = applyRaceResult(currentProgress, latestResult);
-    set({ progress, latestResult, screen: "results" });
-    persistInBackground(saveProgress(progress));
+    set({
+      progress,
+      latestResult,
+      latestResultAttempt: resultAttempt,
+      ...(options?.presentResults === false ? {} : { screen: "results" as const }),
+    });
+    persistInBackground(() => saveProgress(progress));
   },
+
+  presentRaceResult: (raceAttempt) => set((state) => {
+    const raceSessionVisible = state.screen === "race"
+      || state.screen === "paused"
+      || (state.screen === "settings" && state.returnScreen === "paused");
+    if (
+      state.raceAttempt !== raceAttempt
+      || state.latestResultAttempt !== raceAttempt
+      || !state.latestResult
+      || !raceSessionVisible
+    ) return state;
+    return { screen: "results" };
+  }),
 
   completeTutorial: () => {
     const progress = copyProgress(get().progress);
     progress.tutorialComplete = true;
     set({ progress, screen: "title" });
-    persistInBackground(saveProgress(progress));
+    persistInBackground(() => saveProgress(progress));
+  },
+
+  skipTutorial: () => {
+    const progress = copyProgress(get().progress);
+    progress.tutorialComplete = true;
+    set({ progress, screen: "title" });
+    persistInBackground(() => saveProgress(progress));
   },
 
   retryRace: () => {
-    if (get().activeRace) set((state) => ({ latestResult: null, raceAttempt: state.raceAttempt + 1, screen: "race" }));
+    if (get().activeRace) {
+      set((state) => ({
+        latestResult: null,
+        latestResultAttempt: null,
+        raceAttempt: state.raceAttempt + 1,
+        screen: "race",
+      }));
+    }
   },
 
   resetLocalProgress: () => {
     const progress = createDefaultProgress();
     set({ progress });
-    persistInBackground(saveProgress(progress));
+    persistInBackground(() => saveProgress(progress));
   },
 
   retryDevicePersistence: async () => {
@@ -302,8 +400,30 @@ export const useAppStore = create<AppState>((set, get) => ({
     }));
     try {
       const { settings, progress } = get();
-      await retryDatabasePersistence(settings, progress);
-      set({ persistenceStatus: { mode: "persistent", retrying: false } });
+      const profile = await retryDatabasePersistence(settings, progress, {
+        preserveExistingProfile: !profileLoadedFromPersistence,
+      });
+      profileLoadedFromPersistence = true;
+      set((state) => ({
+        settings: profile.settings,
+        progress: profile.progress,
+        recoveredSave: state.recoveredSave || profile.recovered,
+      }));
+      const pendingTestRideSave = get().pendingTestRideSave;
+      if (pendingTestRideSave) await saveCustomTrack(pendingTestRideSave);
+      set((state) => {
+        if (state.pendingTestRideSave !== pendingTestRideSave) {
+          return {
+            persistenceStatus: state.persistenceStatus.mode === "session"
+              ? { ...state.persistenceStatus, retrying: false }
+              : state.persistenceStatus,
+          };
+        }
+        return {
+          pendingTestRideSave: null,
+          persistenceStatus: { mode: "persistent", retrying: false },
+        };
+      });
     } catch {
       set((state) => ({
         persistenceStatus: state.persistenceStatus.mode === "session"

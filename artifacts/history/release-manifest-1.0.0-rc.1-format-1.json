@@ -1,0 +1,115 @@
+{
+  "product": "RIVET RIDGE RALLY",
+  "version": "1.0.0-rc.1",
+  "format": 1,
+  "totalBytes": 4675553,
+  "fileCount": 21,
+  "aggregateSha256": "d953ed1ed66f82a26043d3fbffe634ed8d35021edb8e90ee0f8f064567a70a97",
+  "files": [
+    {
+      "path": "THIRD_PARTY_NOTICES.txt",
+      "bytes": 38475,
+      "sha256": "c959caf9bfbb3d9b051921453e8a19132c1b40fec2ef3f3db41676d3492f84a1"
+    },
+    {
+      "path": "assets/3d/asset-manifest.json",
+      "bytes": 3369,
+      "sha256": "87c6d72dc21cbbb7a6700f2e8d245b2489b224ef8a130762e162c187c4ac3296"
+    },
+    {
+      "path": "assets/3d/festival-bike-albedo.ktx2",
+      "bytes": 2236,
+      "sha256": "a86588924b53fd51915d505d0ba23e343ac3e84a5139c687845a49f8ad8a1ba2"
+    },
+    {
+      "path": "assets/3d/festival-trail-bike.glb",
+      "bytes": 15172,
+      "sha256": "a748123dff38f90dbd29c476244cbffe8fe93d7c8a20de909e6c040af52d2123"
+    },
+    {
+      "path": "assets/GameView-BCKA6P4v.js",
+      "bytes": 210084,
+      "sha256": "6ed6d576b3977b1bba295bed2c303864ec48a90d99e40af8bacbd1fee317b261"
+    },
+    {
+      "path": "assets/TrackEditorScreen-BMHZkMEk.js",
+      "bytes": 36510,
+      "sha256": "139ed12b9ca6b81e4c303c04979bafbf213d3ad712571678b201a688caa1bdc2"
+    },
+    {
+      "path": "assets/art/title-background.png",
+      "bytes": 2129759,
+      "sha256": "292ffdf20edcb4c483b30a5a4f6882f3ecbaf8ff1f28815d8fe28a9aeb6e3e78"
+    },
+    {
+      "path": "assets/basis_transcoder-VXdx5NbI.wasm",
+      "bytes": 527333,
+      "sha256": "6cf17dc889352c42e9acf8897107978d127005fe3386c36a0e3845e27967630a"
+    },
+    {
+      "path": "assets/basis_transcoder-o4Hde_L7.js",
+      "bytes": 57529,
+      "sha256": "8478b5b6d6b74e7d3082b89f6417321d8d1dc0307f2b30d4484bb11b441696a1"
+    },
+    {
+      "path": "assets/icons/app-icon.svg",
+      "bytes": 477,
+      "sha256": "7d55e5fe2392a4d091f962e01e2a09dc6a21def5c1e9886a2bb39bb478f395a5"
+    },
+    {
+      "path": "assets/index-7zkWWQtB.js",
+      "bytes": 412688,
+      "sha256": "d570a23afbca97d7adbe1b655144c843fcae3f8934cb6a1550edfcb85dd8a44f"
+    },
+    {
+      "path": "assets/index-BsX4JgSA.css",
+      "bytes": 46626,
+      "sha256": "9d64c238523852beb44564f2dccab719d82ee3ff2190db1bb833be582ec73377"
+    },
+    {
+      "path": "assets/three.module-CYIrST_y.js",
+      "bytes": 594445,
+      "sha256": "6bcd6a28bbc79094de211f66796594a97f7ed51dc61775c2fcc800dfe633cf07"
+    },
+    {
+      "path": "assets/transcoders/basis/LICENSE.txt",
+      "bytes": 9197,
+      "sha256": "a7d00bfd54525bc694b6e32f64c7ebcf5e6b7ae3657be5cc12767bce74654a47"
+    },
+    {
+      "path": "assets/transcoders/basis/NOTICE.txt",
+      "bytes": 917,
+      "sha256": "42beeb6710c933778e30f62886e0790ebba120debbb0545ab46c7292d3e5a061"
+    },
+    {
+      "path": "assets/transcoders/basis/README.md",
+      "bytes": 1388,
+      "sha256": "a578df416c1e0852e9c36a1cf91b4d28d91a251294f87ce610a3bc7ca4df15e0"
+    },
+    {
+      "path": "assets/transcoders/basis/basis_transcoder.js",
+      "bytes": 57529,
+      "sha256": "8478b5b6d6b74e7d3082b89f6417321d8d1dc0307f2b30d4484bb11b441696a1"
+    },
+    {
+      "path": "assets/transcoders/basis/basis_transcoder.wasm",
+      "bytes": 527333,
+      "sha256": "6cf17dc889352c42e9acf8897107978d127005fe3386c36a0e3845e27967630a"
+    },
+    {
+      "path": "index.html",
+      "bytes": 1176,
+      "sha256": "f2f858f3ff6c108abe4c58338e9dff04440ee3374e03be48cd8b35b08a753a4f"
+    },
+    {
+      "path": "manifest.webmanifest",
+      "bytes": 398,
+      "sha256": "21b481ea561e62e306da2072d94e87f31f83839042dc95ffc50bdb3a8d33c712"
+    },
+    {
+      "path": "sw.js",
+      "bytes": 2912,
+      "sha256": "daa43f5ba6755dff80e5ea128af9f85961cb0758dd68a4961952dcd7efdbb8e0"
+    }
+  ]
+}

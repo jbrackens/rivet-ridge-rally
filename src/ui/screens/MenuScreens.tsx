@@ -9,8 +9,29 @@ import {
   useAppStore,
 } from "../../app/store";
 import { TRACKS, getTrack } from "../../game/content/tracks";
-import { formatKeyCode } from "../../game/input/keyLabels";
+import { formatKeyCode, getKeyBindingRejectionReason } from "../../game/input/keyLabels";
 import { formatTime } from "../format";
+
+const CONTROL_ACTION_LABELS: Readonly<Record<string, string>> = {
+  throttle: "Ride",
+  turbo: "Turbo",
+  laneLeft: "Lane left",
+  laneRight: "Lane right",
+  pitchUp: "Pitch up",
+  pitchDown: "Pitch down",
+  recover: "Recover",
+  pause: "Pause",
+};
+
+function getControlActionLabel(action: string): string {
+  return CONTROL_ACTION_LABELS[action] ?? action.replace(/([A-Z])/g, " $1");
+}
+
+function formatPriorBestDelta(currentMs: number, priorBestMs: number): string {
+  const delta = currentMs - priorBestMs;
+  if (delta === 0) return "±00:00.00";
+  return `${delta < 0 ? "−" : "+"}${formatTime(Math.abs(delta))}`;
+}
 
 function ChevronIcon() {
   return (
@@ -235,6 +256,7 @@ export function SettingsScreen() {
   const [remapping, setRemapping] = useState<string | null>(null);
   const [remapError, setRemapError] = useState("");
   const captureRef = useRef<HTMLButtonElement>(null);
+  const closeButtonRef = useRef<HTMLButtonElement>(null);
 
   const updateAccessibility = (patch: Partial<GameSettings["accessibility"]>) => updateSettings({ ...settings, accessibility: { ...settings.accessibility, ...patch } });
   const updateAudio = (patch: Partial<GameSettings["audio"]>) => updateSettings({ ...settings, audio: { ...settings.audio, ...patch } });
@@ -245,8 +267,13 @@ export function SettingsScreen() {
   }, [remapping]);
 
   useEffect(() => {
+    closeButtonRef.current?.focus({ preventScroll: true });
+  }, []);
+
+  useEffect(() => {
     const closeWithEscape = (event: KeyboardEvent) => {
       if (event.key !== "Escape") return;
+      if (remapping) return;
       event.preventDefault();
       event.stopImmediatePropagation();
       setRemapping(null);
@@ -255,11 +282,11 @@ export function SettingsScreen() {
     };
     window.addEventListener("keydown", closeWithEscape, { capture: true });
     return () => window.removeEventListener("keydown", closeWithEscape, { capture: true });
-  }, [closeOverlay]);
+  }, [closeOverlay, remapping]);
 
   return (
     <main className="panel-screen settings-screen">
-      <header className="screen-header"><button className="back-button" aria-label="Close settings" onClick={closeOverlay}>←</button><div><p>Rider setup</p><h1>Settings</h1></div></header>
+      <header className="screen-header"><button ref={closeButtonRef} className="back-button" aria-label="Close settings" onClick={closeOverlay}>←</button><div><p>Rider setup</p><h1>Settings</h1></div></header>
       <div className="settings-layout">
         <nav className="settings-tabs" aria-label="Settings sections">
           {(["accessibility", "audio", "play"] as const).map((tab) => <button key={tab} className={activeTab === tab ? "active" : ""} onClick={() => setActiveTab(tab)}>{tab}</button>)}
@@ -293,18 +320,35 @@ export function SettingsScreen() {
               <SettingToggle label="Retro recovery tapping" description="Optional only. Hold-to-recover always remains available." checked={settings.controls.retroRecovery} onChange={(value) => updateControls({ retroRecovery: value })} />
               <div className="key-grid" aria-label="Keyboard bindings">
                 {Object.entries(settings.controls.keyBindings).map(([action, code]) => (
-                  <div key={action}><span>{action.replace(/([A-Z])/g, " $1")}</span><button ref={remapping === action ? captureRef : undefined} onClick={() => { setRemapError(""); setRemapping(action); }} onKeyDown={(event) => {
-                    if (remapping !== action) return;
-                    event.preventDefault();
-                    const conflict = Object.entries(settings.controls.keyBindings).find(([otherAction, otherCode]) => otherAction !== action && otherCode === event.code);
-                    if (conflict) {
-                      setRemapError(`${formatKeyCode(event.code)} is already assigned to ${conflict[0].replace(/([A-Z])/g, " $1")}. Choose another key.`);
-                      return;
-                    }
-                    updateControls({ keyBindings: { ...settings.controls.keyBindings, [action]: event.code } });
-                    setRemapError("");
-                    setRemapping(null);
-                  }}>{remapping === action ? "Press a key…" : formatKeyCode(code)}</button></div>
+                  <div key={action}>
+                    <span>{action.replace(/([A-Z])/g, " $1")}</span>
+                    <button
+                      ref={remapping === action ? captureRef : undefined}
+                      aria-label={remapping === action
+                        ? `Choose a key for ${getControlActionLabel(action)}`
+                        : `Remap ${getControlActionLabel(action)}, currently ${formatKeyCode(code)}`}
+                      onClick={() => { setRemapError(""); setRemapping(action); }}
+                      onKeyDown={(event) => {
+                        if (remapping !== action) return;
+                        event.preventDefault();
+                        const rejectionReason = getKeyBindingRejectionReason(event.code);
+                        if (rejectionReason) {
+                          setRemapError(rejectionReason);
+                          return;
+                        }
+                        const conflict = Object.entries(settings.controls.keyBindings).find(([otherAction, otherCode]) => otherAction !== action && otherCode === event.code);
+                        if (conflict) {
+                          setRemapError(`${formatKeyCode(event.code)} is already assigned to ${getControlActionLabel(conflict[0])}. Choose another key.`);
+                          return;
+                        }
+                        updateControls({ keyBindings: { ...settings.controls.keyBindings, [action]: event.code } });
+                        setRemapError("");
+                        setRemapping(null);
+                      }}
+                    >
+                      {remapping === action ? "Press a key…" : formatKeyCode(code)}
+                    </button>
+                  </div>
                 ))}
               </div>
               {remapError ? <p className="control-error" role="alert">{remapError}</p> : null}
@@ -322,16 +366,19 @@ export function ResultsScreen() {
   const retryRace = useAppStore((state) => state.retryRace);
   const navigate = useAppStore((state) => state.navigate);
   if (!result) return <TitleScreen />;
-  const track = getTrack(result.trackId);
+  const trackName = result.trackName ?? getTrack(result.trackId).name;
   const gap = result.targetMs === undefined ? null : result.finishTimeMs - result.targetMs;
   const masteryGoal = result.masteryGoal;
+  const hasCompetitiveField = (result.mode === "rival" || result.mode === "mastery")
+    && result.fieldSize > 1
+    && result.classification.length > 1;
   const heading = masteryGoal
     ? result.masteryGoalMet
       ? masteryGoal.isMaxTierReplay ? "Mastery replay cleared" : "Mastery tier cleared"
       : "Mastery goal missed"
     : gap !== null && gap <= 0
       ? "Target cleared"
-      : result.position <= 3
+      : hasCompetitiveField && result.position <= 3
         ? "Podium finish"
         : "Run complete";
   const coachLabel = masteryGoal
@@ -351,9 +398,24 @@ export function ResultsScreen() {
   return (
     <main className="results-screen">
       <div className="results-stripe" aria-hidden="true" />
-      <header><p>{masteryGoal ? `Summit Mastery · Tier ${masteryGoal.tier}` : result.mode === "rival" ? `Position ${result.position} / ${result.fieldSize}` : track.name}</p><h1>{heading}</h1><span className="final-time-label">Final time</span><strong className="final-time">{formatTime(result.finishTimeMs)}</strong>{result.personalBest ? <span className="personal-best">★ New personal best</span> : null}</header>
+      <header><p>{masteryGoal ? `Summit Mastery · Tier ${masteryGoal.tier}` : result.mode === "rival" ? `Position ${result.position} / ${result.fieldSize}` : trackName}</p><h1>{heading}</h1><span className="final-time-label">Final time</span><strong className="final-time">{formatTime(result.finishTimeMs)}</strong>{result.personalBest ? <span className="personal-best">★ New personal best</span> : null}</header>
       <section className="result-grid" aria-label="Race breakdown">
-        {result.lapTimesMs.map((lapTime, index) => <div key={`${index}-${lapTime}`}><span>Lap {index + 1}</span><strong>{formatTime(lapTime)}</strong></div>)}
+        {result.lapTimesMs.map((lapTime, index) => {
+          const priorBestLap = result.mode === "solo"
+            ? result.previousBestLapTimesMs?.[index]
+            : undefined;
+          return (
+            <div key={`${index}-${lapTime}`}>
+              <span>Lap {index + 1}</span>
+              <strong>{formatTime(lapTime)}</strong>
+              {priorBestLap === undefined ? null : (
+                <small className="prior-best-comparison">
+                  Prior PB {formatTime(priorBestLap)} · {formatPriorBestDelta(lapTime, priorBestLap)}
+                </small>
+              )}
+            </div>
+          );
+        })}
         {result.targetMs !== undefined ? <div><span>Target</span><strong>{formatTime(result.targetMs)}</strong></div> : null}
         <div><span>Target gap</span><strong>{gap === null ? result.mode === "practice" || result.mode === "custom" ? "Free ride" : "Not applicable" : `${gap <= 0 ? "−" : "+"}${formatTime(Math.abs(gap))}`}</strong></div>
         {result.mode === "solo" ? <div><span>Saved best before run</span><strong>{result.previousBestMs === undefined ? "No prior time" : formatTime(result.previousBestMs)}</strong></div> : null}
@@ -383,14 +445,27 @@ export function ResultsScreen() {
         <section className="split-breakdown" aria-label="Checkpoint split times">
           <h2>Checkpoint splits</h2>
           <ol>
-            {result.splitTimesMs.map((split, index) => (
-              <li key={`${index}-${split}`}><span>Lap {Math.floor(index / result.checkpointCount) + 1} · CP {(index % result.checkpointCount) + 1}</span><strong>{formatTime(split)}</strong></li>
-            ))}
+            {result.splitTimesMs.map((split, index) => {
+              const priorBestSplit = result.mode === "solo"
+                ? result.previousBestSplitTimesMs?.[index]
+                : undefined;
+              return (
+                <li key={`${index}-${split}`}>
+                  <span>Lap {Math.floor(index / result.checkpointCount) + 1} · CP {(index % result.checkpointCount) + 1}</span>
+                  <strong>{formatTime(split)}</strong>
+                  {priorBestSplit === undefined ? null : (
+                    <small className="prior-best-comparison">
+                      Prior PB {formatTime(priorBestSplit)} · {formatPriorBestDelta(split, priorBestSplit)}
+                    </small>
+                  )}
+                </li>
+              );
+            })}
           </ol>
         </section>
       ) : null}
       <p className="coach-note"><span>{coachLabel}</span>{coachCopy}</p>
-      <nav className="result-actions"><button className="button-primary" onClick={retryRace}>Retry now</button><button onClick={() => navigate("mode-select")}>Change mode</button><button onClick={() => navigate("title")}>Festival menu</button></nav>
+      <nav className="result-actions"><button className="button-primary" onClick={retryRace}>Retry now</button>{result.mode === "custom" ? <button onClick={() => navigate("editor")}>Return to Track Builder</button> : <button onClick={() => navigate("mode-select")}>Change mode</button>}<button onClick={() => navigate("title")}>Festival menu</button></nav>
     </main>
   );
 }

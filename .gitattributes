@@ -1,2 +1,4 @@
 # Preserve the pinned third-party license byte-for-byte across platforms.
 public/assets/transcoders/basis/LICENSE.txt -text -diff
+docs/licenses/barlow-condensed-OFL-1.1.txt -text -diff
+public/assets/fonts/*.woff2 -text -diff

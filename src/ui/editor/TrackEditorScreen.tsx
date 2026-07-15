@@ -1,35 +1,79 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 
-import { useAppStore } from "../../app/store";
-import { EDITOR_MODULES, type EditorModuleCategory, type EditorModuleDefinition } from "../../game/editor/modules";
+import { useAppStore, type EditorSessionState } from "../../app/store";
+import { EDITOR_MODULE_BY_ID, EDITOR_MODULES, type EditorModuleCategory, type EditorModuleDefinition } from "../../game/editor/modules";
 import { EXAMPLE_TRACKS } from "../../game/editor/examples";
-import { validateCustomTrack } from "../../game/editor/validation";
 import {
+  CUSTOM_TRACK_MODULE_LIMIT,
+  CUSTOM_TRACK_NAME_MAX_CHARS,
+  CUSTOM_TRACK_ROUTE_LIMIT,
+  validateCustomTrack,
+} from "../../game/editor/validation";
+import {
+  CUSTOM_TRACK_ROUTE_ANCHOR_ELEVATION_LIMIT,
+  CUSTOM_TRACK_ROUTE_ANCHOR_LATERAL_LIMIT,
   deleteCustomTrack,
+  deleteCustomTrackRecovery,
   exportCustomTrack,
+  exportCustomTrackRecovery,
   importCustomTrack,
   listCustomTracks,
   MAX_CUSTOM_TRACK_FILE_BYTES,
   saveCustomTrack,
   type CustomTrackData,
   type CustomTrackModule,
+  type CustomTrackRecovery,
 } from "../../game/persistence/database";
-import { EditorScene } from "./EditorScene";
+import { EditorScene, type EditorPlacementPreview } from "./EditorScene";
 
 const HISTORY_LIMIT = 50;
+const INITIAL_ROUTE_VIEW_POSITION = 62;
+const ROUTE_TURN_MIN = -CUSTOM_TRACK_ROUTE_ANCHOR_LATERAL_LIMIT;
+const ROUTE_TURN_MAX = CUSTOM_TRACK_ROUTE_ANCHOR_LATERAL_LIMIT;
+const ROUTE_RISE_MIN = 0;
+const ROUTE_RISE_MAX = CUSTOM_TRACK_ROUTE_ANCHOR_ELEVATION_LIMIT;
 const NOW = () => Date.now();
+
+function boundedNumber(value: string, minimum: number, maximum: number): number {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? Math.max(minimum, Math.min(maximum, parsed)) : 0;
+}
+
+function authoredRouteRange(track: CustomTrackData): readonly [number, number] {
+  const start = track.modules.find((module) => module.moduleId === "start-grid");
+  const finish = track.modules.find((module) => module.moduleId === "finish-arch");
+  if (start && finish && finish.gridPosition > start.gridPosition) {
+    return [start.gridPosition, finish.gridPosition];
+  }
+  const furthestPlacement = track.modules.reduce(
+    (maximum, module) => Math.max(maximum, module.gridPosition),
+    0,
+  );
+  return [0, Math.min(
+    CUSTOM_TRACK_ROUTE_LIMIT,
+    Math.max(240, furthestPlacement + 48),
+  )];
+}
 
 function createDraft(): CustomTrackData {
   const createdAt = NOW();
   return {
-    schemaVersion: 1,
+    schemaVersion: 2,
     id: crypto.randomUUID(),
     name: "Canyon Workshop",
     laps: 2,
     difficultyEstimate: 2,
     modules: [
       { id: crypto.randomUUID(), moduleId: "start-grid", lane: 0, gridPosition: 0, rotation: 0, height: 0 },
-      { id: crypto.randomUUID(), moduleId: "checkpoint", lane: 0, gridPosition: 48, rotation: 0, height: 0 },
+      {
+        id: crypto.randomUUID(),
+        moduleId: "checkpoint",
+        lane: 0,
+        gridPosition: 48,
+        rotation: 0,
+        height: 0,
+        routeAnchor: { lateralOffset: -3, elevation: 2 },
+      },
       { id: crypto.randomUUID(), moduleId: "finish-arch", lane: 0, gridPosition: 96, rotation: 0, height: 0 },
     ],
     createdAt,
@@ -104,29 +148,76 @@ export function TrackEditorScreen() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const sceneRef = useRef<EditorScene | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
+  const initialSessionRef = useRef(useAppStore.getState().editorSession);
   const navigate = useAppStore((state) => state.navigate);
   const startCustomRace = useAppStore((state) => state.startCustomRace);
-  const [track, setTrack] = useState<CustomTrackData>(() => createDraft());
-  const [past, setPast] = useState<CustomTrackData[]>([]);
-  const [future, setFuture] = useState<CustomTrackData[]>([]);
-  const [category, setCategory] = useState<EditorModuleCategory>("jumps");
-  const [selectedModuleId, setSelectedModuleId] = useState("ramp-medium");
-  const [selectedPlacementId, setSelectedPlacementId] = useState<string | null>(null);
+  const setEditorSession = useAppStore((state) => state.setEditorSession);
+  const saveTestRideTrack = useAppStore((state) => state.saveTestRideTrack);
+  const clearPendingTestRideSave = useAppStore((state) => state.clearPendingTestRideSave);
+  const [track, setTrack] = useState<CustomTrackData>(() => structuredClone(initialSessionRef.current?.track ?? createDraft()));
+  const [past, setPast] = useState<CustomTrackData[]>(() => structuredClone(initialSessionRef.current?.past ?? []));
+  const [future, setFuture] = useState<CustomTrackData[]>(() => structuredClone(initialSessionRef.current?.future ?? []));
+  const [category, setCategory] = useState<EditorModuleCategory>(() => initialSessionRef.current?.category ?? "jumps");
+  const [selectedModuleId, setSelectedModuleId] = useState(() => {
+    const restored = initialSessionRef.current?.selectedModuleId;
+    return restored && EDITOR_MODULES.some((module) => module.id === restored) ? restored : "ramp-medium";
+  });
+  const [selectedPlacementId, setSelectedPlacementId] = useState<string | null>(() => {
+    const restored = initialSessionRef.current?.selectedPlacementId;
+    return restored && initialSessionRef.current?.track.modules.some((module) => module.id === restored)
+      ? restored
+      : null;
+  });
   const [library, setLibrary] = useState<CustomTrackData[]>([]);
+  const [recoveries, setRecoveries] = useState<CustomTrackRecovery[]>([]);
+  const [placementPreview, setPlacementPreview] = useState<EditorPlacementPreview | null>(null);
+  const [viewPosition, setViewPosition] = useState(() => (
+    track.modules.find((module) => module.id === selectedPlacementId)?.gridPosition
+      ?? INITIAL_ROUTE_VIEW_POSITION
+  ));
   const [notice, setNotice] = useState("Autosave waits for a valid route.");
   const [showLibrary, setShowLibrary] = useState(false);
+  const trackRef = useRef(track);
+  const selectedModuleIdRef = useRef(selectedModuleId);
+  const viewPositionRef = useRef(viewPosition);
+  trackRef.current = track;
+  selectedModuleIdRef.current = selectedModuleId;
+  viewPositionRef.current = viewPosition;
   const validation = useMemo(() => validateCustomTrack(track), [track]);
+  const routeRange = useMemo(() => authoredRouteRange(track), [track]);
   const selectedPlacement = track.modules.find((module) => module.id === selectedPlacementId) ?? null;
+  const placedModules = useMemo(
+    () => [...track.modules].sort((left, right) => left.gridPosition - right.gridPosition || left.lane - right.lane),
+    [track.modules],
+  );
+
+  useLayoutEffect(() => {
+    setEditorSession({ track, past, future, category, selectedModuleId, selectedPlacementId });
+  }, [category, future, past, selectedModuleId, selectedPlacementId, setEditorSession, track]);
+
+  useLayoutEffect(() => {
+    if (selectedPlacementId && !selectedPlacement) setSelectedPlacementId(null);
+  }, [selectedPlacement, selectedPlacementId]);
 
   const refreshLibrary = useCallback(async () => {
     try {
-      const existing = await listCustomTracks();
-      if (existing.length === 0) {
-        await Promise.all(EXAMPLE_TRACKS.map((example) => saveCustomTrack({ ...example, modules: example.modules.map((module) => ({ ...module })) })));
+      let localTracks = await listCustomTracks();
+      if (localTracks.tracks.length === 0) {
+        try {
+          await Promise.all(EXAMPLE_TRACKS.map((example) => saveCustomTrack({ ...example, modules: example.modules.map((module) => ({ ...module })) })));
+          localTracks = await listCustomTracks();
+        } catch {
+          setNotice("Example tracks could not be restored, but any recovered local data remains available below.");
+        }
       }
-      setLibrary(await listCustomTracks());
+      setLibrary(localTracks.tracks);
+      setRecoveries(localTracks.recoveries);
+      if (localTracks.recoveries.length > 0) {
+        setNotice(`${localTracks.recoveries.length} damaged local track ${localTracks.recoveries.length === 1 ? "record is" : "records are"} preserved for recovery.`);
+      }
     } catch {
       setLibrary([]);
+      setRecoveries([]);
       setNotice("Local track storage is unavailable. Editing and test rides still work this session.");
     }
   }, []);
@@ -150,16 +241,24 @@ export function TrackEditorScreen() {
     const scene = new EditorScene(canvas);
     sceneRef.current = scene;
     scene.setPlacementHandler((lane, gridPosition) => {
-      const placement: CustomTrackModule = { id: crypto.randomUUID(), moduleId: selectedModuleId, lane, gridPosition, rotation: 0, height: 0 };
+      const placement: CustomTrackModule = { id: crypto.randomUUID(), moduleId: selectedModuleIdRef.current, lane, gridPosition, rotation: 0, height: 0 };
       commit((current) => ({ ...current, modules: [...current.modules, placement] }));
       setSelectedPlacementId(placement.id);
     });
+    scene.setSelectionHandler(setSelectedPlacementId);
+    scene.setPreviewHandler(setPlacementPreview);
+    scene.setNavigationHandler(setViewPosition);
+    scene.focusRoutePosition(viewPositionRef.current);
     return () => { scene.dispose(); sceneRef.current = null; };
-  }, [commit, selectedModuleId]);
+  }, [commit]);
 
   useEffect(() => {
-    sceneRef.current?.update(track.modules, selectedPlacementId, selectedModuleId);
+    sceneRef.current?.update(trackRef.current, selectedPlacementId, selectedModuleId);
   }, [selectedModuleId, selectedPlacementId, track.modules]);
+
+  useEffect(() => {
+    if (selectedPlacement) sceneRef.current?.focusRoutePosition(selectedPlacement.gridPosition);
+  }, [selectedPlacement]);
 
   const undo = () => {
     const previous = past.at(-1);
@@ -177,32 +276,78 @@ export function TrackEditorScreen() {
     setTrack(next);
   };
 
+  const createTrackSnapshot = (): CustomTrackData => {
+    const thumbnail = sceneRef.current?.captureThumbnail();
+    const draft = structuredClone(track);
+    return thumbnail
+      ? { ...draft, thumbnail, updatedAt: NOW() }
+      : { ...draft, updatedAt: NOW() };
+  };
+
   const save = async () => {
     if (!validation.valid) { setNotice(validation.errors[0] ?? "Fix validation errors before saving."); return false; }
     try {
-      const thumbnail = sceneRef.current?.captureThumbnail();
-      const saved: CustomTrackData = thumbnail ? { ...track, thumbnail, updatedAt: NOW() } : { ...track, updatedAt: NOW() };
+      const saved = createTrackSnapshot();
       await saveCustomTrack(saved);
+      clearPendingTestRideSave(saved.id);
       setTrack(saved);
       await refreshLibrary();
       setNotice("Track saved locally.");
       return true;
-    } catch {
-      setNotice("The track could not be saved. Check local storage and retry.");
+    } catch (error) {
+      setNotice(error instanceof Error ? error.message : "The track could not be saved. Check local storage and retry.");
       return false;
     }
   };
 
   const downloadExport = () => {
     if (!validation.valid) { setNotice(validation.errors[0] ?? "Fix validation errors before export."); return; }
-    const blob = new Blob([exportCustomTrack(track)], { type: "application/json" });
-    const url = URL.createObjectURL(blob);
-    const anchor = document.createElement("a");
-    anchor.href = url;
-    anchor.download = `${track.name.toLowerCase().replace(/[^a-z0-9]+/g, "-")}.rrr-track.json`;
-    anchor.click();
-    URL.revokeObjectURL(url);
-    setNotice("Safe JSON export created.");
+    try {
+      const blob = new Blob([exportCustomTrack(track)], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const anchor = document.createElement("a");
+      anchor.href = url;
+      anchor.download = `${track.name.toLowerCase().replace(/[^a-z0-9]+/g, "-")}.rrr-track.json`;
+      anchor.click();
+      URL.revokeObjectURL(url);
+      clearPendingTestRideSave(track.id);
+      setNotice("Safe JSON export created.");
+    } catch (error) {
+      setNotice(error instanceof Error ? error.message : "Track export failed.");
+    }
+  };
+
+  const downloadRecovery = async (recovery: CustomTrackRecovery) => {
+    try {
+      const blob = new Blob([await exportCustomTrackRecovery(recovery)], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const anchor = document.createElement("a");
+      const safeName = recovery.name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "recovered-track";
+      anchor.href = url;
+      anchor.download = `${safeName}.recovery.json`;
+      anchor.click();
+      URL.revokeObjectURL(url);
+      setNotice("Portable recovery package downloaded. The preserved local record was not changed.");
+    } catch (error) {
+      setNotice(error instanceof Error ? error.message : "Recovered track data could not be downloaded.");
+    }
+  };
+
+  const removeRecovery = async (recovery: CustomTrackRecovery) => {
+    if (recovery.key === null) return;
+    if (!window.confirm("Remove this preserved recovery record? Download its package first if you may need it.")) return;
+    try {
+      await deleteCustomTrackRecovery(recovery.key);
+      await refreshLibrary();
+      setNotice("Recovery record removed from this device.");
+    } catch (error) {
+      setNotice(error instanceof Error ? error.message : "The recovery record could not be removed.");
+    }
+  };
+
+  const focusRouteStart = () => {
+    setViewPosition(INITIAL_ROUTE_VIEW_POSITION);
+    sceneRef.current?.focusRoutePosition(INITIAL_ROUTE_VIEW_POSITION);
   };
 
   const importFile = async (file: File) => {
@@ -212,9 +357,13 @@ export function TrackEditorScreen() {
     }
     try {
       const imported = importCustomTrack(await file.text());
+      const suffix = " Copy";
+      const copyName = `${imported.name.slice(0, CUSTOM_TRACK_NAME_MAX_CHARS - suffix.length).trimEnd()}${suffix}`;
       setPast((items) => [...items, structuredClone(track)].slice(-HISTORY_LIMIT));
       setFuture([]);
-      setTrack({ ...imported, id: crypto.randomUUID(), name: `${imported.name} Copy`, createdAt: NOW(), updatedAt: NOW() });
+      setTrack({ ...imported, id: crypto.randomUUID(), name: copyName, createdAt: NOW(), updatedAt: NOW() });
+      setSelectedPlacementId(null);
+      focusRouteStart();
       setNotice("Track imported as a safe local copy.");
     } catch (error) {
       setNotice(error instanceof Error ? error.message : "Track import failed.");
@@ -234,7 +383,15 @@ export function TrackEditorScreen() {
 
   const duplicateSelected = () => {
     if (!selectedPlacement) return;
-    const duplicate = { ...selectedPlacement, id: crypto.randomUUID(), gridPosition: selectedPlacement.gridPosition + 12 };
+    if (track.modules.length >= CUSTOM_TRACK_MODULE_LIMIT) {
+      setNotice(`The track has reached the ${CUSTOM_TRACK_MODULE_LIMIT}-module safety limit.`);
+      return;
+    }
+    const duplicate = {
+      ...selectedPlacement,
+      id: crypto.randomUUID(),
+      gridPosition: Math.min(CUSTOM_TRACK_ROUTE_LIMIT, selectedPlacement.gridPosition + 12),
+    };
     commit((current) => ({ ...current, modules: [...current.modules, duplicate] }));
     setSelectedPlacementId(duplicate.id);
   };
@@ -244,7 +401,7 @@ export function TrackEditorScreen() {
       <h1 className="sr-only">Track Builder — {track.name}</h1>
       <header className="editor-toolbar">
         <button className="editor-home" onClick={() => navigate("title")} aria-label="Back to festival menu">← <span>Track Builder</span></button>
-        <input aria-label="Track name" value={track.name} maxLength={42} onChange={(event) => commit((current) => ({ ...current, name: event.target.value }))} />
+        <input aria-label="Track name" value={track.name} maxLength={CUSTOM_TRACK_NAME_MAX_CHARS} onChange={(event) => commit((current) => ({ ...current, name: event.target.value }))} />
         <button onClick={undo} disabled={past.length === 0} aria-label="Undo">↶</button>
         <button onClick={redo} disabled={future.length === 0} aria-label="Redo">↷</button>
         <span className="toolbar-spacer" />
@@ -255,7 +412,18 @@ export function TrackEditorScreen() {
             setNotice(validation.errors[0] ?? "Fix validation errors before test riding.");
             return;
           }
-          void save().then((saved) => { if (saved) startCustomRace(track); });
+          const snapshot = createTrackSnapshot();
+          const session: EditorSessionState = structuredClone({
+            track: snapshot,
+            past,
+            future,
+            category,
+            selectedModuleId,
+            selectedPlacementId,
+          });
+          setEditorSession(session);
+          void saveTestRideTrack(snapshot).catch(() => undefined);
+          startCustomRace(snapshot);
         }}>Test Ride</button>
         <button onClick={downloadExport}>Export</button>
         <button onClick={() => fileRef.current?.click()}>Import</button>
@@ -269,18 +437,129 @@ export function TrackEditorScreen() {
           {EDITOR_MODULES.filter((module) => module.category === category).map((module) => <button key={module.id} className={selectedModuleId === module.id ? "active" : ""} onClick={() => setSelectedModuleId(module.id)}><ModuleThumbnail module={module} /><strong>{module.name}</strong><small>{module.description}</small></button>)}
         </aside>
         <section className="editor-canvas-wrap">
-          <canvas ref={canvasRef} aria-label="Interactive 3D track build camera. Click a lane to place the selected module; drag to orbit and scroll to zoom." />
-          <div className="editor-help"><kbd>Click</kbd> Place <kbd>Drag</kbd> Orbit <kbd>Wheel</kbd> Zoom</div>
-          {showLibrary ? <aside className="library-drawer"><header><h2>Local tracks</h2><button aria-label="Close local track library" onClick={() => setShowLibrary(false)}>×</button></header>{library.map((item) => <article key={item.id}>{item.thumbnail ? <img src={item.thumbnail} alt="" /> : <span className="library-placeholder" />}<div><strong>{item.name}</strong><small>{item.laps} laps · difficulty {item.difficultyEstimate}</small></div><button onClick={() => { setPast((items) => [...items, structuredClone(track)].slice(-HISTORY_LIMIT)); setTrack(structuredClone(item)); setShowLibrary(false); }}>Open</button><button aria-label={`Delete ${item.name}`} onClick={() => { void deleteCustomTrack(item.id).then(refreshLibrary).catch(() => setNotice("The local track could not be deleted.")); }}>×</button></article>)}</aside> : null}
+          <canvas
+            ref={canvasRef}
+            aria-label="Interactive 3D track build camera. Click an existing module to select it, click an empty lane to place the chosen module, drag left or right to orbit, drag up or down to travel the route, use the wheel to zoom, Shift plus wheel to travel, or use Fit route to frame the complete authored course."
+          />
+          {placementPreview ? (
+            <div
+              className={`editor-placement-preview ${placementPreview.valid ? "valid" : "invalid"}`}
+              role="status"
+              aria-live="polite"
+            >
+              <strong>{placementPreview.valid ? "✓ Valid placement" : "! Invalid placement"}</strong>
+              <span>{placementPreview.moduleName} · {placementPreview.message}</span>
+            </div>
+          ) : null}
+          <div className="editor-route-navigation">
+            <label htmlFor="editor-route-view">Route view</label>
+            <input
+              id="editor-route-view"
+              aria-label="Route view position"
+              type="range"
+              min="0"
+              max={CUSTOM_TRACK_ROUTE_LIMIT}
+              step="1"
+              value={viewPosition}
+              onChange={(event) => sceneRef.current?.focusRoutePosition(Number(event.target.value))}
+            />
+            <button type="button" onClick={() => sceneRef.current?.frameRoute()}>Fit route</button>
+            <output htmlFor="editor-route-view">
+              View {viewPosition.toLocaleString()} m / {CUSTOM_TRACK_ROUTE_LIMIT.toLocaleString()} m
+              {" · "}Authored {routeRange[0].toLocaleString()}–{routeRange[1].toLocaleString()} m
+            </output>
+          </div>
+          <div className="editor-help"><kbd>Click</kbd> Select / place <kbd>Drag ↔</kbd> Orbit <kbd>Drag ↕</kbd> Travel <kbd>Wheel</kbd> Zoom <kbd>Fit route</kbd> Overview</div>
+          {showLibrary ? (
+            <aside className="library-drawer">
+              <header><h2>Local tracks</h2><button aria-label="Close local track library" onClick={() => setShowLibrary(false)}>×</button></header>
+              {recoveries.length > 0 ? (
+                <section className="recovery-list" aria-label="Recovered track data">
+                  <h3>! Recovered track data</h3>
+                  <p>{recoveries.length} damaged track {recoveries.length === 1 ? "record is" : "records are"} preserved below. Download the portable recovery package before removing any local data.</p>
+                  {recoveries.map((recovery, index) => (
+                    <div className="recovery-card" key={`${recovery.key ?? "session"}-${recovery.createdAt}-${index}`}>
+                      <div>
+                        <strong>{recovery.name}</strong>
+                        <small>{recovery.quarantined ? "Preserved in local quarantine" : "Not preserved in storage — download now"}</small>
+                        <p>{recovery.reason}</p>
+                      </div>
+                      <button onClick={() => { void downloadRecovery(recovery); }}>Download recovery package</button>
+                      {recovery.key === null ? null : (
+                        <button onClick={() => { void removeRecovery(recovery); }}>Remove recovery record…</button>
+                      )}
+                    </div>
+                  ))}
+                </section>
+              ) : null}
+              {library.map((item) => (
+                <article key={item.id}>
+                  {item.thumbnail ? <img src={item.thumbnail} alt="" /> : <span className="library-placeholder" />}
+                  <div><strong>{item.name}</strong><small>{item.laps} laps · difficulty {item.difficultyEstimate}</small></div>
+                  <button onClick={() => {
+                    setPast((items) => [...items, structuredClone(track)].slice(-HISTORY_LIMIT));
+                    setFuture([]);
+                    setTrack(structuredClone(item));
+                    setSelectedPlacementId(null);
+                    focusRouteStart();
+                    setShowLibrary(false);
+                  }}>Open</button>
+                  <button aria-label={`Delete ${item.name}`} onClick={() => { void deleteCustomTrack(item.id).then(refreshLibrary).catch(() => setNotice("The local track could not be deleted.")); }}>×</button>
+                </article>
+              ))}
+            </aside>
+          ) : null}
         </section>
         <aside className="editor-inspector">
           <h2>Placement</h2>
           <section className="inspector-group">
+          <label className="placement-picker">Placed module
+            <select
+              aria-label="Placed module"
+              value={selectedPlacementId ?? ""}
+              onChange={(event) => setSelectedPlacementId(event.target.value || null)}
+            >
+              <option value="">Select a module…</option>
+              {placedModules.map((module) => (
+                <option key={module.id} value={module.id}>
+                  {EDITOR_MODULE_BY_ID.get(module.moduleId)?.name ?? module.moduleId} · lane {module.lane + 1} · {module.gridPosition} m
+                </option>
+              ))}
+            </select>
+          </label>
           {selectedPlacement ? <>
             <label>Lane <input type="number" min="1" max="4" value={selectedPlacement.lane + 1} onChange={(event) => updateSelected({ lane: Math.max(0, Math.min(3, Number(event.target.value) - 1)) as 0 | 1 | 2 | 3 })} /></label>
-            <label>Position <input type="number" min="0" max="240" step="2" value={selectedPlacement.gridPosition} onChange={(event) => updateSelected({ gridPosition: Number(event.target.value) })} /></label>
+            <label>Position <input type="number" min="0" max={CUSTOM_TRACK_ROUTE_LIMIT} step="2" value={selectedPlacement.gridPosition} onChange={(event) => updateSelected({ gridPosition: Math.max(0, Math.min(CUSTOM_TRACK_ROUTE_LIMIT, Number(event.target.value))) })} /></label>
             <label>Rotation <select value={selectedPlacement.rotation} onChange={(event) => updateSelected({ rotation: Number(event.target.value) as 0 | 90 | 180 | 270 })}><option>0</option><option>90</option><option>180</option><option>270</option></select></label>
             <label>Height <input type="number" min="-4" max="40" step="0.5" value={selectedPlacement.height} onChange={(event) => updateSelected({ height: Number(event.target.value) })} /></label>
+            {selectedPlacement.moduleId === "checkpoint" ? <>
+              <label>Route turn <input
+                type="number"
+                min={ROUTE_TURN_MIN}
+                max={ROUTE_TURN_MAX}
+                step="0.5"
+                value={selectedPlacement.routeAnchor?.lateralOffset ?? 0}
+                onChange={(event) => updateSelected({
+                  routeAnchor: {
+                    lateralOffset: boundedNumber(event.target.value, ROUTE_TURN_MIN, ROUTE_TURN_MAX),
+                    elevation: selectedPlacement.routeAnchor?.elevation ?? 0,
+                  },
+                })}
+              /></label>
+              <label>Route rise <input
+                type="number"
+                min={ROUTE_RISE_MIN}
+                max={ROUTE_RISE_MAX}
+                step="0.5"
+                value={selectedPlacement.routeAnchor?.elevation ?? 0}
+                onChange={(event) => updateSelected({
+                  routeAnchor: {
+                    lateralOffset: selectedPlacement.routeAnchor?.lateralOffset ?? 0,
+                    elevation: boundedNumber(event.target.value, ROUTE_RISE_MIN, ROUTE_RISE_MAX),
+                  },
+                })}
+              /></label>
+            </> : null}
             <div className="inspector-actions"><button onClick={duplicateSelected}>Duplicate</button><button onClick={deleteSelected}>Delete</button></div>
           </> : <p className="inspector-empty">Click a placed module to inspect it, or click the canvas to place the selected module.</p>}
           </section>
@@ -288,7 +567,7 @@ export function TrackEditorScreen() {
           <section className="inspector-group">
           <label>Laps <input type="number" min="1" max="9" value={track.laps} onChange={(event) => commit((current) => ({ ...current, laps: Math.max(1, Math.min(9, Number(event.target.value))) }))} /></label>
           <label>Difficulty <input type="range" min="1" max="5" value={track.difficultyEstimate} onChange={(event) => commit((current) => ({ ...current, difficultyEstimate: Number(event.target.value) }))} /><span>{track.difficultyEstimate} / 5</span></label>
-          <button className="clear-track" onClick={() => { if (window.confirm("Clear every placed module? This can be undone.")) commit((current) => ({ ...current, modules: [] })); }}>Clear all…</button>
+          <button className="clear-track" onClick={() => { if (window.confirm("Clear every placed module? This can be undone.")) { commit((current) => ({ ...current, modules: [] })); setSelectedPlacementId(null); } }}>Clear all…</button>
           </section>
           <section className={`validation-panel ${validation.valid ? "valid" : "invalid"}`}><h3>{validation.valid ? "✓ Route complete" : "! Route needs work"}</h3>{validation.errors.map((error) => <p key={error}>{error}</p>)}{validation.warnings.map((warning) => <p key={warning} className="warning">{warning}</p>)}</section>
         </aside>

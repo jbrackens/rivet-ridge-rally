@@ -3,11 +3,13 @@ import { chromium } from "playwright";
 
 import {
   DEFAULT_BASE_URL,
-  assertServer,
+  browserDeviceEvidence,
+  builtAssetEvidence,
   collectPageMessages,
   createPerformanceSession,
   hasFlag,
   heapEvidence,
+  hostEvidence,
   measureInputResponsiveness,
   measureRestart,
   nodePerformance,
@@ -16,8 +18,11 @@ import {
   readOption,
   readPositiveNumber,
   round,
+  setExplicitQuality,
+  sourceIdentityEvidence,
   startQaRace,
   summarize,
+  verifyServedBuild,
   writeJson,
 } from "./common.mjs";
 
@@ -65,7 +70,7 @@ function trend(points) {
 const argumentsList = process.argv.slice(2);
 
 if (hasFlag(argumentsList, "help")) {
-  console.log(`Usage: npm run perf:soak -- [options]\n\nOptions:\n  --base-url URL           QA preview URL (default ${DEFAULT_BASE_URL})\n  --output PATH            JSON output relative to the repository\n  --minutes N              Soak duration, fractional values allowed (default 30)\n  --sample-interval N      Seconds between samples (default 5)\n  --profile desktop|mobile Viewport profile (default desktop)\n  --mode rival|practice    Race workload (default rival)\n  --headed                 Run a visible Chromium window for hardware evidence\n  --help                    Show this help`);
+  console.log(`Usage: npm run perf:soak -- [options]\n\nOptions:\n  --base-url URL           QA preview URL (default ${DEFAULT_BASE_URL})\n  --output PATH            JSON output relative to the repository\n  --minutes N              Soak duration, fractional values allowed (default 30)\n  --sample-interval N      Seconds between samples (default 5)\n  --profile desktop|mobile Viewport profile (default desktop)\n  --mode rival|practice    Race workload; Practice is diagnostic only (default rival)\n  --quality LEVEL          Force low, medium, or high (default high desktop, low mobile)\n  --headed                 Run a visible Chromium window for hardware evidence\n  --help                    Show this help`);
   process.exit(0);
 }
 
@@ -78,6 +83,10 @@ const mode = readOption(argumentsList, "mode", "rival");
 const headed = hasFlag(argumentsList, "headed");
 if (!["desktop", "mobile"].includes(profileName)) throw new Error("--profile must be desktop or mobile.");
 if (!["rival", "practice"].includes(mode)) throw new Error("--mode must be rival or practice.");
+const quality = readOption(argumentsList, "quality", profileName === "mobile" ? "low" : "high");
+if (!["low", "medium", "high"].includes(quality)) {
+  throw new Error("--quality must be low, medium, or high; auto is not admissible evidence.");
+}
 
 const contextOptions = profileName === "mobile"
   ? { viewport: { width: 390, height: 844 }, deviceScaleFactor: 2, hasTouch: true, isMobile: true }
@@ -107,6 +116,15 @@ let activeAttemptStartedAt = null;
 let activeAttemptMaxDroppedSimulationMs = null;
 let activeAttemptSampleCount = 0;
 let cumulativeDroppedSimulationMs = 0;
+let device = null;
+let qualityEvidence = { requested: quality, selected: null, effective: null };
+let runtime = null;
+const candidate = {
+  source: null,
+  localBuild: null,
+  servedBefore: null,
+  servedAfter: null,
+};
 
 function recordHarnessError(stage, error) {
   const message = error instanceof Error ? error.message : String(error);
@@ -155,7 +173,12 @@ async function finalizeAttempt(outcome) {
 }
 
 try {
-  await assertServer(baseURL);
+  harnessStage = "source-identity";
+  candidate.source = await sourceIdentityEvidence();
+  harnessStage = "local-build-inventory";
+  candidate.localBuild = await builtAssetEvidence();
+  harnessStage = "served-candidate-before";
+  candidate.servedBefore = await verifyServedBuild(candidate.localBuild, baseURL);
   harnessStage = "browser-launch";
   browser = await chromium.launch({ headless: !headed, args: ["--enable-precise-memory-info"] });
   browserVersion = browser.version();
@@ -190,6 +213,16 @@ try {
 
   harnessStage = "shell-open";
   await openShell(page, baseURL);
+  harnessStage = "quality-selection";
+  qualityEvidence = await setExplicitQuality(page, quality);
+  harnessStage = "device-evidence";
+  device = await browserDeviceEvidence(page);
+  runtime = await page.evaluate((expectedVersion) => ({
+    title: document.title,
+    qaApiPresent: Object.prototype.hasOwnProperty.call(window, "__RRR_QA__"),
+    versionPresent: (document.body.textContent ?? "").includes(`v${expectedVersion}`),
+    build: window.__RRR_BUILD__ ?? null,
+  }), candidate.source.packageVersion);
   harnessStage = "initial-race-start";
   await startQaRace(page, mode);
   workloadStartedAt = nodePerformance.now();
@@ -264,6 +297,13 @@ try {
   }
 } finally {
   if (workloadStartedAt !== null && workloadEndedAt === null) workloadEndedAt = nodePerformance.now();
+  if (candidate.localBuild !== null && candidate.servedBefore !== null) {
+    try {
+      candidate.servedAfter = await verifyServedBuild(candidate.localBuild, baseURL);
+    } catch (error) {
+      recordHarnessError("served-candidate-after", error);
+    }
+  }
   if (session !== null) {
     try {
       await session.detach();
@@ -310,14 +350,24 @@ const knownDiagnosticWarnings = consoleMessages.filter((message) =>
   message.type === "warning" && KNOWN_DIAGNOSTIC_WARNING.test(message.text));
 const unexpectedConsoleMessages = consoleMessages.filter((message) =>
   !knownDiagnosticWarnings.includes(message));
-const releaseCriteria = [
+const diagnosticCriteria = [
   { id: "no-harness-error", passed: harnessErrors.length === 0, actual: harnessErrors.length },
+  { id: "source-identity-recorded", passed: Boolean(candidate.source?.commit), actual: candidate.source?.commit ?? null },
+  { id: "source-worktree-clean", passed: candidate.source?.dirty === false, actual: candidate.source?.dirty ?? null },
+  { id: "served-candidate-verified-before", passed: candidate.servedBefore?.verified === true, actual: candidate.servedBefore?.verified ?? false },
+  { id: "served-candidate-verified-after", passed: candidate.servedAfter?.verified === true, actual: candidate.servedAfter?.verified ?? false },
   {
-    id: "minimum-active-duration",
-    passed: workloadDurationMs >= RELEASE_MINIMUM_DURATION_MS,
-    requiredMs: RELEASE_MINIMUM_DURATION_MS,
-    actualMs: workloadDurationMs,
+    id: "served-candidate-stable",
+    passed: Boolean(candidate.servedBefore?.aggregateSha256)
+      && candidate.servedBefore.aggregateSha256 === candidate.servedAfter?.aggregateSha256,
+    actual: {
+      before: candidate.servedBefore?.aggregateSha256 ?? null,
+      after: candidate.servedAfter?.aggregateSha256 ?? null,
+    },
   },
+  { id: "explicit-quality-applied", passed: qualityEvidence.effective === quality && qualityEvidence.effective !== "auto", actual: qualityEvidence },
+  { id: "qa-runtime-identity", passed: runtime?.title === "Rivet Ridge Rally" && runtime?.qaApiPresent === true && runtime?.versionPresent === true, actual: runtime },
+  { id: "runtime-source-commit-binding", passed: Boolean(candidate.source?.commit) && runtime?.build?.commit === candidate.source.commit && runtime?.build?.dirty === false, actual: { sourceCommit: candidate.source?.commit ?? null, runtimeBuild: runtime?.build ?? null } },
   {
     id: "configured-duration-completed",
     passed: workloadDurationMs >= configuredDurationMs,
@@ -358,14 +408,28 @@ const releaseCriteria = [
     },
   },
 ];
+const releaseOnlyCriteria = [
+  { id: "rival-release-workload", passed: mode === "rival", required: "rival", actual: mode },
+  {
+    id: "minimum-30-minute-active-duration",
+    passed: workloadDurationMs >= RELEASE_MINIMUM_DURATION_MS,
+    requiredMs: RELEASE_MINIMUM_DURATION_MS,
+    actualMs: workloadDurationMs,
+  },
+];
+const releaseCriteria = [...diagnosticCriteria, ...releaseOnlyCriteria];
+const failedDiagnosticCriteria = diagnosticCriteria.filter((criterion) => !criterion.passed);
 const failedReleaseCriteria = releaseCriteria.filter((criterion) => !criterion.passed);
 const evidence = {
-  schemaVersion: 1,
+  schemaVersion: 2,
   kind: "performance-soak",
   createdAt: new Date().toISOString(),
   baseURL,
   browser: { name: "chromium", version: browserVersion, headless: !headed },
-  host: { node: process.version, platform: process.platform, architecture: process.arch },
+  host: hostEvidence(),
+  device,
+  runtime,
+  candidate,
   configuration: {
     minutes,
     configuredDurationMs,
@@ -373,6 +437,8 @@ const evidence = {
     attemptTimeoutMs: ATTEMPT_TIMEOUT_MS,
     profile: profileName,
     mode,
+    qualification: mode === "rival" ? "release" : "diagnostic",
+    quality: qualityEvidence,
     viewport: contextOptions.viewport,
   },
   actualDurationMs,
@@ -439,8 +505,15 @@ const evidence = {
     unexpected: unexpectedConsoleMessages.length,
     unexpectedMessages: unexpectedConsoleMessages,
   },
+  diagnosticGate: {
+    status: failedDiagnosticCriteria.length === 0 ? "PASS" : "FAIL",
+    criteria: diagnosticCriteria,
+    failedCriteria: failedDiagnosticCriteria.map((criterion) => criterion.id),
+  },
   releaseGate: {
-    status: failedReleaseCriteria.length === 0 ? "PASS" : "FAIL",
+    status: mode === "practice"
+      ? "DIAGNOSTIC"
+      : failedReleaseCriteria.length === 0 ? "PASS" : "FAIL",
     criteria: releaseCriteria,
     failedCriteria: failedReleaseCriteria.map((criterion) => criterion.id),
     manualTrendReviewRequired: [
@@ -450,6 +523,9 @@ const evidence = {
       "fixedStepTiming.cumulativeDroppedSimulationMs.trend",
     ],
   },
+  status: mode === "practice"
+    ? failedDiagnosticCriteria.length === 0 ? "DIAGNOSTIC" : "FAIL"
+    : failedReleaseCriteria.length === 0 ? "PASS" : "FAIL",
   samples,
   consoleMessages,
 };
@@ -467,7 +543,12 @@ console.log(JSON.stringify({
   failedRequests: evidence.network.failedRequestCount,
   httpErrorResponses: evidence.network.httpErrorResponseCount,
   harnessError: evidence.harnessError,
+  status: evidence.status,
   releaseGate: evidence.releaseGate.status,
+  diagnosticGate: evidence.diagnosticGate.status,
   failedReleaseCriteria: evidence.releaseGate.failedCriteria,
 }, null, 2));
-if (evidence.releaseGate.status !== "PASS") process.exitCode = 1;
+if (
+  evidence.diagnosticGate.status !== "PASS"
+  || (mode === "rival" && evidence.releaseGate.status !== "PASS")
+) process.exitCode = 1;

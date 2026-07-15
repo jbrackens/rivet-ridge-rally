@@ -1,7 +1,22 @@
 import * as THREE from "three";
 
+import { getTrack } from "../../game/content/tracks";
 import { EDITOR_MODULE_BY_ID, type EditorModuleDefinition } from "../../game/editor/modules";
-import type { CustomTrackModule } from "../../game/persistence/database";
+import {
+  CUSTOM_TRACK_PRESENTATION_FALLBACK_LENGTH,
+  customTrackToPresentationDefinition,
+} from "../../game/editor/toTrackDefinition";
+import {
+  CUSTOM_TRACK_MODULE_LIMIT,
+  CUSTOM_TRACK_ROUTE_LIMIT,
+  validateCustomTrackPlacement,
+} from "../../game/editor/validation";
+import {
+  CoursePresentationRoute,
+  createCourseRibbonGeometry,
+  type CoursePresentationOrientation,
+} from "../../game/engine/CoursePresentationRoute";
+import type { CustomTrackData, CustomTrackModule } from "../../game/persistence/database";
 import {
   observeWebglContext,
   releaseWebglContext,
@@ -10,10 +25,25 @@ import {
 } from "../../game/qa/lifecycleDiagnostics";
 
 const LANE_X = [-4.5, -1.5, 1.5, 4.5] as const;
-const TRACK_START_Z = 18;
-const TRACK_END_Z = -244;
+const INITIAL_ROUTE_VIEW_POSITION = 62;
+const PREVIEW_PLACEMENT_ID = "__editor-placement-preview__";
+const EDITOR_ROUTE_HALF_WIDTH = 7.5;
+const EDITOR_ROUTE_PICK_HALF_WIDTH = 7.8;
+const EDITOR_SCENERY_HALF_WIDTH = 34;
+const EDITOR_EXTENSION_LOOK_BEHIND = 120;
+const EDITOR_EXTENSION_LOOK_AHEAD = 240;
+const EDITOR_EXTENSION_REBUILD_MARGIN = 54;
+const EDITOR_PICK_LAYER = 1;
 
 type VisualState = "normal" | "selected" | "preview";
+
+export interface EditorPlacementPreview {
+  readonly moduleName: string;
+  readonly lane: 0 | 1 | 2 | 3;
+  readonly gridPosition: number;
+  readonly valid: boolean;
+  readonly message: string;
+}
 
 interface ModuleMaterials {
   readonly dirt: THREE.MeshStandardMaterial;
@@ -39,21 +69,55 @@ export class EditorScene {
   private readonly webglContext: WebGLRenderingContext;
   private readonly scene = new THREE.Scene();
   private readonly camera = new THREE.PerspectiveCamera(48, 1, 0.1, 500);
+  private readonly routeFoundation = new THREE.Group();
+  private readonly routeScenery = new THREE.Group();
+  private readonly courseSurface = new THREE.Group();
+  private readonly routeExtensionSurface = new THREE.Group();
   private readonly modules = new THREE.Group();
   private readonly preview = new THREE.Group();
   private readonly raycaster = new THREE.Raycaster();
   private readonly pointer = new THREE.Vector2();
   private readonly groundPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
+  private readonly routePosition = new THREE.Vector3();
+  private readonly routeRotation = new THREE.Matrix4();
+  private readonly routeRight = new THREE.Vector3();
+  private readonly routeUp = new THREE.Vector3();
+  private readonly routeBackward = new THREE.Vector3();
+  private readonly routeBaseOverviewBounds = new THREE.Box3();
+  private readonly routeOverviewBounds = new THREE.Box3();
+  private readonly routeOverviewTarget = new THREE.Vector3();
+  private readonly keyLight = new THREE.DirectionalLight(0xffe2b1, 4.7);
   private readonly resizeObserver: ResizeObserver;
   private animationFrame = 0;
   private orbit = -0.36;
-  private radius = 54;
+  private routeRadius = 54;
+  private overviewRadius = 90;
+  private overviewFitRadius = 90;
+  private cameraMode: "route" | "overview" = "route";
+  private cameraRoutePosition = INITIAL_ROUTE_VIEW_POSITION;
   private dragging = false;
   private dragX = 0;
+  private dragY = 0;
   private dragStartX = 0;
+  private dragStartY = 0;
   private hasDragged = false;
   private disposed = false;
+  private currentTrack: CustomTrackData | null = null;
+  private courseRoute: CoursePresentationRoute;
+  private courseRouteOrigin = 0;
+  private courseRouteLength = CUSTOM_TRACK_PRESENTATION_FALLBACK_LENGTH;
+  private courseRouteSignature = "__uninitialized__";
+  private moduleLayoutSignature = "__uninitialized__";
+  private routePickSurface: THREE.Mesh | null = null;
+  private routeExtensionPickSurface: THREE.Mesh | null = null;
+  private routeExtensionStart = Number.NaN;
+  private routeExtensionEnd = Number.NaN;
+  private previewModuleId = "ramp-medium";
+  private previewSignature = "none";
   private onPlace: (lane: 0 | 1 | 2 | 3, gridPosition: number) => void = () => undefined;
+  private onSelect: (placementId: string) => void = () => undefined;
+  private onPreview: (preview: EditorPlacementPreview | null) => void = () => undefined;
+  private onNavigate: (gridPosition: number) => void = () => undefined;
 
   constructor(canvas: HTMLCanvasElement) {
     this.canvas = canvas;
@@ -66,15 +130,28 @@ export class EditorScene {
     this.renderer.shadowMap.type = THREE.PCFShadowMap;
     this.scene.background = new THREE.Color(0x79bac8);
     this.scene.fog = new THREE.Fog(0xaeb69a, 86, 164);
-    this.scene.add(this.modules, this.preview);
+    this.courseRoute = this.createFallbackRoute();
+    this.scene.add(
+      this.routeFoundation,
+      this.routeScenery,
+      this.courseSurface,
+      this.routeExtensionSurface,
+      this.modules,
+      this.preview,
+    );
     this.buildGround();
+    this.rebuildRouteEnvironment();
+    this.raycaster.layers.enable(EDITOR_PICK_LAYER);
     this.updateCamera();
     this.resizeObserver = new ResizeObserver(this.resize);
     this.resizeObserver.observe(canvas);
+    canvas.dataset.routeLimit = String(CUSTOM_TRACK_ROUTE_LIMIT);
+    canvas.dataset.routeViewPosition = String(INITIAL_ROUTE_VIEW_POSITION);
     canvas.addEventListener("pointerdown", this.pointerDown);
     canvas.addEventListener("pointermove", this.pointerMove);
     canvas.addEventListener("pointerup", this.pointerUp);
     canvas.addEventListener("pointercancel", this.pointerCancel);
+    canvas.addEventListener("pointerleave", this.pointerLeave);
     canvas.addEventListener("wheel", this.wheel, { passive: false });
     this.animationFrame = requestAnimationFrame(this.frame);
     startLifecycleResource("editorScenes");
@@ -86,23 +163,82 @@ export class EditorScene {
     this.onPlace = handler;
   }
 
-  update(placements: CustomTrackModule[], selectedId: string | null, previewModuleId: string): void {
+  setSelectionHandler(handler: (placementId: string) => void): void {
+    this.onSelect = handler;
+  }
+
+  setPreviewHandler(handler: (preview: EditorPlacementPreview | null) => void): void {
+    this.onPreview = handler;
+    handler(null);
+  }
+
+  setNavigationHandler(handler: (gridPosition: number) => void): void {
+    this.onNavigate = handler;
+  }
+
+  focusRoutePosition(gridPosition: number): void {
+    const boundedPosition = Math.round(THREE.MathUtils.clamp(
+      gridPosition,
+      0,
+      CUSTOM_TRACK_ROUTE_LIMIT,
+    ));
+    this.cameraMode = "route";
+    this.cameraRoutePosition = boundedPosition;
+    this.updateRouteExtension(boundedPosition);
+    this.canvas.dataset.routeViewMode = "position";
+    this.canvas.dataset.routeViewPosition = String(boundedPosition);
+    this.updateCamera();
+    this.onNavigate(boundedPosition);
+  }
+
+  frameRoute(): void {
+    if (this.routeOverviewBounds.isEmpty()) return;
+    if (this.routeExtensionSurface.children.length > 0) this.clearRouteExtension();
+    const sphere = this.routeOverviewBounds.getBoundingSphere(new THREE.Sphere());
+    this.routeOverviewTarget.copy(sphere.center);
+    const verticalFov = THREE.MathUtils.degToRad(this.camera.fov);
+    const horizontalFov = 2 * Math.atan(
+      Math.tan(verticalFov / 2) * Math.max(0.01, this.camera.aspect),
+    );
+    const limitingFov = Math.min(verticalFov, horizontalFov);
+    const fitDistance = sphere.radius / Math.max(0.01, Math.sin(limitingFov / 2));
+    this.overviewFitRadius = THREE.MathUtils.clamp(
+      Math.max(fitDistance * 1.12, 76),
+      76,
+      40_000,
+    );
+    this.overviewRadius = this.overviewFitRadius;
+    this.cameraMode = "overview";
+    this.canvas.dataset.routeViewMode = "overview";
+    this.updateCamera();
+  }
+
+  update(track: CustomTrackData, selectedId: string | null, previewModuleId: string): void {
+    this.currentTrack = track;
+    this.previewModuleId = previewModuleId;
+    const routeChanged = this.updateCourseSurface(track);
+    const nextModuleLayoutSignature = this.createModuleLayoutSignature(track);
+    const moduleLayoutChanged = nextModuleLayoutSignature !== this.moduleLayoutSignature;
+    this.moduleLayoutSignature = nextModuleLayoutSignature;
     this.clearGroup(this.modules);
-    for (const placement of placements) {
+    for (const placement of track.modules) {
       const definition = EDITOR_MODULE_BY_ID.get(placement.moduleId);
       if (!definition) continue;
       const state: VisualState = placement.id === selectedId ? "selected" : "normal";
       const visual = this.createModuleVisual(definition, state);
-      visual.position.set(
-        LANE_X[placement.lane] + (definition.laneSpan - 1) * 1.5,
-        0.06 + placement.height,
-        -placement.gridPosition,
-      );
-      visual.rotation.y = THREE.MathUtils.degToRad(placement.rotation);
+      this.placeOnRoute(visual, placement, definition, 0.06, true);
       visual.userData.placementId = placement.id;
       this.modules.add(visual);
     }
-    this.updatePreview(previewModuleId, 1, this.nextGridPosition(placements));
+    this.modules.updateMatrixWorld(true);
+    this.refreshRouteOverviewBounds();
+    if (routeChanged || (this.cameraMode === "overview" && moduleLayoutChanged)) {
+      this.frameRoute();
+    } else {
+      if (this.cameraMode === "route") this.updateRouteExtension(this.cameraRoutePosition);
+      this.updateCamera();
+    }
+    this.clearPreview();
   }
 
   captureThumbnail(): string {
@@ -130,6 +266,7 @@ export class EditorScene {
     this.canvas.removeEventListener("pointermove", this.pointerMove);
     this.canvas.removeEventListener("pointerup", this.pointerUp);
     this.canvas.removeEventListener("pointercancel", this.pointerCancel);
+    this.canvas.removeEventListener("pointerleave", this.pointerLeave);
     this.canvas.removeEventListener("wheel", this.wheel);
     this.clearGroup(this.scene);
     this.renderer.dispose();
@@ -148,92 +285,602 @@ export class EditorScene {
     this.animationFrame = requestAnimationFrame(this.frame);
   };
 
+  private createFallbackRoute(
+    length = CUSTOM_TRACK_PRESENTATION_FALLBACK_LENGTH,
+  ): CoursePresentationRoute {
+    const base = getTrack("canyon-kickoff");
+    return new CoursePresentationRoute({
+      ...base,
+      courseLength: length,
+      obstacles: [],
+    }, { identity: true });
+  }
+
+  private routeSignature(track: CustomTrackData): string {
+    const markerSignature = track.modules
+      .filter((module) => (
+        module.moduleId === "start-grid"
+        || module.moduleId === "checkpoint"
+        || module.moduleId === "finish-arch"
+      ))
+      .map((module) => {
+        const anchored = module as CustomTrackModule & {
+          readonly routeAnchor?: { readonly lateralOffset: number; readonly elevation: number };
+        };
+        return [
+          module.id,
+          module.moduleId,
+          module.gridPosition,
+          anchored.routeAnchor?.lateralOffset ?? 0,
+          anchored.routeAnchor?.elevation ?? 0,
+        ].join(":");
+      })
+      .join("|");
+    const start = track.modules.find((module) => module.moduleId === "start-grid");
+    const finish = track.modules.find((module) => module.moduleId === "finish-arch");
+    if (start && finish && finish.gridPosition > start.gridPosition) return markerSignature;
+    const furthestPlacement = track.modules.reduce(
+      (maximum, module) => Math.max(maximum, module.gridPosition),
+      0,
+    );
+    return `${markerSignature}|fallback:${furthestPlacement}`;
+  }
+
+  private createModuleLayoutSignature(track: CustomTrackData): string {
+    return track.modules.map((module) => [
+      module.id,
+      module.moduleId,
+      module.lane,
+      module.gridPosition,
+      module.rotation,
+      module.height,
+    ].join(":")).join("|");
+  }
+
+  private updateCourseSurface(track: CustomTrackData): boolean {
+    const signature = this.routeSignature(track);
+    if (signature === this.courseRouteSignature) return false;
+    this.courseRouteSignature = signature;
+
+    const furthestPlacement = track.modules.reduce(
+      (maximum, module) => Math.max(maximum, module.gridPosition),
+      0,
+    );
+    const fallbackLength = THREE.MathUtils.clamp(
+      Math.max(CUSTOM_TRACK_PRESENTATION_FALLBACK_LENGTH, furthestPlacement + 48),
+      CUSTOM_TRACK_PRESENTATION_FALLBACK_LENGTH,
+      CUSTOM_TRACK_ROUTE_LIMIT,
+    );
+    const definition = customTrackToPresentationDefinition(track, fallbackLength);
+    const authoredStart = definition.authoredCourse?.start;
+    const isFallback = authoredStart?.id === "editor-preview-start";
+    this.courseRouteOrigin = isFallback ? 0 : authoredStart?.sourceGridPosition ?? 0;
+    this.courseRoute = new CoursePresentationRoute(definition);
+    this.courseRouteLength = definition.courseLength;
+
+    this.clearGroup(this.courseSurface);
+    this.clearRouteExtension();
+    this.routePickSurface = null;
+    this.courseSurface.position.set(0, 0, -this.courseRouteOrigin);
+    this.buildCourseSurface();
+    this.courseSurface.updateMatrixWorld(true);
+    this.rebuildRouteEnvironment();
+    this.canvas.dataset.courseRouteStyle = this.courseRoute.identity
+      ? "authored-flat-v2"
+      : "authored-centerline-v2";
+    return true;
+  }
+
+  private buildCourseSurface(): void {
+    const routeDetailScale = THREE.MathUtils.clamp(this.courseRouteLength / 3_600, 1, 6);
+    const addRibbon = (
+      left: number,
+      right: number,
+      yOffset: number,
+      material: THREE.Material,
+      segmentLength = 3,
+      segmentVisible?: (segmentIndex: number) => boolean,
+      uvRepeatLength = 30,
+    ): THREE.Mesh => {
+      const mesh = new THREE.Mesh(
+        createCourseRibbonGeometry(this.courseRoute, {
+          startProgress: 0,
+          endProgress: this.courseRouteLength,
+          left,
+          right,
+          yOffset,
+          segmentLength,
+          uvRepeatLength,
+          ...(segmentVisible
+            ? { segmentVisible: (segmentIndex: number) => segmentVisible(segmentIndex) }
+            : {}),
+        }),
+        material,
+      );
+      mesh.receiveShadow = true;
+      this.courseSurface.add(mesh);
+      return mesh;
+    };
+
+    addRibbon(
+      -13,
+      13,
+      -0.34,
+      new THREE.MeshStandardMaterial({ color: 0x4f7d41, roughness: 1, flatShading: true }),
+      4 * routeDetailScale,
+    );
+    addRibbon(
+      -8.35,
+      8.35,
+      -0.08,
+      new THREE.MeshStandardMaterial({ color: 0xc38952, roughness: 1, flatShading: true }),
+      3 * routeDetailScale,
+    );
+    addRibbon(
+      -EDITOR_ROUTE_HALF_WIDTH,
+      EDITOR_ROUTE_HALF_WIDTH,
+      0.04,
+      new THREE.MeshStandardMaterial({ color: 0x9f5937, roughness: 0.98, flatShading: true }),
+      2 * routeDetailScale,
+    );
+
+    const edgeMaterials = [
+      new THREE.MeshStandardMaterial({ color: 0xd4473f, roughness: 0.72, flatShading: true }),
+      new THREE.MeshStandardMaterial({ color: 0xffe2ad, roughness: 0.78, flatShading: true }),
+    ] as const;
+    for (const [materialIndex, material] of edgeMaterials.entries()) {
+      const visible = (index: number): boolean => index % 2 === materialIndex;
+      addRibbon(-8.35, -7.82, 0.14, material, 6 * routeDetailScale, visible);
+      addRibbon(7.82, 8.35, 0.14, material.clone(), 6 * routeDetailScale, visible);
+    }
+
+    const laneMaterial = new THREE.MeshStandardMaterial({
+      color: 0xffe6ad,
+      roughness: 0.8,
+      emissive: 0x3a2411,
+      emissiveIntensity: 0.08,
+    });
+    for (const lateral of [-6, -3, 0, 3, 6]) {
+      addRibbon(
+        lateral - 0.045,
+        lateral + 0.045,
+        0.12,
+        laneMaterial,
+        3 * routeDetailScale,
+      );
+    }
+
+    const majorPositions: number[] = [];
+    const left = new THREE.Vector3();
+    const right = new THREE.Vector3();
+    const markerSpacing = Math.max(12, this.courseRouteLength / 512);
+    for (let progress = 0; progress <= this.courseRouteLength; progress += markerSpacing) {
+      this.courseRoute.sample(progress, -EDITOR_ROUTE_HALF_WIDTH, 0.15, left);
+      this.courseRoute.sample(progress, EDITOR_ROUTE_HALF_WIDTH, 0.15, right);
+      majorPositions.push(left.x, left.y, left.z, right.x, right.y, right.z);
+    }
+    const majorGeometry = new THREE.BufferGeometry();
+    majorGeometry.setAttribute("position", new THREE.Float32BufferAttribute(majorPositions, 3));
+    const majorMaterial = new THREE.LineBasicMaterial({
+      color: 0xfff0c5,
+      transparent: true,
+      opacity: 0.38,
+    });
+    this.courseSurface.add(new THREE.LineSegments(majorGeometry, majorMaterial));
+
+    const pickMaterial = new THREE.MeshBasicMaterial({
+      transparent: true,
+      opacity: 0,
+      depthWrite: false,
+      side: THREE.DoubleSide,
+    });
+    pickMaterial.colorWrite = false;
+    this.routePickSurface = addRibbon(
+      -EDITOR_ROUTE_PICK_HALF_WIDTH,
+      EDITOR_ROUTE_PICK_HALF_WIDTH,
+      0.32,
+      pickMaterial,
+      8 * routeDetailScale,
+      undefined,
+      1,
+    );
+    this.routePickSurface.receiveShadow = false;
+    this.routePickSurface.layers.set(EDITOR_PICK_LAYER);
+    this.routePickSurface.userData.gridOffset = this.courseRouteOrigin;
+  }
+
+  private clearRouteExtension(): void {
+    this.clearGroup(this.routeExtensionSurface);
+    this.routeExtensionPickSurface = null;
+    this.routeExtensionStart = Number.NaN;
+    this.routeExtensionEnd = Number.NaN;
+    delete this.canvas.dataset.routeGuideRange;
+  }
+
+  private updateRouteExtension(gridPosition: number): void {
+    const routeStart = THREE.MathUtils.clamp(this.courseRouteOrigin, 0, CUSTOM_TRACK_ROUTE_LIMIT);
+    const routeEnd = THREE.MathUtils.clamp(
+      this.courseRouteOrigin + this.courseRouteLength,
+      0,
+      CUSTOM_TRACK_ROUTE_LIMIT,
+    );
+    if (gridPosition >= routeStart && gridPosition <= routeEnd) {
+      if (this.routeExtensionSurface.children.length > 0) this.clearRouteExtension();
+      return;
+    }
+
+    const beforeRoute = gridPosition < routeStart;
+    if (Number.isFinite(this.routeExtensionStart) && Number.isFinite(this.routeExtensionEnd)) {
+      const safeStart = beforeRoute && this.routeExtensionStart > 0
+        ? this.routeExtensionStart + EDITOR_EXTENSION_REBUILD_MARGIN
+        : this.routeExtensionStart;
+      const safeEnd = !beforeRoute && this.routeExtensionEnd < CUSTOM_TRACK_ROUTE_LIMIT
+        ? this.routeExtensionEnd - EDITOR_EXTENSION_REBUILD_MARGIN
+        : this.routeExtensionEnd;
+      if (gridPosition >= safeStart && gridPosition <= safeEnd) return;
+    }
+
+    const start = beforeRoute
+      ? Math.max(0, gridPosition - EDITOR_EXTENSION_LOOK_AHEAD)
+      : Math.max(routeEnd, gridPosition - EDITOR_EXTENSION_LOOK_BEHIND);
+    const end = beforeRoute
+      ? Math.min(routeStart, gridPosition + EDITOR_EXTENSION_LOOK_BEHIND)
+      : Math.min(CUSTOM_TRACK_ROUTE_LIMIT, gridPosition + EDITOR_EXTENSION_LOOK_AHEAD);
+    if (end - start < 1) {
+      this.clearRouteExtension();
+      return;
+    }
+    this.buildRouteExtension(start, end);
+  }
+
+  private buildRouteExtension(start: number, end: number): void {
+    this.clearRouteExtension();
+    this.routeExtensionStart = start;
+    this.routeExtensionEnd = end;
+
+    const addRibbon = (
+      left: number,
+      right: number,
+      yOffset: number,
+      material: THREE.Material,
+      segmentLength: number,
+      uvRepeatLength = 30,
+    ): THREE.Mesh => {
+      const mesh = new THREE.Mesh(
+        this.createEditorRibbonGeometry(
+          start,
+          end,
+          left,
+          right,
+          yOffset,
+          segmentLength,
+          uvRepeatLength,
+        ),
+        material,
+      );
+      mesh.receiveShadow = true;
+      this.routeExtensionSurface.add(mesh);
+      return mesh;
+    };
+
+    addRibbon(
+      -13,
+      13,
+      -0.34,
+      new THREE.MeshStandardMaterial({ color: 0x4f7d41, roughness: 1, flatShading: true }),
+      12,
+    );
+    addRibbon(
+      -8.35,
+      8.35,
+      -0.08,
+      new THREE.MeshStandardMaterial({ color: 0xc38952, roughness: 1, flatShading: true }),
+      8,
+    );
+    addRibbon(
+      -EDITOR_ROUTE_HALF_WIDTH,
+      EDITOR_ROUTE_HALF_WIDTH,
+      0.04,
+      new THREE.MeshStandardMaterial({ color: 0x9f5937, roughness: 0.98, flatShading: true }),
+      5,
+    );
+    addRibbon(
+      -8.35,
+      -7.82,
+      0.14,
+      new THREE.MeshStandardMaterial({ color: 0xd4473f, roughness: 0.72, flatShading: true }),
+      8,
+    );
+    addRibbon(
+      7.82,
+      8.35,
+      0.14,
+      new THREE.MeshStandardMaterial({ color: 0xffe2ad, roughness: 0.78, flatShading: true }),
+      8,
+    );
+
+    const laneMaterial = new THREE.MeshStandardMaterial({
+      color: 0xffe6ad,
+      roughness: 0.8,
+      emissive: 0x3a2411,
+      emissiveIntensity: 0.08,
+    });
+    for (const lateral of [-6, -3, 0, 3, 6]) {
+      addRibbon(lateral - 0.045, lateral + 0.045, 0.12, laneMaterial, 6);
+    }
+
+    const pickMaterial = new THREE.MeshBasicMaterial({
+      transparent: true,
+      opacity: 0,
+      depthWrite: false,
+      side: THREE.DoubleSide,
+    });
+    pickMaterial.colorWrite = false;
+    this.routeExtensionPickSurface = addRibbon(
+      -EDITOR_ROUTE_PICK_HALF_WIDTH,
+      EDITOR_ROUTE_PICK_HALF_WIDTH,
+      0.32,
+      pickMaterial,
+      8,
+      1,
+    );
+    this.routeExtensionPickSurface.receiveShadow = false;
+    this.routeExtensionPickSurface.layers.set(EDITOR_PICK_LAYER);
+    this.routeExtensionPickSurface.userData.gridOffset = 0;
+    this.routeExtensionSurface.updateMatrixWorld(true);
+    this.canvas.dataset.routeGuideRange = `${Math.round(start)}-${Math.round(end)}`;
+  }
+
+  private createEditorRibbonGeometry(
+    startGridPosition: number,
+    endGridPosition: number,
+    left: number,
+    right: number,
+    yOffset: number,
+    segmentLength: number,
+    uvRepeatLength: number,
+  ): THREE.BufferGeometry {
+    const length = endGridPosition - startGridPosition;
+    const segmentCount = Math.max(1, Math.ceil(length / segmentLength));
+    const actualSegmentLength = length / segmentCount;
+    const positions: number[] = [];
+    const normals: number[] = [];
+    const uvs: number[] = [];
+    const indices: number[] = [];
+    const startLeft = new THREE.Vector3();
+    const startRight = new THREE.Vector3();
+    const endLeft = new THREE.Vector3();
+    const endRight = new THREE.Vector3();
+
+    for (let index = 0; index < segmentCount; index += 1) {
+      const segmentStart = startGridPosition + index * actualSegmentLength;
+      const segmentEnd = index === segmentCount - 1
+        ? endGridPosition
+        : segmentStart + actualSegmentLength;
+      const startOrientation = this.sampleEditorRoute(segmentStart, left, yOffset, startLeft);
+      const startUp = [
+        startOrientation.upX,
+        startOrientation.upY,
+        startOrientation.upZ,
+      ] as const;
+      this.sampleEditorRoute(segmentStart, right, yOffset, startRight);
+      const endOrientation = this.sampleEditorRoute(segmentEnd, left, yOffset, endLeft);
+      const endUp = [
+        endOrientation.upX,
+        endOrientation.upY,
+        endOrientation.upZ,
+      ] as const;
+      this.sampleEditorRoute(segmentEnd, right, yOffset, endRight);
+      const vertexOffset = positions.length / 3;
+
+      positions.push(
+        startLeft.x, startLeft.y, startLeft.z,
+        startRight.x, startRight.y, startRight.z,
+        endLeft.x, endLeft.y, endLeft.z,
+        endRight.x, endRight.y, endRight.z,
+      );
+      normals.push(...startUp, ...startUp, ...endUp, ...endUp);
+      uvs.push(
+        0, segmentStart / uvRepeatLength,
+        1, segmentStart / uvRepeatLength,
+        0, segmentEnd / uvRepeatLength,
+        1, segmentEnd / uvRepeatLength,
+      );
+      indices.push(
+        vertexOffset, vertexOffset + 1, vertexOffset + 3,
+        vertexOffset, vertexOffset + 3, vertexOffset + 2,
+      );
+    }
+
+    const geometry = new THREE.BufferGeometry();
+    geometry.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3));
+    geometry.setAttribute("normal", new THREE.Float32BufferAttribute(normals, 3));
+    geometry.setAttribute("uv", new THREE.Float32BufferAttribute(uvs, 2));
+    geometry.setIndex(indices);
+    geometry.computeBoundingBox();
+    geometry.computeBoundingSphere();
+    geometry.name = "editor-route-extension-ribbon";
+    geometry.userData.presentationOnly = true;
+    return geometry;
+  }
+
+  private sampleEditorRoute(
+    gridPosition: number,
+    lateral: number,
+    elevation: number,
+    outPosition: THREE.Vector3,
+  ): CoursePresentationOrientation {
+    const localProgress = gridPosition - this.courseRouteOrigin;
+    const clampedProgress = THREE.MathUtils.clamp(localProgress, 0, this.courseRouteLength);
+    const orientation = this.courseRoute.sample(
+      clampedProgress,
+      lateral,
+      elevation,
+      outPosition,
+    );
+    if (localProgress !== clampedProgress) {
+      const extension = localProgress - clampedProgress;
+      outPosition.x += orientation.forwardX * extension;
+      outPosition.y += orientation.forwardY * extension;
+      outPosition.z += orientation.forwardZ * extension;
+    }
+    outPosition.z -= this.courseRouteOrigin;
+    return orientation;
+  }
+
+  private setRouteOrientation(
+    object: THREE.Object3D,
+    orientation: CoursePresentationOrientation,
+    localRotationDegrees = 0,
+  ): void {
+    this.routeRight.set(orientation.rightX, orientation.rightY, orientation.rightZ);
+    this.routeUp.set(orientation.upX, orientation.upY, orientation.upZ);
+    this.routeBackward.set(
+      -orientation.forwardX,
+      -orientation.forwardY,
+      -orientation.forwardZ,
+    );
+    this.routeRotation.makeBasis(this.routeRight, this.routeUp, this.routeBackward);
+    object.quaternion.setFromRotationMatrix(this.routeRotation);
+    if (localRotationDegrees !== 0) {
+      object.rotateY(THREE.MathUtils.degToRad(localRotationDegrees));
+    }
+  }
+
+  private placeOnRoute(
+    object: THREE.Object3D,
+    placement: CustomTrackModule,
+    definition: EditorModuleDefinition,
+    baseElevation: number,
+    applySavedRotation: boolean,
+  ): void {
+    const lateral = LANE_X[placement.lane] + (definition.laneSpan - 1) * 1.5;
+    const orientation = this.sampleEditorRoute(
+      placement.gridPosition,
+      lateral,
+      baseElevation + placement.height,
+      this.routePosition,
+    );
+    object.position.copy(this.routePosition);
+    this.setRouteOrientation(
+      object,
+      orientation,
+      applySavedRotation ? placement.rotation : 0,
+    );
+  }
+
   private buildGround(): void {
     const hemisphere = new THREE.HemisphereLight(0xe7f8ff, 0x4f3027, 1.7);
     this.scene.add(hemisphere);
 
-    const key = new THREE.DirectionalLight(0xffe2b1, 4.7);
-    key.position.set(-35, 52, 30);
-    key.castShadow = true;
-    key.shadow.mapSize.set(1536, 1536);
-    key.shadow.bias = -0.00025;
-    const shadowCamera = key.shadow.camera;
+    this.keyLight.position.set(-35, 52, 30);
+    this.keyLight.castShadow = true;
+    this.keyLight.shadow.mapSize.set(1536, 1536);
+    this.keyLight.shadow.bias = -0.00025;
+    const shadowCamera = this.keyLight.shadow.camera;
     shadowCamera.left = -74;
     shadowCamera.right = 74;
     shadowCamera.top = 92;
     shadowCamera.bottom = -92;
     shadowCamera.near = 1;
     shadowCamera.far = 180;
-    this.scene.add(key);
+    this.scene.add(this.keyLight, this.keyLight.target);
 
     const fill = new THREE.DirectionalLight(0x78c6e7, 0.8);
     fill.position.set(34, 22, -56);
     this.scene.add(fill);
+  }
 
-    const baseMaterial = new THREE.MeshStandardMaterial({ color: 0x7b4733, roughness: 1, flatShading: true });
-    this.addMesh(this.scene, new THREE.BoxGeometry(58, 4.2, 286), baseMaterial, [0, -2.18, -111], [0, 0, 0], true, true);
+  private rebuildRouteEnvironment(): void {
+    this.clearGroup(this.routeFoundation);
+    this.clearGroup(this.routeScenery);
+    this.routeOverviewBounds.makeEmpty();
 
-    const sandMaterial = new THREE.MeshStandardMaterial({ color: 0xb96c43, roughness: 1, flatShading: true });
-    this.addMesh(this.scene, new THREE.PlaneGeometry(116, 360), sandMaterial, [0, -4.25, -111], [-Math.PI / 2, 0, 0], false, true);
-
-    const grassMaterial = new THREE.MeshStandardMaterial({ color: 0x4f7d41, roughness: 1, flatShading: true });
-    this.addMesh(this.scene, new THREE.BoxGeometry(54, 0.34, 282), grassMaterial, [0, -0.16, -111], [0, 0, 0], false, true);
-
-    const shoulderMaterial = new THREE.MeshStandardMaterial({ color: 0xc38952, roughness: 1, flatShading: true });
-    for (const x of [-8.15, 8.15]) {
-      this.addMesh(this.scene, new THREE.BoxGeometry(1.3, 0.24, 272), shoulderMaterial, [x, 0.02, -111], [0, 0, 0], false, true);
+    const sampleCount = THREE.MathUtils.clamp(
+      Math.ceil(this.courseRouteLength / 8),
+      16,
+      512,
+    );
+    const sample = new THREE.Vector3();
+    for (let index = 0; index <= sampleCount; index += 1) {
+      const gridPosition = this.courseRouteOrigin + (index / sampleCount) * this.courseRouteLength;
+      for (const lateral of [-EDITOR_SCENERY_HALF_WIDTH, EDITOR_SCENERY_HALF_WIDTH]) {
+        this.sampleEditorRoute(gridPosition, lateral, 0, sample);
+        this.routeOverviewBounds.expandByPoint(sample);
+      }
     }
 
-    const dirtMaterial = new THREE.MeshStandardMaterial({ color: 0x9f5937, roughness: 0.98, flatShading: true });
-    this.addMesh(this.scene, new THREE.BoxGeometry(15, 0.22, 270), dirtMaterial, [0, 0.04, -111], [0, 0, 0], false, true);
+    const routeSize = this.routeOverviewBounds.getSize(new THREE.Vector3());
+    const routeCenter = this.routeOverviewBounds.getCenter(new THREE.Vector3());
+    const foundationWidth = Math.max(78, routeSize.x + 22);
+    const foundationDepth = Math.max(92, routeSize.z + 22);
+    const lowerMaterial = new THREE.MeshStandardMaterial({
+      color: 0x703d31,
+      roughness: 1,
+      flatShading: true,
+    });
+    const topMaterial = new THREE.MeshStandardMaterial({
+      color: 0xb96c43,
+      roughness: 1,
+      flatShading: true,
+    });
+    this.addMesh(
+      this.routeFoundation,
+      new THREE.BoxGeometry(foundationWidth + 5, 3.8, foundationDepth + 5),
+      lowerMaterial,
+      [routeCenter.x, -3.55, routeCenter.z],
+      [0, 0, 0],
+      true,
+      true,
+    );
+    this.addMesh(
+      this.routeFoundation,
+      new THREE.BoxGeometry(foundationWidth, 1.1, foundationDepth),
+      topMaterial,
+      [routeCenter.x, -1.05, routeCenter.z],
+      [0, 0, 0],
+      true,
+      true,
+    );
+    this.routeOverviewBounds.expandByPoint(new THREE.Vector3(
+      routeCenter.x - foundationWidth / 2,
+      -5.45,
+      routeCenter.z - foundationDepth / 2,
+    ));
+    this.routeOverviewBounds.expandByPoint(new THREE.Vector3(
+      routeCenter.x + foundationWidth / 2,
+      Math.max(12, this.routeOverviewBounds.max.y + 8),
+      routeCenter.z + foundationDepth / 2,
+    ));
 
-    this.buildSnapGrid();
-    this.buildShoulderBlocks();
     this.buildWorkshop();
     this.buildDioramaScenery();
+
+    this.routeFoundation.updateMatrixWorld(true);
+    this.routeScenery.updateMatrixWorld(true);
+    this.courseSurface.updateMatrixWorld(true);
+    this.routeBaseOverviewBounds.makeEmpty();
+    if (this.routeFoundation.children.length > 0) {
+      this.routeBaseOverviewBounds.union(new THREE.Box3().setFromObject(this.routeFoundation));
+    }
+    if (this.routeScenery.children.length > 0) {
+      this.routeBaseOverviewBounds.union(new THREE.Box3().setFromObject(this.routeScenery));
+    }
+    if (this.courseSurface.children.length > 0) {
+      this.routeBaseOverviewBounds.union(new THREE.Box3().setFromObject(this.courseSurface));
+    }
+    this.routeOverviewBounds.copy(this.routeBaseOverviewBounds);
   }
 
-  private buildSnapGrid(): void {
-    const snapPositions: number[] = [];
-    for (let z = TRACK_START_Z; z >= TRACK_END_Z; z -= 2) {
-      snapPositions.push(-7.3, 0.19, z, 7.3, 0.19, z);
-    }
-    const snapGeometry = new THREE.BufferGeometry();
-    snapGeometry.setAttribute("position", new THREE.Float32BufferAttribute(snapPositions, 3));
-    const snapMaterial = new THREE.LineBasicMaterial({ color: 0xffe0a1, transparent: true, opacity: 0.17 });
-    this.scene.add(new THREE.LineSegments(snapGeometry, snapMaterial));
-
-    const laneMaterial = new THREE.MeshStandardMaterial({ color: 0xffe6ad, roughness: 0.8, emissive: 0x3a2411, emissiveIntensity: 0.08 });
-    for (const x of [-6, -3, 0, 3, 6]) {
-      this.addMesh(this.scene, new THREE.BoxGeometry(0.075, 0.045, 268), laneMaterial, [x, 0.19, -111], [0, 0, 0], false, true);
-    }
-
-    const majorPositions: number[] = [];
-    for (let z = 16; z >= -240; z -= 12) {
-      majorPositions.push(-7.5, 0.205, z, 7.5, 0.205, z);
-    }
-    const majorGeometry = new THREE.BufferGeometry();
-    majorGeometry.setAttribute("position", new THREE.Float32BufferAttribute(majorPositions, 3));
-    const majorMaterial = new THREE.LineBasicMaterial({ color: 0xfff0c5, transparent: true, opacity: 0.4 });
-    this.scene.add(new THREE.LineSegments(majorGeometry, majorMaterial));
-  }
-
-  private buildShoulderBlocks(): void {
-    const red = new THREE.MeshStandardMaterial({ color: 0xd4473f, roughness: 0.72, flatShading: true });
-    const cream = new THREE.MeshStandardMaterial({ color: 0xffe2ad, roughness: 0.78, flatShading: true });
-    for (let index = 0; index < 13; index += 1) {
-      const z = 10 - index * 21;
-      for (const x of [-8.45, 8.45]) {
-        const material = (index + (x > 0 ? 1 : 0)) % 2 === 0 ? red : cream;
-        this.addMesh(this.scene, new THREE.BoxGeometry(0.82, 0.68, 6.8), material, [x, 0.36, z], [0, 0, 0], true, true);
-      }
+  private refreshRouteOverviewBounds(): void {
+    this.routeOverviewBounds.copy(this.routeBaseOverviewBounds);
+    if (this.modules.children.length > 0) {
+      this.routeOverviewBounds.union(new THREE.Box3().setFromObject(this.modules));
     }
   }
 
   private buildWorkshop(): void {
     const group = new THREE.Group();
-    group.position.set(-20.2, 0.2, -68);
-    this.scene.add(group);
 
     const walls = new THREE.MeshStandardMaterial({ color: 0x31566a, roughness: 0.78, flatShading: true });
     const trim = new THREE.MeshStandardMaterial({ color: 0xe3a744, roughness: 0.66, flatShading: true });
@@ -254,10 +901,9 @@ export class EditorScene {
     for (const [x, z, scale] of [[-5.4, 2.4, 1], [-4.7, 0.7, 0.78], [5.2, 1.8, 0.9]] as const) {
       this.addMesh(group, new THREE.BoxGeometry(1.4 * scale, 1.4 * scale, 1.4 * scale), crateMaterial, [x, 0.7 * scale, z], [0, 0.2, 0], true, true);
     }
+    this.placeSceneryOnRoute(group, 0.27, -22, 0.2, -8);
 
     const machine = new THREE.Group();
-    machine.position.set(19, 0.35, -77);
-    this.scene.add(machine);
     const machineYellow = new THREE.MeshStandardMaterial({ color: 0xe3a332, roughness: 0.62, flatShading: true });
     const tire = new THREE.MeshStandardMaterial({ color: 0x1d2525, roughness: 0.95, flatShading: true });
     this.addMesh(machine, new THREE.BoxGeometry(4.8, 1.8, 3), machineYellow, [0, 1.55, 0], [0, 0.15, 0], true, true);
@@ -268,108 +914,199 @@ export class EditorScene {
       }
     }
     this.addMesh(machine, new THREE.BoxGeometry(3.8, 0.45, 1.2), machineYellow, [3.2, 0.85, 0], [0, 0.15, -0.18], true, true);
+    this.placeSceneryOnRoute(machine, 0.34, 21, 0.35, 10);
   }
 
   private buildDioramaScenery(): void {
-    const treeLocations = [
-      [-22, 5, 1.05], [22, -4, 0.9], [-23, -24, 0.85], [22, -42, 1.1],
-      [-22, -100, 1.15], [23, -118, 0.88], [-23, -150, 1.02], [22, -176, 1.16],
-      [-22, -205, 0.9], [23, -231, 1.05],
-    ] as const;
-    treeLocations.forEach(([x, z, scale]) => this.addTree(x, z, scale));
+    const treeCount = Math.min(44, Math.max(10, Math.ceil(this.courseRouteLength / 30)));
+    for (let index = 0; index < treeCount; index += 1) {
+      const side = index % 2 === 0 ? -1 : 1;
+      const lateral = side * (21 + (index % 4) * 0.9);
+      const ratio = (index + 0.35) / treeCount;
+      const scale = 0.86 + (index % 5) * 0.07;
+      this.addTree(lateral, ratio, scale);
+    }
 
     const rockMaterial = new THREE.MeshStandardMaterial({ color: 0x9a553d, roughness: 0.96, flatShading: true });
-    const rockLocations = [
-      [-17, -13, 1.2], [19, -22, 0.9], [-17, -47, 0.7], [18, -92, 1.1],
-      [-19, -126, 0.9], [17, -145, 0.65], [-18, -188, 1.15], [19, -216, 0.8],
-    ] as const;
-    rockLocations.forEach(([x, z, scale], index) => {
+    const rockCount = Math.min(28, Math.max(8, Math.ceil(this.courseRouteLength / 42)));
+    for (let index = 0; index < rockCount; index += 1) {
+      const side = index % 2 === 0 ? -1 : 1;
+      const scale = 0.7 + (index % 4) * 0.14;
+      const rock = new THREE.Group();
       this.addMesh(
-        this.scene,
+        rock,
         new THREE.DodecahedronGeometry(1.65 * scale, 0),
         rockMaterial,
-        [x, 0.75 * scale, z],
+        [0, 0.75 * scale, 0],
         [0.2, index * 0.63, 0.14],
         true,
         true,
       );
-    });
-
-    const mesaLocations = [
-      [-27, -18, 0.95], [27, -50, 0.82], [-27, -134, 1.08], [27, -205, 0.92],
-    ] as const;
-    mesaLocations.forEach(([x, z, scale], index) => this.addCanyonMesa(x, z, scale, index * 0.38));
-
-    const cactusMaterial = new THREE.MeshStandardMaterial({ color: 0x3d7b4b, roughness: 0.92, flatShading: true });
-    for (const [x, z, rotation] of [[17.8, -14, 0.2], [-18.5, -113, -0.25], [18.2, -186, 0.14]] as const) {
-      this.addMesh(this.scene, new THREE.CylinderGeometry(0.25, 0.34, 2.7, 7), cactusMaterial, [x, 1.35, z], [0, rotation, 0], true, true);
-      this.addMesh(this.scene, new THREE.CylinderGeometry(0.14, 0.18, 1.15, 7), cactusMaterial, [x + 0.48, 1.45, z], [0, 0, Math.PI / 2], true, true);
+      this.placeSceneryOnRoute(
+        rock,
+        (index + 0.72) / rockCount,
+        side * (17 + (index % 3) * 0.8),
+      );
     }
 
-    this.addFestivalBanner(-34, 0xec5549);
-    this.addFestivalBanner(-168, 0x27bfd0);
+    const mesaCount = Math.min(10, Math.max(4, Math.ceil(this.courseRouteLength / 220)));
+    for (let index = 0; index < mesaCount; index += 1) {
+      const side = index % 2 === 0 ? -1 : 1;
+      this.addCanyonMesa(
+        side * (27 + (index % 2) * 0.8),
+        (index + 0.5) / mesaCount,
+        0.82 + (index % 3) * 0.12,
+        index * 0.38,
+      );
+    }
+
+    const cactusMaterial = new THREE.MeshStandardMaterial({ color: 0x3d7b4b, roughness: 0.92, flatShading: true });
+    const cactusCount = Math.min(12, Math.max(3, Math.ceil(this.courseRouteLength / 180)));
+    for (let index = 0; index < cactusCount; index += 1) {
+      const cactus = new THREE.Group();
+      const rotation = index % 2 === 0 ? 0.2 : -0.25;
+      this.addMesh(cactus, new THREE.CylinderGeometry(0.25, 0.34, 2.7, 7), cactusMaterial, [0, 1.35, 0], [0, rotation, 0], true, true);
+      this.addMesh(cactus, new THREE.CylinderGeometry(0.14, 0.18, 1.15, 7), cactusMaterial, [0.48, 1.45, 0], [0, 0, Math.PI / 2], true, true);
+      this.placeSceneryOnRoute(
+        cactus,
+        (index + 0.62) / cactusCount,
+        (index % 2 === 0 ? 1 : -1) * 18.2,
+      );
+    }
+
+    this.addFestivalBanner(0.14, 0xec5549);
+    this.addFestivalBanner(0.72, 0x27bfd0);
   }
 
-  private addCanyonMesa(x: number, z: number, scale: number, rotation: number): void {
+  private addCanyonMesa(lateral: number, routeRatio: number, scale: number, rotation: number): void {
     const group = new THREE.Group();
-    group.position.set(x, -0.1, z);
-    group.rotation.y = rotation;
     group.scale.setScalar(scale);
-    this.scene.add(group);
     const sandstone = new THREE.MeshStandardMaterial({ color: 0xa9563e, roughness: 0.98, flatShading: true });
     const sunFace = new THREE.MeshStandardMaterial({ color: 0xc96f4b, roughness: 0.96, flatShading: true });
     this.addMesh(group, new THREE.CylinderGeometry(4.5, 5.4, 3.2, 7), sandstone, [0, 1.6, 0], [0, 0.16, 0], true, true);
     this.addMesh(group, new THREE.CylinderGeometry(3.25, 4.2, 3, 7), sunFace, [0.35, 4.68, -0.2], [0, -0.12, 0], true, true);
     this.addMesh(group, new THREE.CylinderGeometry(2.1, 3, 2.4, 7), sandstone.clone(), [0.1, 7.35, -0.1], [0, 0.24, 0], true, true);
+    this.placeSceneryOnRoute(group, routeRatio, lateral, -0.1, THREE.MathUtils.radToDeg(rotation));
   }
 
-  private addTree(x: number, z: number, scale: number): void {
+  private addTree(lateral: number, routeRatio: number, scale: number): void {
     const group = new THREE.Group();
-    group.position.set(x, 0, z);
     group.scale.setScalar(scale);
-    this.scene.add(group);
     const trunk = new THREE.MeshStandardMaterial({ color: 0x65412c, roughness: 1, flatShading: true });
     const needles = new THREE.MeshStandardMaterial({ color: 0x3f6f42, roughness: 0.96, flatShading: true });
     this.addMesh(group, new THREE.CylinderGeometry(0.36, 0.52, 3.1, 7), trunk, [0, 1.55, 0], [0, 0, 0], true, true);
     this.addMesh(group, new THREE.ConeGeometry(2.2, 4.2, 8), needles, [0, 3.4, 0], [0, 0.18, 0], true, true);
     this.addMesh(group, new THREE.ConeGeometry(1.75, 3.7, 8), needles, [0, 5.35, 0], [0, -0.12, 0], true, true);
     this.addMesh(group, new THREE.ConeGeometry(1.22, 3.2, 8), needles, [0, 7.05, 0], [0, 0.08, 0], true, true);
+    this.placeSceneryOnRoute(group, routeRatio, lateral);
   }
 
-  private addFestivalBanner(z: number, color: number): void {
+  private addFestivalBanner(routeRatio: number, color: number): void {
+    const group = new THREE.Group();
     const pole = new THREE.MeshStandardMaterial({ color: 0x334a52, roughness: 0.48, metalness: 0.38, flatShading: true });
     const banner = new THREE.MeshStandardMaterial({ color, roughness: 0.72, flatShading: true, side: THREE.DoubleSide });
     for (const x of [-9.8, 9.8]) {
-      this.addMesh(this.scene, new THREE.CylinderGeometry(0.12, 0.16, 4.8, 8), pole, [x, 2.4, z], [0, 0, 0], true, true);
-      this.addMesh(this.scene, new THREE.BoxGeometry(2.6, 1.15, 0.12), banner, [x + (x < 0 ? 1.3 : -1.3), 3.9, z], [0, 0, 0], true, true);
+      this.addMesh(group, new THREE.CylinderGeometry(0.12, 0.16, 4.8, 8), pole, [x, 2.4, 0], [0, 0, 0], true, true);
+      this.addMesh(group, new THREE.BoxGeometry(2.6, 1.15, 0.12), banner, [x + (x < 0 ? 1.3 : -1.3), 3.9, 0], [0, 0, 0], true, true);
     }
+    this.placeSceneryOnRoute(group, routeRatio, 0);
   }
 
-  private updatePreview(moduleId: string, lane: 0 | 1 | 2 | 3, gridPosition: number): void {
+  private placeSceneryOnRoute(
+    object: THREE.Object3D,
+    routeRatio: number,
+    lateral: number,
+    elevation = 0,
+    localRotationDegrees = 0,
+  ): void {
+    const gridPosition = this.courseRouteOrigin
+      + THREE.MathUtils.clamp(routeRatio, 0, 1) * this.courseRouteLength;
+    const orientation = this.sampleEditorRoute(
+      gridPosition,
+      lateral,
+      elevation,
+      this.routePosition,
+    );
+    object.position.copy(this.routePosition);
+    this.setRouteOrientation(object, orientation, localRotationDegrees);
+    this.routeScenery.add(object);
+  }
+
+  private updatePreview(module: CustomTrackModule): void {
     this.clearGroup(this.preview);
-    const definition = EDITOR_MODULE_BY_ID.get(moduleId);
-    if (!definition) return;
+    const definition = EDITOR_MODULE_BY_ID.get(module.moduleId);
+    const track = this.currentTrack;
+    if (!definition || !track) {
+      this.publishPreview(null);
+      return;
+    }
+    const validation = validateCustomTrackPlacement(track, module);
 
     const visual = this.createModuleVisual(definition, "preview");
-    visual.position.set(LANE_X[lane] + (definition.laneSpan - 1) * 1.5, 0.13, -gridPosition);
+    this.placeOnRoute(visual, module, definition, 0.13, true);
     this.preview.add(visual);
 
-    const width = Math.max(2.45, definition.laneSpan * 2.75);
-    const length = Math.max(2, definition.length * 0.22);
+    const baseWidth = Math.max(2.45, definition.laneSpan * 2.75);
+    const baseLength = Math.max(2, definition.length * 0.22);
+    const sideways = module.rotation === 90 || module.rotation === 270;
+    const width = sideways ? baseLength : baseWidth;
+    const length = sideways ? baseWidth : baseLength;
     const footprint = new THREE.BoxGeometry(width + 0.38, 0.22, length + 0.38);
     const edges = new THREE.EdgesGeometry(footprint);
     footprint.dispose();
-    const lineMaterial = new THREE.LineBasicMaterial({ color: 0xaaffff, transparent: true, opacity: 0.92 });
+    const feedbackColor = validation.valid ? 0xaaffff : 0xff6b5c;
+    const lineMaterial = new THREE.LineBasicMaterial({ color: feedbackColor, transparent: true, opacity: 0.96 });
     const outline = new THREE.LineSegments(edges, lineMaterial);
-    outline.position.copy(visual.position);
-    outline.position.y = 0.17;
+    this.placeOnRoute(outline, module, definition, 0.17, false);
     this.preview.add(outline);
 
-    const markerMaterial = new THREE.MeshBasicMaterial({ color: 0xd7ffff, transparent: true, opacity: 0.9 });
-    const marker = new THREE.Mesh(new THREE.ConeGeometry(0.34, 0.92, 4), markerMaterial);
-    marker.position.set(visual.position.x, 3.4, visual.position.z);
-    marker.rotation.z = Math.PI;
-    this.preview.add(marker);
+    const markerMaterial = new THREE.MeshBasicMaterial({ color: feedbackColor, transparent: true, opacity: 0.96 });
+    const markerPosition = new THREE.Vector3();
+    this.sampleEditorRoute(
+      module.gridPosition,
+      LANE_X[module.lane] + (definition.laneSpan - 1) * 1.5,
+      module.height + 3.4,
+      markerPosition,
+    );
+    if (validation.valid) {
+      const marker = new THREE.Mesh(new THREE.ConeGeometry(0.34, 0.92, 4), markerMaterial);
+      marker.position.copy(markerPosition);
+      marker.rotation.z = Math.PI;
+      this.preview.add(marker);
+    } else {
+      const marker = new THREE.Group();
+      marker.position.copy(markerPosition);
+      for (const rotation of [-Math.PI / 4, Math.PI / 4]) {
+        const stroke = new THREE.Mesh(new THREE.BoxGeometry(0.16, 1.15, 0.16), markerMaterial);
+        stroke.rotation.z = rotation;
+        marker.add(stroke);
+      }
+      this.preview.add(marker);
+    }
+
+    this.publishPreview({
+      moduleName: definition.name,
+      lane: module.lane,
+      gridPosition: module.gridPosition,
+      valid: validation.valid,
+      message: validation.valid
+        ? `Lane ${module.lane + 1} · ${module.gridPosition} m · click to place.`
+        : validation.errors[0] ?? "This placement needs adjustment.",
+    });
+  }
+
+  private clearPreview(): void {
+    this.clearGroup(this.preview);
+    this.publishPreview(null);
+  }
+
+  private publishPreview(preview: EditorPlacementPreview | null): void {
+    const signature = preview
+      ? `${preview.moduleName}:${preview.lane}:${preview.gridPosition}:${preview.valid}:${preview.message}`
+      : "none";
+    if (signature === this.previewSignature) return;
+    this.previewSignature = signature;
+    this.onPreview(preview);
   }
 
   private createModuleVisual(definition: EditorModuleDefinition, state: VisualState): THREE.Group {
@@ -932,10 +1669,6 @@ export class EditorScene {
     return mesh;
   }
 
-  private nextGridPosition(placements: CustomTrackModule[]): number {
-    return placements.reduce((maximum, placement) => Math.max(maximum, placement.gridPosition), 0) + 12;
-  }
-
   private readonly resize = (): void => {
     const width = Math.max(1, this.canvas.clientWidth);
     const height = Math.max(1, this.canvas.clientHeight);
@@ -943,60 +1676,251 @@ export class EditorScene {
     this.renderer.setSize(width, height, false);
     this.camera.aspect = width / height;
     this.camera.updateProjectionMatrix();
+    if (this.cameraMode === "overview") this.frameRoute();
   };
 
   private updateCamera(): void {
-    const targetZ = -62;
-    this.camera.position.set(Math.sin(this.orbit) * this.radius, 40, targetZ + Math.cos(this.orbit) * this.radius);
-    this.camera.lookAt(0, 0, targetZ);
+    const target = new THREE.Vector3();
+    if (this.cameraMode === "overview") {
+      target.copy(this.routeOverviewTarget);
+      const horizontalDistance = this.overviewRadius * 0.68;
+      this.camera.position.set(
+        target.x + Math.sin(this.orbit) * horizontalDistance,
+        target.y + this.overviewRadius * 0.74,
+        target.z + Math.cos(this.orbit) * horizontalDistance,
+      );
+      this.camera.far = Math.max(500, this.overviewRadius * 3.4);
+      if (this.scene.fog instanceof THREE.Fog) {
+        this.scene.fog.near = Math.max(86, this.overviewRadius * 0.76);
+        this.scene.fog.far = Math.max(164, this.overviewRadius * 1.9);
+      }
+    } else {
+      const orientation = this.sampleEditorRoute(
+        this.cameraRoutePosition,
+        0,
+        0,
+        target,
+      );
+      const orbitSide = Math.sin(this.orbit) * this.routeRadius;
+      const orbitTrail = Math.cos(this.orbit) * this.routeRadius;
+      this.camera.position.set(
+        target.x + orientation.rightX * orbitSide - orientation.forwardX * orbitTrail,
+        target.y + 40,
+        target.z + orientation.rightZ * orbitSide - orientation.forwardZ * orbitTrail,
+      );
+      this.camera.far = 500;
+      if (this.scene.fog instanceof THREE.Fog) {
+        this.scene.fog.near = 86;
+        this.scene.fog.far = 164;
+      }
+    }
+    this.camera.lookAt(target);
+    this.camera.updateProjectionMatrix();
+    this.camera.updateMatrixWorld(true);
+    this.keyLight.target.position.copy(target);
+    this.keyLight.position.set(target.x - 35, target.y + 52, target.z + 30);
+    this.keyLight.target.updateMatrixWorld(true);
+    this.keyLight.updateMatrixWorld(true);
   }
 
   private readonly pointerDown = (event: PointerEvent): void => {
+    if (event.button !== 0) return;
     this.dragging = true;
     this.dragX = event.clientX;
+    this.dragY = event.clientY;
     this.dragStartX = event.clientX;
+    this.dragStartY = event.clientY;
     this.hasDragged = false;
     this.canvas.setPointerCapture(event.pointerId);
   };
 
   private readonly pointerMove = (event: PointerEvent): void => {
-    if (!this.dragging) return;
-    const delta = event.clientX - this.dragX;
-    if (Math.abs(delta) > 2) {
-      this.hasDragged = true;
-      this.orbit += delta * 0.006;
-      this.dragX = event.clientX;
-      this.updateCamera();
+    if (!this.dragging) {
+      this.updatePointerPreview(event);
+      return;
     }
+    const deltaX = event.clientX - this.dragX;
+    const deltaY = event.clientY - this.dragY;
+    if (Math.hypot(event.clientX - this.dragStartX, event.clientY - this.dragStartY) > 4) {
+      this.hasDragged = true;
+    }
+    if (Math.abs(deltaX) > 0.5 || Math.abs(deltaY) > 0.5) {
+      this.orbit += deltaX * 0.006;
+      if (Math.abs(deltaY) > 0.5) {
+        this.focusRoutePosition(this.cameraRoutePosition - deltaY * 0.9);
+      } else {
+        this.updateCamera();
+      }
+      this.clearPreview();
+    }
+    this.dragX = event.clientX;
+    this.dragY = event.clientY;
   };
 
   private readonly pointerUp = (event: PointerEvent): void => {
     if (!this.dragging) return;
-    const moved = this.hasDragged || Math.abs(event.clientX - this.dragStartX) > 4;
+    const moved = this.hasDragged || Math.hypot(
+      event.clientX - this.dragStartX,
+      event.clientY - this.dragStartY,
+    ) > 4;
     this.dragging = false;
-    if (!moved) this.placeAtPointer(event);
+    if (this.canvas.hasPointerCapture(event.pointerId)) {
+      this.canvas.releasePointerCapture(event.pointerId);
+    }
+    if (moved) {
+      this.updatePointerPreview(event);
+      return;
+    }
+    this.selectOrPlaceAtPointer(event);
   };
 
   private readonly pointerCancel = (): void => {
     this.dragging = false;
     this.hasDragged = false;
+    this.clearPreview();
+  };
+
+  private readonly pointerLeave = (): void => {
+    if (!this.dragging) this.clearPreview();
   };
 
   private readonly wheel = (event: WheelEvent): void => {
     event.preventDefault();
-    this.radius = Math.max(26, Math.min(72, this.radius + event.deltaY * 0.025));
+    this.clearPreview();
+    if (event.shiftKey) {
+      this.focusRoutePosition(this.cameraRoutePosition + event.deltaY * 0.25);
+      return;
+    }
+    const minimumRadius = this.cameraMode === "overview"
+      ? this.overviewFitRadius * 0.52
+      : 26;
+    const maximumRadius = this.cameraMode === "overview"
+      ? this.overviewFitRadius * 2.4
+      : 72;
+    if (this.cameraMode === "overview") {
+      this.overviewRadius = THREE.MathUtils.clamp(
+        this.overviewRadius + event.deltaY * 0.08,
+        minimumRadius,
+        maximumRadius,
+      );
+    } else {
+      this.routeRadius = THREE.MathUtils.clamp(
+        this.routeRadius + event.deltaY * 0.025,
+        minimumRadius,
+        maximumRadius,
+      );
+    }
     this.updateCamera();
   };
 
-  private placeAtPointer(event: PointerEvent): void {
+  private setRaycasterFromPointer(event: PointerEvent): boolean {
     const bounds = this.canvas.getBoundingClientRect();
+    if (bounds.width <= 0 || bounds.height <= 0) return false;
     this.pointer.set(((event.clientX - bounds.left) / bounds.width) * 2 - 1, -((event.clientY - bounds.top) / bounds.height) * 2 + 1);
     this.raycaster.setFromCamera(this.pointer, this.camera);
+    return true;
+  }
+
+  private placementIdAtPointer(event: PointerEvent): string | null {
+    if (!this.setRaycasterFromPointer(event)) return null;
+    this.modules.updateMatrixWorld(true);
+    const intersections = this.raycaster.intersectObjects(this.modules.children, true);
+    for (const intersection of intersections) {
+      let target: THREE.Object3D | null = intersection.object;
+      while (target && target !== this.modules) {
+        if (typeof target.userData.placementId === "string") return target.userData.placementId;
+        target = target.parent;
+      }
+    }
+    return null;
+  }
+
+  private placementCandidateAtPointer(event: PointerEvent): CustomTrackModule | null {
+    if (!this.currentTrack || !EDITOR_MODULE_BY_ID.has(this.previewModuleId)) return null;
+    if (!this.setRaycasterFromPointer(event)) return null;
+    const routePickSurfaces = [this.routePickSurface, this.routeExtensionPickSurface]
+      .filter((surface): surface is THREE.Mesh => surface !== null);
+    if (routePickSurfaces.length > 0) {
+      this.courseSurface.updateMatrixWorld(true);
+      this.routeExtensionSurface.updateMatrixWorld(true);
+      const intersection = this.raycaster.intersectObjects(routePickSurfaces, false)[0];
+      if (intersection?.uv) {
+        const localLateral = THREE.MathUtils.lerp(
+          -EDITOR_ROUTE_PICK_HALF_WIDTH,
+          EDITOR_ROUTE_PICK_HALF_WIDTH,
+          intersection.uv.x,
+        );
+        const lane = LANE_X.reduce(
+          (best, x, index) => (
+            Math.abs(localLateral - x) < Math.abs(localLateral - LANE_X[best])
+              ? index as 0 | 1 | 2 | 3
+              : best
+          ),
+          0 as 0 | 1 | 2 | 3,
+        );
+        const gridOffset = typeof intersection.object.userData.gridOffset === "number"
+          ? intersection.object.userData.gridOffset
+          : 0;
+        const gridPosition = THREE.MathUtils.clamp(
+          Math.round((gridOffset + intersection.uv.y) / 2) * 2,
+          0,
+          CUSTOM_TRACK_ROUTE_LIMIT,
+        );
+        return {
+          id: PREVIEW_PLACEMENT_ID,
+          moduleId: this.previewModuleId,
+          lane,
+          gridPosition,
+          rotation: 0,
+          height: 0,
+        };
+      }
+      return null;
+    }
     const hit = new THREE.Vector3();
-    if (!this.raycaster.ray.intersectPlane(this.groundPlane, hit)) return;
+    if (!this.raycaster.ray.intersectPlane(this.groundPlane, hit)) return null;
     const lane = LANE_X.reduce((best, x, index) => Math.abs(hit.x - x) < Math.abs(hit.x - LANE_X[best]) ? index as 0 | 1 | 2 | 3 : best, 0 as 0 | 1 | 2 | 3);
-    const gridPosition = Math.max(0, Math.min(240, Math.round(-hit.z / 2) * 2));
-    this.onPlace(lane, gridPosition);
+    const gridPosition = THREE.MathUtils.clamp(
+      Math.round(-hit.z / 2) * 2,
+      0,
+      CUSTOM_TRACK_ROUTE_LIMIT,
+    );
+    return {
+      id: PREVIEW_PLACEMENT_ID,
+      moduleId: this.previewModuleId,
+      lane,
+      gridPosition,
+      rotation: 0,
+      height: 0,
+    };
+  }
+
+  private updatePointerPreview(event: PointerEvent): void {
+    if (this.placementIdAtPointer(event)) {
+      this.clearPreview();
+      return;
+    }
+    const candidate = this.placementCandidateAtPointer(event);
+    if (candidate) this.updatePreview(candidate);
+    else this.clearPreview();
+  }
+
+  private selectOrPlaceAtPointer(event: PointerEvent): void {
+    const placementId = this.placementIdAtPointer(event);
+    if (placementId) {
+      this.clearPreview();
+      this.onSelect(placementId);
+      const placement = this.currentTrack?.modules.find((module) => module.id === placementId);
+      if (placement) this.focusRoutePosition(placement.gridPosition);
+      return;
+    }
+    const candidate = this.placementCandidateAtPointer(event);
+    if (!candidate) return;
+    if (this.currentTrack && this.currentTrack.modules.length >= CUSTOM_TRACK_MODULE_LIMIT) {
+      this.updatePreview(candidate);
+      return;
+    }
+    this.onPlace(candidate.lane, candidate.gridPosition);
   }
 
   private clearGroup(group: THREE.Object3D): void {

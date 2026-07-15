@@ -7,6 +7,7 @@ export {
   NEUTRAL_INPUT,
   type BikePhase,
   type BikeState,
+  type CrashCause,
   type LandingQuality,
   type LaneChange,
   type LaneIndex,
