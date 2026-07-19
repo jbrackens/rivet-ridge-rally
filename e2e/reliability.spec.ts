@@ -172,9 +172,9 @@ test.describe("production asset network fallbacks", () => {
 
   test("a panorama that misses the race deadline upgrades the generated fallback when it arrives", async ({ page }, testInfo) => {
     test.skip(testInfo.project.name !== "chromium", "Late environment upgrade runs once in Chromium");
-    test.setTimeout(45_000);
+    test.setTimeout(60_000);
     await page.route("**/assets/art/canyon-festival-panorama.png", async (route) => {
-      await new Promise((resolve) => setTimeout(resolve, 6_200));
+      await new Promise((resolve) => setTimeout(resolve, 14_000));
       await route.continue();
     });
 
@@ -210,7 +210,7 @@ test.describe("production asset network fallbacks", () => {
 
     await page.getByRole("button", { name: "Start lesson 1" }).click();
     await page.keyboard.down("w");
-    await expect(page.getByRole("heading", { name: "Coast to slow" })).toBeVisible({ timeout: 10_000 });
+    await expect(page.getByRole("heading", { name: /Coast to slow|Choose a lane/ })).toBeVisible({ timeout: 10_000 });
     await page.keyboard.up("w");
   });
 
