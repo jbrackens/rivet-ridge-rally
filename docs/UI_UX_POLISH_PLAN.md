@@ -110,9 +110,8 @@ assets/bundle**. Each item lists file anchor → change → verification evidenc
   nondeterministic across machines **and destabilizes the already-failing visual baselines**.
   Recommendation: drop to `system-ui` (determinism) or bundle an Inter subset with the same
   care as the display font. Decide once, before re-promoting baselines.
-- `styles.css:328`: heat-meter warning tick hard-coded at 78 % while thresholds live in the
-  simulation (62 % safe / 78 % critical) — drive both ticks from shared constants; unit
-  test asserts CSS var == simulation constant.
+- Heat meter warning tick drift is closed in Wave 3.6: the HUD now reads the shared
+  critical threshold through `--heat-warning-threshold`, with a focused unit/browser gate.
 
 ---
 
@@ -154,12 +153,12 @@ assets/bundle**. Each item lists file anchor → change → verification evidenc
   (`packageManager` field). Under this machine's default npm 10.9.8 exactly that one guard
   test fails by design; all 44 pass under `npx -y npm@11.17.0 run test:…`.
 
-## 5. Verified green (2026-07-18, this machine)
+## 5. Verified green (2026-07-19, this machine)
 
 | Gate | Result |
 |---|---|
 | `npm run typecheck` (TS 7.0.2 native) | ✅ exit 0 (~0.6 s) |
 | `npx eslint .` (type-aware via TS6 shim) | ✅ exit 0 |
-| `npx vitest run` | ✅ 292/292, 31 files |
-| `npx vite build` | ✅ exit 0 |
-| `npm test` release scripts | ✅ 44/44 under pinned npm 11.17.0 (1 env-guard fail under npm 10, by design) |
+| `npx vitest run` | ✅ 297/297, 32 files, via `npm test` |
+| `npm run build` | ✅ exit 0, no Vite chunk-size warning |
+| `npm test` release scripts | ✅ 44/44 release-manifest, 71/71 release-attestation, 31/31 production-smoke/service-worker under pinned npm 11.17.0 |
