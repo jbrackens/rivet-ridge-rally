@@ -91,3 +91,93 @@ test("Auto, Low, Medium, and High renderer presets all start a clean race", asyn
   }
   expect(errors).toEqual([]);
 });
+
+test("all five launch tracks expose distinct venue signature diagnostics", async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== "chromium", "Single-browser five-track visual identity gate");
+  test.setTimeout(180_000);
+  const errors: string[] = [];
+  page.on("console", (message) => {
+    if (message.type() === "error") errors.push(message.text());
+  });
+  page.on("pageerror", (error) => errors.push(error.message));
+  page.on("requestfailed", (request) => errors.push(`${request.failure()?.errorText ?? "request failed"}: ${request.url()}`));
+
+  await page.goto("/?qa-fast-race=1");
+  await page.getByRole("button", { name: "Skip training" }).click();
+  await page.getByRole("button", { name: "Settings", exact: true }).click();
+  await page.getByRole("button", { name: "play", exact: true }).click();
+  await page.getByLabel("Quality").selectOption("high");
+  await page.getByRole("button", { name: "Done", exact: true }).click();
+
+  const tracks = [
+    {
+      id: "canyon-kickoff",
+      label: "Canyon Kickoff",
+      assertions: async (canvas: ReturnType<typeof page.getByLabel>) => {
+        await expect(canvas).toHaveAttribute("data-canyon-cactus-style", "branched-saguaro");
+        await expect(canvas).toHaveAttribute("data-canyon-shoulder-dressing-style", "route-following-cut-bank");
+        await expect(canvas).toHaveAttribute("data-canyon-route-crowd-style", "route-following-rail-bleachers-v2");
+        await expect(canvas).toHaveAttribute("data-canyon-route-banner-style", "route-following-textured-sponsor-v2");
+      },
+    },
+    {
+      id: "pine-run",
+      label: "Pine Run",
+      assertions: async (canvas: ReturnType<typeof page.getByLabel>) => {
+        await expect(canvas).toHaveAttribute("data-pine-root-style", "bump-aligned-batched");
+        await expect(canvas).toHaveAttribute("data-pine-root-count", /^[1-9]\d*$/);
+        await expect(canvas).toHaveAttribute("data-pine-trail-marker-style", "red-shoulder");
+        await expect(canvas).toHaveAttribute("data-pine-trail-marker-count", "24");
+      },
+    },
+    {
+      id: "coastline-clash",
+      label: "Coastline Clash",
+      assertions: async (canvas: ReturnType<typeof page.getByLabel>) => {
+        await expect(canvas).toHaveAttribute("data-coastline-water-style", "right-side-water-boardwalk");
+        await expect(canvas).toHaveAttribute("data-coastline-boardwalk-style", "route-following-planks");
+        await expect(canvas).toHaveAttribute("data-coastline-hut-style", "colorful-boardwalk-huts");
+        await expect(canvas).toHaveAttribute("data-coastline-hut-count", "22");
+      },
+    },
+    {
+      id: "foundry-flight",
+      label: "Foundry Flight",
+      assertions: async (canvas: ReturnType<typeof page.getByLabel>) => {
+        await expect(canvas).toHaveAttribute("data-foundry-gantry-style", "cyan-orange-safety");
+        await expect(canvas).toHaveAttribute("data-foundry-gantry-bar-count", "7");
+        await expect(canvas).toHaveAttribute("data-foundry-furnace-panel-style", "opaque-emissive");
+        await expect(canvas).toHaveAttribute("data-foundry-furnace-panel-count", "18");
+      },
+    },
+    {
+      id: "summit-showdown",
+      label: "Summit Showdown",
+      assertions: async (canvas: ReturnType<typeof page.getByLabel>) => {
+        await expect(canvas).toHaveAttribute("data-summit-finale-equipment-style", "bilateral-yellow-service");
+        await expect(canvas).toHaveAttribute("data-summit-finale-equipment-batch-count", "1");
+        await expect(canvas).toHaveAttribute("data-summit-finale-equipment-count", "12");
+        await expect(canvas).toHaveAttribute("data-summit-finale-stations-per-lap", "6");
+      },
+    },
+  ] as const;
+
+  for (const track of tracks) {
+    await page.evaluate((id) => {
+      if (!window.__RRR_QA__) throw new Error("Five-track visual identity check requires QA mode.");
+      window.__RRR_QA__.startTrack(id, "practice");
+    }, track.id);
+    const canvas = page.getByLabel(`Live 3D race on ${track.label}`);
+    await expect(canvas).toBeVisible({ timeout: 20_000 });
+    await expect(page.locator(".game-shell")).toHaveAttribute(
+      "data-race-gate-phase",
+      "racing",
+      { timeout: 20_000 },
+    );
+    await expect(canvas).toHaveAttribute("data-dirt-texture-detail-style", "layered-rut-pebble-v2");
+    await expect(canvas).toHaveAttribute("data-festival-start-stand-style", "broadened-tiered");
+    await track.assertions(canvas);
+  }
+
+  expect(errors).toEqual([]);
+});

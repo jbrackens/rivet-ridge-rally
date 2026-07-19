@@ -7640,6 +7640,11 @@ export class GameEngine {
     }
     huts.castShadow = this.quality !== "low";
     hutRoofs.castShadow = this.quality !== "low";
+    this.canvas.dataset.coastlineWaterStyle = "right-side-water-boardwalk";
+    this.canvas.dataset.coastlineBoardwalkStyle = "route-following-planks";
+    this.canvas.dataset.coastlineHutStyle = "colorful-boardwalk-huts";
+    this.canvas.dataset.coastlineHutCount = String(hutCount);
+    this.canvas.dataset.coastlineThemeBatchCount = "4";
     this.scene.add(water, boardwalk);
     this.addCourseAnchored(huts, hutRoofs);
   }
