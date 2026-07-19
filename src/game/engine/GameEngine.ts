@@ -1032,7 +1032,7 @@ const TERRAIN_MARK_BATCH_SIZE = 128;
 const MAX_TERRAIN_CANVAS_CACHE_ENTRIES = 10;
 const terrainCanvasCache = new Map<string, HTMLCanvasElement>();
 const DIRT_HEIGHT_TEXTURE_SIZE = 512;
-const DIRT_TEXTURE_DETAIL_STYLE = "layered-rut-pebble-v2";
+const DIRT_TEXTURE_DETAIL_STYLE = "layered-rut-pebble-v3";
 const DIRT_LANE_EDGE_RATIOS = [0.028, 0.2744, 0.5, 0.7256, 0.972] as const;
 const DIRT_LANE_CENTER_RATIOS = [0.1617, 0.3872, 0.6128, 0.8383] as const;
 let dirtHeightCanvasCache: HTMLCanvasElement | null = null;
@@ -1093,7 +1093,7 @@ function paintDirtPebbleFlecks(
   const lightPebble = base.clone().lerp(new THREE.Color(0xf7d09a), 0.42);
   const darkPebble = mark.clone().multiplyScalar(0.72);
   const redPebble = base.clone().lerp(new THREE.Color(0xb7442f), 0.35);
-  for (let index = 0; index < 620; index += 1) {
+  for (let index = 0; index < 860; index += 1) {
     const color = index % 7 === 0
       ? lightPebble
       : index % 5 === 0
@@ -1103,7 +1103,7 @@ function paintDirtPebbleFlecks(
     const y = random() * height;
     const radius = 0.45 + random() * (index % 7 === 0 ? 1.15 : 0.75);
     context.fillStyle = `#${color.getHexString()}`;
-    context.globalAlpha = index % 7 === 0 ? 0.34 : 0.22;
+    context.globalAlpha = index % 7 === 0 ? 0.4 : 0.28;
     context.beginPath();
     context.ellipse(
       x,
@@ -1158,9 +1158,9 @@ function paintDirtLanes(
     context.stroke();
   }
 
-  context.strokeStyle = `#${mark.clone().multiplyScalar(0.68).getHexString()}`;
-  context.globalAlpha = 0.46;
-  context.lineWidth = 6.5;
+  context.strokeStyle = `#${mark.clone().multiplyScalar(0.56).getHexString()}`;
+  context.globalAlpha = 0.56;
+  context.lineWidth = 8.2;
   for (const center of DIRT_LANE_CENTER_RATIOS) {
     for (const offset of [-0.025, 0.025]) {
       context.beginPath();
@@ -1173,8 +1173,8 @@ function paintDirtLanes(
       context.stroke();
     }
 
-    context.globalAlpha = 0.3;
-    context.lineWidth = 1.5;
+    context.globalAlpha = 0.36;
+    context.lineWidth = 1.8;
     for (let y = 0; y < height; y += 16) {
       const wobble = dirtRutWobble(y, height, center);
       context.beginPath();
@@ -1182,14 +1182,14 @@ function paintDirtLanes(
       context.lineTo(width * center + 7 + wobble, y + 3);
       context.stroke();
     }
-    context.globalAlpha = 0.46;
-    context.lineWidth = 6.5;
+    context.globalAlpha = 0.56;
+    context.lineWidth = 8.2;
   }
 
   context.globalCompositeOperation = "screen";
   context.strokeStyle = "#fff0bd";
-  context.globalAlpha = 0.12;
-  context.lineWidth = 2.25;
+  context.globalAlpha = 0.08;
+  context.lineWidth = 1.8;
   for (const center of DIRT_LANE_CENTER_RATIOS) {
     for (const offset of [-0.044, 0.044]) {
       context.beginPath();
@@ -1228,8 +1228,8 @@ function createTerrainCanvas(
 
     context.strokeStyle = `#${mark.getHexString()}`;
     context.fillStyle = context.strokeStyle;
-    context.globalAlpha = kind === "dirt" ? 0.3 : 0.23;
-    const markCount = kind === "dirt" ? 1_100 : 760;
+    context.globalAlpha = kind === "dirt" ? 0.34 : 0.23;
+    const markCount = kind === "dirt" ? 1_420 : 760;
     // Small calls retain the dense deterministic pattern without presenting one
     // large hot loop to JavaScriptCore during the first terrain paint.
     for (let offset = 0; offset < markCount; offset += TERRAIN_MARK_BATCH_SIZE) {
@@ -1308,9 +1308,9 @@ function paintDirtHeightRuts(
   for (const center of DIRT_LANE_CENTER_RATIOS) {
     for (const offset of [-0.025, 0.025]) {
       const rutX = width * (center + offset);
-      context.strokeStyle = "#5d5d5d";
-      context.globalAlpha = 0.62;
-      context.lineWidth = 7;
+      context.strokeStyle = "#565656";
+      context.globalAlpha = 0.76;
+      context.lineWidth = 8.5;
       context.beginPath();
       for (let y = 0; y <= height; y += 4) {
         const wobble = dirtRutWobble(y, height, center);
@@ -1319,14 +1319,14 @@ function paintDirtHeightRuts(
       }
       context.stroke();
 
-      context.strokeStyle = "#707070";
-      context.globalAlpha = 0.78;
-      context.lineWidth = 2;
+      context.strokeStyle = "#6a6a6a";
+      context.globalAlpha = 0.84;
+      context.lineWidth = 2.4;
       context.stroke();
 
-      context.strokeStyle = "#686868";
-      context.globalAlpha = 0.48;
-      context.lineWidth = 1.25;
+      context.strokeStyle = "#626262";
+      context.globalAlpha = 0.56;
+      context.lineWidth = 1.45;
       for (let y = 0; y < height; y += 16) {
         const wobble = dirtRutWobble(y, height, center);
         context.beginPath();
@@ -6133,9 +6133,9 @@ export class GameEngine {
     const dirtMaterial = new THREE.MeshStandardMaterial({
       map: dirtTexture,
       bumpMap: dirtHeightTexture,
-      bumpScale: 0.105,
+      bumpScale: 0.135,
       color: 0xffffff,
-      roughness: 0.88,
+      roughness: 0.94,
       metalness: 0,
     });
     this.canvas.dataset.dirtTextureDetailStyle = DIRT_TEXTURE_DETAIL_STYLE;

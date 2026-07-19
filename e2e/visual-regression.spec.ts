@@ -94,7 +94,7 @@ async function openFrozenRace(
   await expect(raceCanvas).toHaveAttribute("data-start-grid-style", "numbered-four-lane");
   await expect(raceCanvas).toHaveAttribute("data-start-grid-stencil-count", "4");
   await expect(raceCanvas).toHaveAttribute("data-start-grid-batch-count", "2");
-  await expect(raceCanvas).toHaveAttribute("data-dirt-texture-detail-style", "layered-rut-pebble-v2");
+  await expect(raceCanvas).toHaveAttribute("data-dirt-texture-detail-style", "layered-rut-pebble-v3");
   await expect(raceCanvas).toHaveAttribute("data-dirt-texture-resolution", "512x512");
   await expect(raceCanvas).toHaveAttribute("data-dirt-height-texture-resolution", "512x512");
   await expect(raceCanvas).toHaveAttribute("data-canyon-route-banner-style", "route-following-textured-sponsor-v2");

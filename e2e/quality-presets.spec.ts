@@ -174,7 +174,7 @@ test("all five launch tracks expose distinct venue signature diagnostics", async
       "racing",
       { timeout: 20_000 },
     );
-    await expect(canvas).toHaveAttribute("data-dirt-texture-detail-style", "layered-rut-pebble-v2");
+    await expect(canvas).toHaveAttribute("data-dirt-texture-detail-style", "layered-rut-pebble-v3");
     await expect(canvas).toHaveAttribute("data-festival-start-stand-style", "broadened-tiered");
     await track.assertions(canvas);
   }
