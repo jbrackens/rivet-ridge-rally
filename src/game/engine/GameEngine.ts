@@ -2015,33 +2015,45 @@ function tuneFocalBikeMaterialResponse(
       if (!(material instanceof THREE.MeshStandardMaterial) || tuned.has(material)) continue;
       tuned.add(material);
       material.envMap = environmentMap;
+      if (material.name === "RRR_PlasticTeal") {
+        material.color.offsetHSL(0.01, 0.08, -0.055);
+        material.roughness = Math.min(material.roughness + 0.04, 0.62);
+      } else if (material.name === "RRR_PlasticCoral") {
+        material.color.offsetHSL(-0.01, 0.07, -0.06);
+        material.roughness = Math.min(material.roughness + 0.04, 0.62);
+      } else if (material.name === "RRR_PlateCream" || material.name === "RRR_NumberCream") {
+        material.color.multiplyScalar(0.82);
+        material.roughness = Math.min(material.roughness + 0.04, material.name === "RRR_PlateCream" ? 0.72 : 0.78);
+      } else if (material.name === "RRR_RiderFabric" || material.name === "RRR_RiderArmor") {
+        material.color.offsetHSL(0, 0.04, -0.045);
+      }
       material.envMapIntensity = material.name === "RRR_MetalBright"
         || material.name === "RRR_MetalDark"
-        ? 2.25
+        ? 1.72
         : material.name === "RRR_Visor"
-          ? 2
+          ? 1.55
           : material.name === "RRR_Rubber"
-            ? 0.62
+            ? 0.5
             : material.name === "RRR_PlasticTeal" || material.name === "RRR_PlasticCoral"
-              ? 1.42
+              ? 1.08
               : material.name === "RRR_RiderArmor"
-                ? 1.28
-                : 1.16;
+                ? 0.98
+                : 0.9;
       material.needsUpdate = true;
     }
   });
 }
 
 function heroKeyLightIntensity(quality: Exclude<GameSettings["quality"], "auto">): number {
-  return quality === "high" ? 112 : quality === "medium" ? 68 : 0;
+  return quality === "high" ? 72 : quality === "medium" ? 44 : 0;
 }
 
 function heroRimLightIntensity(quality: Exclude<GameSettings["quality"], "auto">): number {
-  return quality === "high" ? 44 : quality === "medium" ? 24 : 0;
+  return quality === "high" ? 34 : quality === "medium" ? 19 : 0;
 }
 
 function heroFillLightIntensity(quality: Exclude<GameSettings["quality"], "auto">): number {
-  return quality === "high" ? 1.35 : quality === "medium" ? 0.82 : 0;
+  return quality === "high" ? 0.58 : quality === "medium" ? 0.36 : 0;
 }
 
 function assertHeroAsset(condition: unknown, message: string): asserts condition {
