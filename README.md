@@ -84,7 +84,7 @@ Use `npm run assets:build` only when intentionally regenerating the checked-in h
 
 ## Architecture
 
-The game uses strict TypeScript, Vite, React for application UI, direct Three.js/WebGLRenderer for 3D presentation, Zustand for app flow, a custom fixed-step simulation, IndexedDB/Dexie for versioned local data, and Web Audio for original procedural sound. Gameplay and rendering stay outside React's render loop. Nonessential race/editor code is lazy loaded; the generated player-bike GLB uses Meshopt geometry plus an embedded BasisLZ/ETC1S KTX2 texture; handcrafted Canyon/Rider School independently load an authored Meshopt modular kit with complete procedural fallback; a quality-sized PMREM supplies bounded PBR fill; and the Canyon/tutorial matte uses a bounded ImageBitmap-backed 2D background path with a procedural fallback.
+The game uses strict TypeScript, Vite, React for application UI, direct Three.js/WebGLRenderer for 3D presentation, Zustand for app flow, a custom fixed-step simulation, IndexedDB/Dexie for versioned local data, and Web Audio for original procedural sound. Gameplay and rendering stay outside React's render loop. Nonessential race/editor code is lazy loaded; the current authored player-bike-and-rider GLB uses Meshopt geometry, 10 opaque solid-color PBR materials, and zero textures; handcrafted Canyon/Rider School independently load an authored Meshopt modular kit with complete procedural fallback; a quality-sized PMREM supplies bounded PBR fill; and the Canyon/tutorial matte uses a bounded ImageBitmap-backed 2D background path with a procedural fallback.
 
 ## Documentation
 
