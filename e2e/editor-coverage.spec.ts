@@ -213,6 +213,35 @@ test("checkpoint route controls are bounded, undoable, and checkpoint-only", asy
   await expect(page.getByLabel("Route rise")).toHaveCount(0);
 });
 
+test("concept-style inspector steppers update selected module and race settings", async ({ page }) => {
+  const placedModule = page.getByLabel("Placed module");
+  const checkpointOption = placedModule.locator("option").filter({ hasText: "Checkpoint · lane 1 · 48 m" });
+  const checkpointId = await checkpointOption.getAttribute("value");
+  if (!checkpointId) throw new Error("The default checkpoint option is required.");
+  await placedModule.selectOption(checkpointId);
+
+  await expect(page.getByRole("status", { name: "Selected module lane" })).toHaveText("Lane 1");
+  await page.getByRole("button", { name: "Move selected module right one lane" }).click();
+  await expect(page.getByRole("status", { name: "Selected module lane" })).toHaveText("Lane 2");
+  await expect(page.getByLabel("Lane", { exact: true })).toHaveValue("2");
+
+  await expect(page.getByRole("status", { name: "Selected module rotation" })).toHaveText("0°");
+  await page.getByRole("button", { name: "Rotate selected module clockwise" }).click();
+  await expect(page.getByRole("status", { name: "Selected module rotation" })).toHaveText("90°");
+  await expect(page.locator(".editor-inspector label").filter({ hasText: /^Rotation/ }).locator("select")).toHaveValue("90");
+
+  await expect(page.getByRole("status", { name: "Selected module height" })).toHaveText("0 m");
+  await page.getByRole("button", { name: "Raise selected module height" }).click();
+  await expect(page.getByRole("status", { name: "Selected module height" })).toHaveText("0.5 m");
+  await expect(page.locator(".editor-inspector label").filter({ hasText: /^Height/ }).locator("input")).toHaveValue("0.5");
+
+  await expect(page.getByRole("status", { name: "Track lap count" })).toHaveText("2 laps");
+  await page.getByRole("button", { name: "Increase laps" }).click();
+  await expect(page.getByRole("status", { name: "Track lap count" })).toHaveText("3 laps");
+  await expect(page.getByLabel("Laps", { exact: true })).toHaveValue("3");
+  await expect(page.getByText("4 / 50 actions", { exact: true })).toBeVisible();
+});
+
 test("pointer placement preview announces valid and invalid candidates without color alone", async ({ page }) => {
   const canvas = page.getByLabel(/Interactive 3D track build camera/);
   const bounds = await canvas.boundingBox();

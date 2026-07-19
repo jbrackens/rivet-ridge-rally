@@ -228,6 +228,7 @@ The editor shall provide:
 - a complete keyboard-only placement path that uses the selected module, route-view position, and explicit lane without requiring pointer interaction with the 3D canvas;
 - placement preview with valid/invalid feedback beyond color alone;
 - selection and editing of existing placements after creation or reopening;
+- inspector steppers for common placement adjustments, including selected-module lane, rotation, height, and one-through-nine lap count, while retaining exact form controls for precise entry and accessibility;
 - route navigation and focus across the complete accepted 0–20,000 m placement range, with a bounded visible and raycastable local continuation whenever focus moves beyond the authored Start–Finish surface;
 - a **Fit route** overview that includes the authored surface, route scenery, and all placed module geometry at allowed heights, independent of the local-route zoom state;
 - checkpoint-only Route turn and Route rise controls whose edits participate in the same 50-action history as placement edits;

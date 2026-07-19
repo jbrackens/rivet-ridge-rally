@@ -67,6 +67,10 @@ function boundedNumber(value: string, minimum: number, maximum: number): number 
   return Number.isFinite(parsed) ? Math.max(minimum, Math.min(maximum, parsed)) : 0;
 }
 
+function clampNumber(value: number, minimum: number, maximum: number): number {
+  return Math.max(minimum, Math.min(maximum, value));
+}
+
 function authoredRouteRange(track: CustomTrackData): readonly [number, number] {
   const start = track.modules.find((module) => module.moduleId === "start-grid");
   const finish = track.modules.find((module) => module.moduleId === "finish-arch");
@@ -586,6 +590,28 @@ export function TrackEditorScreen() {
     commit((current) => ({ ...current, modules: current.modules.map((module) => module.id === selectedPlacement.id ? { ...module, ...patch } : module) }));
   };
 
+  const nudgeSelectedLane = (delta: -1 | 1) => {
+    if (!selectedPlacement) return;
+    updateSelected({ lane: clampNumber(selectedPlacement.lane + delta, 0, 3) as 0 | 1 | 2 | 3 });
+  };
+
+  const rotateSelected = (delta: -90 | 90) => {
+    if (!selectedPlacement) return;
+    const rotations = [0, 90, 180, 270] as const;
+    const currentIndex = Math.max(0, rotations.indexOf(selectedPlacement.rotation));
+    const nextIndex = (currentIndex + (delta > 0 ? 1 : -1) + rotations.length) % rotations.length;
+    updateSelected({ rotation: rotations[nextIndex] ?? 0 });
+  };
+
+  const nudgeSelectedHeight = (delta: -0.5 | 0.5) => {
+    if (!selectedPlacement) return;
+    updateSelected({ height: clampNumber(Number((selectedPlacement.height + delta).toFixed(1)), -4, 40) });
+  };
+
+  const nudgeLaps = (delta: -1 | 1) => {
+    commit((current) => ({ ...current, laps: clampNumber(current.laps + delta, 1, 9) }));
+  };
+
   const deleteSelected = () => {
     if (saveInFlightRef.current) return;
     if (!resolvedSelectedPlacementId) return;
@@ -830,6 +856,29 @@ export function TrackEditorScreen() {
             </select>
           </label>
           {selectedPlacement ? <>
+            <div className="inspector-stepper" role="group" aria-label="Lane stepper">
+              <span>Lane</span>
+              <button type="button" aria-label="Move selected module left one lane" onClick={() => nudgeSelectedLane(-1)} disabled={selectedPlacement.lane <= 0}>‹</button>
+              <output aria-label="Selected module lane">Lane {selectedPlacement.lane + 1}</output>
+              <button type="button" aria-label="Move selected module right one lane" onClick={() => nudgeSelectedLane(1)} disabled={selectedPlacement.lane >= 3}>›</button>
+            </div>
+            <div className="inspector-lane-map" aria-hidden="true">
+              {[0, 1, 2, 3].map((lane) => (
+                <span key={lane} className={selectedPlacement.lane === lane ? "active" : undefined}>{lane + 1}</span>
+              ))}
+            </div>
+            <div className="inspector-stepper" role="group" aria-label="Rotation stepper">
+              <span>Rotation</span>
+              <button type="button" aria-label="Rotate selected module counterclockwise" onClick={() => rotateSelected(-90)}>↺</button>
+              <output aria-label="Selected module rotation">{selectedPlacement.rotation}°</output>
+              <button type="button" aria-label="Rotate selected module clockwise" onClick={() => rotateSelected(90)}>↻</button>
+            </div>
+            <div className="inspector-stepper" role="group" aria-label="Height stepper">
+              <span>Height</span>
+              <button type="button" aria-label="Lower selected module height" onClick={() => nudgeSelectedHeight(-0.5)} disabled={selectedPlacement.height <= -4}>⌄</button>
+              <output aria-label="Selected module height">{selectedPlacement.height} m</output>
+              <button type="button" aria-label="Raise selected module height" onClick={() => nudgeSelectedHeight(0.5)} disabled={selectedPlacement.height >= 40}>⌃</button>
+            </div>
             <label>Lane <input type="number" min="1" max="4" value={selectedPlacement.lane + 1} onChange={(event) => updateSelected({ lane: Math.max(0, Math.min(3, Number(event.target.value) - 1)) as 0 | 1 | 2 | 3 })} /></label>
             <label>Position <input type="number" min="0" max={CUSTOM_TRACK_ROUTE_LIMIT} step="2" value={selectedPlacement.gridPosition} onChange={(event) => updateSelected({ gridPosition: Math.max(0, Math.min(CUSTOM_TRACK_ROUTE_LIMIT, Number(event.target.value))) })} /></label>
             <label>Rotation <select value={selectedPlacement.rotation} onChange={(event) => updateSelected({ rotation: Number(event.target.value) as 0 | 90 | 180 | 270 })}><option>0</option><option>90</option><option>180</option><option>270</option></select></label>
@@ -867,6 +916,12 @@ export function TrackEditorScreen() {
           </section>
           <h2>Race</h2>
           <section className="inspector-group">
+          <div className="inspector-stepper" role="group" aria-label="Lap count stepper">
+            <span>Laps</span>
+            <button type="button" aria-label="Decrease laps" onClick={() => nudgeLaps(-1)} disabled={track.laps <= 1}>‹</button>
+            <output aria-label="Track lap count">{track.laps} {track.laps === 1 ? "lap" : "laps"}</output>
+            <button type="button" aria-label="Increase laps" onClick={() => nudgeLaps(1)} disabled={track.laps >= 9}>›</button>
+          </div>
           <label>Laps <input type="number" min="1" max="9" value={track.laps} onChange={(event) => commit((current) => ({ ...current, laps: Math.max(1, Math.min(9, Number(event.target.value))) }))} /></label>
           <label>Difficulty <input type="range" min="1" max="5" value={track.difficultyEstimate} onChange={(event) => commit((current) => ({ ...current, difficultyEstimate: Number(event.target.value) }))} /><span>{track.difficultyEstimate} / 5</span></label>
           <button className="clear-track" onClick={requestClearTrack}>Clear all…</button>
