@@ -12,6 +12,16 @@ async function unlockCampaign(page: import("@playwright/test").Page): Promise<vo
   });
 }
 
+async function setDifficulty(
+  page: import("@playwright/test").Page,
+  difficulty: "rookie" | "rider" | "ace",
+): Promise<void> {
+  await page.evaluate((nextDifficulty) => {
+    if (!window.__RRR_QA__) throw new Error("Difficulty selection requires a VITE_QA_MODE=1 build.");
+    window.__RRR_QA__.setDifficulty(nextDifficulty);
+  }, difficulty);
+}
+
 function displayedTimeMs(value: string): number {
   const [minutes = "0", remainder = "0"] = value.split(":");
   const [seconds = "0", hundredths = "0"] = remainder.split(".");
@@ -206,6 +216,7 @@ test("Solo qualification unlocks Rival and Rival completes with a six-rider fiel
 test("Summit Mastery clears a tier, escalates its goal, and increases hot-start heat", async ({ page }) => {
   test.setTimeout(150_000);
   await onboard(page);
+  await setDifficulty(page, "rookie");
   await unlockCampaign(page);
   const summit = page.getByRole("button", { name: /^Summit Showdown/ });
   await expect(summit).toBeEnabled();

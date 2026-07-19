@@ -2,7 +2,7 @@ import { createRoot } from "react-dom/client";
 
 import { App } from "./app/App";
 import { useAppStore } from "./app/store";
-import type { RaceMode } from "./app/types";
+import type { Difficulty, RaceMode } from "./app/types";
 import { TRACK_IDS, type TrackId } from "./game/content/tracks";
 import { getLifecycleDiagnostics } from "./game/qa/lifecycleDiagnostics";
 import "./styles.css";
@@ -45,6 +45,13 @@ if (import.meta.env.VITE_QA_MODE === "1") {
       }
       progress.selectedTrackId = "summit-showdown";
       useAppStore.setState({ progress });
+    },
+    setDifficulty(difficulty: Difficulty) {
+      if (!["rookie", "rider", "ace"].includes(difficulty)) {
+        throw new Error(`Unknown QA difficulty: ${difficulty}`);
+      }
+      const state = useAppStore.getState();
+      state.updateSettings({ ...state.settings, difficulty });
     },
     lifecycle: getLifecycleDiagnostics,
   };

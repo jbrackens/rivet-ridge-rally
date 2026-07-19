@@ -15,6 +15,7 @@ interface Window {
     startTrack: (trackId: string, mode?: import("./app/types").RaceMode) => void;
     openEditor: () => void;
     unlockCampaign: () => void;
+    setDifficulty: (difficulty: import("./app/types").Difficulty) => void;
     lifecycle: () => import("./game/qa/lifecycleDiagnostics").LifecycleDiagnostics;
   };
 }

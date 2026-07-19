@@ -2,7 +2,7 @@
 
 ## Status
 
-Schema version 3 is implemented by `scripts/release-attestation.mjs`. Scoped working-tree browser qualification passes in the scopes recorded by `QA_REPORT.md`, and all 71 release-attestation fixtures pass within the 444-check `npm test` command: 297 Vitest, 45 release-manifest, 71 release-attestation, and 31 production-smoke/service-worker checks. This is source-fixture evidence only. The working tree is dirty/untracked, with no annotated `v1.0.0-rc.2` product tag, format-2 manifest, qualifying performance/soak/production-smoke/rollback record, human approval, `1.0.0-rc.2` attestation, evidence commit, or attestation tag.
+Schema version 3 is implemented by `scripts/release-attestation.mjs`. Scoped working-tree browser qualification passes in the scopes recorded by `QA_REPORT.md`, and all 71 release-attestation fixtures pass within the 445-check `npm test` command: 298 Vitest, 45 release-manifest, 71 release-attestation, and 31 production-smoke/service-worker checks. This is source-fixture evidence only. The working tree is dirty/untracked, with no annotated `v1.0.0-rc.2` product tag, format-2 manifest, qualifying performance/soak/production-smoke/rollback record, human approval, `1.0.0-rc.2` attestation, evidence commit, or attestation tag.
 
 The corrected production-length visual harness passes all production-asset readiness prerequisites, but the exact-tip suite still ends 5 failed / 5 skipped and no baseline was changed. Passing Canyon structural/runtime checks and the normal local preview do not satisfy this contract's exact-product visual approval, production-smoke, performance, rollback, or human-approval requirements.
 

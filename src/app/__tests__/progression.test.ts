@@ -326,6 +326,41 @@ describe("Summit mastery", () => {
     expect(cleared.tracks[MASTERY_TRACK_ID].masteryLevel).toBe(1);
   });
 
+  it("clears every Summit tier sequentially and keeps the final tier replayable", () => {
+    let current = unlockSummitMastery();
+
+    for (let masteryLevel = 0; masteryLevel < MASTERY_TIER_COUNT; masteryLevel += 1) {
+      const goal = getMasteryGoal(masteryLevel);
+      expect(goal).toMatchObject({
+        tier: masteryLevel + 1,
+        isMaxTierReplay: false,
+      });
+
+      current = applyRaceResult(
+        current,
+        raceResult("mastery", MASTERY_TRACK_ID, {
+          finishTimeMs: goal.targetMs,
+          position: 3,
+        }),
+      );
+      expect(current.tracks[MASTERY_TRACK_ID].masteryLevel).toBe(masteryLevel + 1);
+    }
+
+    const replayGoal = getMasteryGoal(current.tracks[MASTERY_TRACK_ID].masteryLevel);
+    expect(replayGoal).toMatchObject({
+      tier: MASTERY_TIER_COUNT,
+      isMaxTierReplay: true,
+    });
+    current = applyRaceResult(
+      current,
+      raceResult("mastery", MASTERY_TRACK_ID, {
+        finishTimeMs: replayGoal.targetMs,
+        position: 1,
+      }),
+    );
+    expect(current.tracks[MASTERY_TRACK_ID].masteryLevel).toBe(MASTERY_TIER_COUNT);
+  });
+
   it("caps progression at the final tier while keeping its goal replayable", () => {
     const unlocked = unlockSummitMastery();
     unlocked.tracks[MASTERY_TRACK_ID].masteryLevel = MASTERY_TIER_COUNT - 1;
