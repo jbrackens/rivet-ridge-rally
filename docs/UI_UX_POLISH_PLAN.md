@@ -151,7 +151,7 @@ assets/bundle**. Each item lists file anchor → change → verification evidenc
   (LSP) support for TS7 language service.
 - Environment: `npm test`'s release-manifest guard requires the **pinned npm 11.17.0**
   (`packageManager` field). Under this machine's default npm 10.9.8 exactly that one guard
-  test fails by design; all 44 pass under `npx -y npm@11.17.0 run test:…`.
+  test fails by design; all 45 pass under `npx -y npm@11.17.0 run test:…`.
 
 ## 5. Verified green (2026-07-19, this machine)
 
@@ -161,4 +161,4 @@ assets/bundle**. Each item lists file anchor → change → verification evidenc
 | `npx eslint .` (type-aware via TS6 shim) | ✅ exit 0 |
 | `npx vitest run` | ✅ 297/297, 32 files, via `npm test` |
 | `npm run build` | ✅ exit 0, no Vite chunk-size warning |
-| `npm test` release scripts | ✅ 44/44 release-manifest, 71/71 release-attestation, 31/31 production-smoke/service-worker under pinned npm 11.17.0 |
+| `npm test` release scripts | ✅ 45/45 release-manifest, 71/71 release-attestation, 31/31 production-smoke/service-worker under pinned npm 11.17.0 |

@@ -57,15 +57,6 @@ function releaseForbiddenByteSequences(sourceRoot, temporaryRoot, releaseWorktre
     { label: 'EC PEM private-key header', value: '-----BEGIN EC PRIVATE KEY-----' },
     { label: 'OpenSSH private-key header', value: '-----BEGIN OPENSSH PRIVATE KEY-----' },
     { label: 'PGP private-key header', value: '-----BEGIN PGP PRIVATE KEY BLOCK-----' },
-    { label: 'GitHub token prefix ghp_', value: 'ghp_' },
-    { label: 'GitHub fine-grained token prefix github_pat_', value: 'github_pat_' },
-    { label: 'OpenAI project token prefix sk-proj-', value: 'sk-proj-' },
-    { label: 'OpenAI service-account token prefix sk-svcacct-', value: 'sk-svcacct-' },
-    { label: 'Slack bot token prefix xoxb-', value: 'xoxb-' },
-    { label: 'Slack user token prefix xoxp-', value: 'xoxp-' },
-    { label: 'Stripe live secret prefix sk_live_', value: 'sk_live_' },
-    { label: 'Stripe restricted live key prefix rk_live_', value: 'rk_live_' },
-    { label: 'GitLab personal access token prefix glpat-', value: 'glpat-' },
   ];
   const seen = new Set();
   return entries
@@ -76,6 +67,20 @@ function releaseForbiddenByteSequences(sourceRoot, temporaryRoot, releaseWorktre
       return true;
     })
     .map(({ label, value }) => ({ label, value: Buffer.from(value) }));
+}
+
+function releaseForbiddenTextPatterns() {
+  return [
+    { label: 'GitHub token ghp_', pattern: /ghp_[A-Za-z0-9]{36}/u },
+    { label: 'GitHub fine-grained token github_pat_', pattern: /github_pat_[A-Za-z0-9_]{80,}/u },
+    { label: 'OpenAI project token sk-proj-', pattern: /sk-proj-[A-Za-z0-9_-]{20,}/u },
+    { label: 'OpenAI service-account token sk-svcacct-', pattern: /sk-svcacct-[A-Za-z0-9_-]{20,}/u },
+    { label: 'Slack bot token xoxb-', pattern: /xoxb-[A-Za-z0-9-]{20,}/u },
+    { label: 'Slack user token xoxp-', pattern: /xoxp-[A-Za-z0-9-]{20,}/u },
+    { label: 'Stripe live secret sk_live_', pattern: /sk_live_[A-Za-z0-9]{20,}/u },
+    { label: 'Stripe restricted live key rk_live_', pattern: /rk_live_[A-Za-z0-9]{20,}/u },
+    { label: 'GitLab personal access token glpat-', pattern: /glpat-[A-Za-z0-9_-]{20,}/u },
+  ];
 }
 
 function compareNames(left, right) {
@@ -871,6 +876,7 @@ try {
     worktreePath,
     visualQaProfile,
   );
+  const forbiddenTextPatterns = releaseForbiddenTextPatterns();
   const requiredQaMarker = Buffer.from('__RRR_QA__');
   let qaMarkerFound = false;
   const records = [];
@@ -881,6 +887,12 @@ try {
     qaMarkerFound ||= contents.includes(requiredQaMarker);
     for (const forbidden of forbiddenByteSequences) {
       if (contents.includes(forbidden.value)) {
+        throw new Error(`Release guard failed: ${forbidden.label} found in dist/${relative}`);
+      }
+    }
+    const textContents = contents.toString('latin1');
+    for (const forbidden of forbiddenTextPatterns) {
+      if (forbidden.pattern.test(textContents)) {
         throw new Error(`Release guard failed: ${forbidden.label} found in dist/${relative}`);
       }
     }

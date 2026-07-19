@@ -103,7 +103,8 @@ if (command === 'run' && JSON.stringify(args) === JSON.stringify(['build'])) {
   }
   if (mode === 'file-url') body += 'file:///opt/fixture/project\n';
   if (mode === 'private-key') body += '-----BEGIN PRIVATE KEY-----\nfixture\n';
-  if (mode === 'live-token') body += 'ghp_fixture_high_confidence_token_prefix\n';
+  if (mode === 'live-token') body += 'ghp_' + 'A'.repeat(36) + '\n';
+  if (mode === 'short-token-prefix-noise') body += 'binary-ish-noise=ghp_abcd\n';
   await writeFile(path.join('dist', 'index.html'), body);
   if (mode === 'source-map') await writeFile(path.join('dist', 'bundle.js.map'), '{}\n');
   if (mode === 'symlink') await symlink('../SOURCE.txt', path.join('dist', 'source-link'));
@@ -477,6 +478,14 @@ test('builds a pre-tag visual candidate bound to the same complete npm package t
   assert.equal(await readFile(path.join(directory, 'dist', 'FOREIGN.txt'), 'utf8'), 'stale foreign root artifact\n');
 });
 
+test('allows short token-prefix coincidences that are not token-shaped', async (t) => {
+  const directory = await createFixture({ buildMode: 'short-token-prefix-noise' });
+  t.after(() => rm(path.dirname(directory), { recursive: true, force: true }));
+
+  const result = runManifest(directory);
+  assert.equal(result.status, 0, `${result.stdout}\n${result.stderr}`);
+});
+
 test('rejects visual candidates captured after the expected annotated or lightweight tag', async (t) => {
   for (const tagMode of ['annotated', 'lightweight']) {
     await t.test(tagMode, async (subtest) => {
@@ -671,7 +680,7 @@ test('fails closed for invalid isolated build outputs', async (t) => {
     { buildMode: 'windows-path', message: /absolute local file URL/ },
     { buildMode: 'file-url', message: /absolute local file URL/ },
     { buildMode: 'private-key', message: /PEM private-key header/ },
-    { buildMode: 'live-token', message: /GitHub token prefix ghp_/ },
+    { buildMode: 'live-token', message: /GitHub token ghp_/ },
     { buildMode: 'symlink', message: /non-regular dist entry: source-link/ },
   ];
 
