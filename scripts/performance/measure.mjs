@@ -464,10 +464,13 @@ if (failedCriteria.length === 0) {
 }
 
 const outputPath = await writeJson(output, evidence);
+const releaseContractError = evidence.harnessErrors.find((error) => error.stage === "release-contract-validation") ?? null;
 console.log(JSON.stringify({
   outputPath,
   status: evidence.status,
   failedCriteria: evidence.automatedGate.failedCriteria,
+  releaseContractError,
+  harnessErrors: evidence.harnessErrors,
   profiles: evidence.profiles.map((profile) => ({
     name: profile.name,
     quality: profile.quality,

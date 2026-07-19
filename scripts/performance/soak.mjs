@@ -717,6 +717,7 @@ if (mode === "rival" && currentReleaseFailures.length === 0) {
 }
 
 const outputPath = await writeJson(output, evidence);
+const releaseContractError = harnessErrors.find((error) => error.stage === "release-contract-validation") ?? null;
 console.log(JSON.stringify({
   outputPath,
   actualDurationMs: evidence.actualDurationMs,
@@ -729,6 +730,8 @@ console.log(JSON.stringify({
   failedRequests: evidence.network.failedRequestCount,
   httpErrorResponses: evidence.network.httpErrorResponseCount,
   harnessError: evidence.harnessError,
+  releaseContractError,
+  harnessErrors,
   status: evidence.status,
   releaseGate: evidence.releaseGate.status,
   diagnosticGate: evidence.diagnosticGate.status,
