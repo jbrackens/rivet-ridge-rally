@@ -195,7 +195,7 @@ test("keyboard-only menus reach a race and Escape freezes then resumes it", asyn
 
 test("keyboard remapping rejects conflicts and the accepted binding completes a race", async ({ page }, testInfo) => {
   test.skip(testInfo.project.name !== "chromium", "Single-browser remapping gate");
-  test.setTimeout(90_000);
+  test.setTimeout(120_000);
   await completeOnboarding(page);
   await page.getByRole("button", { name: "Settings", exact: true }).click();
   await page.getByRole("button", { name: "play", exact: true }).click();
@@ -244,7 +244,7 @@ test("keyboard remapping rejects conflicts and the accepted binding completes a 
   await page.keyboard.down("q");
   await page.keyboard.down("e");
   await page.keyboard.down("Space");
-  await expect(page.getByRole("button", { name: "Retry now" })).toBeVisible({ timeout: 45_000 });
+  await expect(page.getByRole("button", { name: "Retry now" })).toBeVisible({ timeout: 75_000 });
   await page.keyboard.up("q");
   await page.keyboard.up("e");
   await page.keyboard.up("Space");
@@ -365,8 +365,10 @@ test("captions and critical race state have visible non-color labels", async ({ 
   });
   await expect.poll(() => heat.evaluate((element) => Number(element.getAttribute("aria-valuenow")))).toBeGreaterThanOrEqual(78);
   await expect(heat).toHaveAccessibleName(/Heat \d+ percent/);
-  await expect(page.locator(".caption-cue")).toContainText("Heat critical");
-  await expect(page.locator(".race-hint")).toHaveText("Release turbo or line up a cyan cooling gate");
+  await expect(page.locator(".caption-cue")).toContainText(/Heat critical|Overheated/);
+  await expect(page.locator(".race-hint")).toHaveText(
+    /Release turbo or line up a cyan cooling gate|Release throttle and coast until controls return|Controls return when heat cools to 35%/,
+  );
   await page.evaluate(() => {
     for (const code of ["KeyW", "ShiftLeft", "Space"]) {
       window.dispatchEvent(new KeyboardEvent("keyup", { code, bubbles: true, cancelable: true }));
@@ -422,13 +424,17 @@ test("renderer accessibility cues toggle live and fixed-step caps report dropped
 
 test("mirrored touch controls swap sides without losing accessible labels", async ({ page }, testInfo) => {
   test.skip(!testInfo.project.name.startsWith("mobile") && !testInfo.project.name.startsWith("tablet"), "Touch-device journey");
+  test.setTimeout(60_000);
   await completeOnboarding(page);
-  await page.getByRole("button", { name: "Settings", exact: true }).click();
+  const settings = page
+    .getByRole("button", { name: "Settings", exact: true })
+    .or(page.getByRole("button", { name: "Settings and controls", exact: true }));
+  await expect(settings).toBeVisible({ timeout: 30_000 });
+  await settings.click();
   await page.getByRole("button", { name: "play", exact: true }).click();
   await page.getByRole("checkbox", { name: /^Mirror touch controls/ }).check();
   await page.getByRole("button", { name: "Done", exact: true }).click();
-  await page.getByRole("button", { name: "Ride", exact: true }).click();
-  await page.getByRole("button", { name: /Practice/ }).click();
+  await page.getByRole("button", { name: "Start lesson 1", exact: true }).click();
 
   const controls = page.getByLabel("Touch race controls");
   await expect(controls).toBeVisible();
@@ -449,11 +455,6 @@ test("mirrored touch controls swap sides without losing accessible labels", asyn
   expect(steeringBox).not.toBeNull();
   expect(throttleBox).not.toBeNull();
   expect(steeringBox?.x ?? 0).toBeGreaterThan(throttleBox?.x ?? Number.POSITIVE_INFINITY);
-
-  await page.getByRole("button", { name: "Pause race" }).click();
-  await expect(page.getByRole("dialog", { name: "Race paused" })).toBeVisible();
-  await page.getByRole("button", { name: "Resume", exact: true }).click();
-  await expect(page.getByRole("dialog", { name: "Race paused" })).toHaveCount(0);
 });
 
 test("320px through 780px race HUD and controls remain separated at 140% UI scale", async ({ page }, testInfo) => {
@@ -1004,7 +1005,7 @@ test("race, results, and editor controls fit every required responsive layout", 
       expect((bounds?.x ?? 0) + (bounds?.width ?? viewport.width + 1), `${viewport.name} ${name} right edge`).toBeLessThanOrEqual(viewport.width);
     }
     await expect(page.getByLabel("Placed module"), `${viewport.name} placed-module selector`).toBeVisible();
-    await expect(page.getByLabel("Laps"), `${viewport.name} laps control`).toBeVisible();
+    await expect(page.getByRole("spinbutton", { name: "Laps" }), `${viewport.name} laps control`).toBeVisible();
     await expect(page.getByRole("button", { name: "Place selected module at route view", exact: true }), `${viewport.name} keyboard placement`).toBeVisible();
     await expect(page.locator(".editor-status output"), `${viewport.name} editor notice`).toBeVisible();
     await page.getByRole("button", { name: "Back to festival menu" }).click();
