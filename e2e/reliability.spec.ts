@@ -316,7 +316,7 @@ test.describe("production asset network fallbacks", () => {
     // Install the stall only after the tutorial model has settled, so the
     // observed abort belongs to the subsequent Practice engine deadline.
     await page.route("**/assets/3d/hero-bike-rider.glb", async (route) => {
-      await new Promise((resolve) => setTimeout(resolve, 6_250));
+      await new Promise((resolve) => setTimeout(resolve, 13_250));
       await route.continue().catch(() => undefined);
     });
 
