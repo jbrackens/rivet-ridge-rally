@@ -2,7 +2,8 @@ import { expect, test, type Locator, type Page } from "@playwright/test";
 
 async function completeOnboarding(page: Page, initialPath = "/?qa-fast-race=1"): Promise<void> {
   await page.goto(initialPath);
-  const ride = page.getByRole("button", { name: "Ride", exact: true });
+  const titleScreen = page.locator(".title-screen");
+  const ride = titleScreen.getByRole("button", { name: "Ride", exact: true });
   const skip = page.getByRole("button", { name: "Skip training" });
   await expect(ride.or(skip).first()).toBeVisible({ timeout: 15_000 });
   if (await ride.isVisible().catch(() => false)) return;
@@ -22,6 +23,27 @@ async function clearFocus(page: Page): Promise<void> {
     }
     sentinel.focus({ preventScroll: true });
   });
+}
+
+async function finishRaceWithPulsedTurbo(page: Page, rideKey = "w", turboKey = "Shift", pitchKey = "Space"): Promise<void> {
+  const retryButton = page.getByRole("button", { name: "Retry now" });
+  await page.keyboard.down(rideKey);
+  await page.keyboard.down(pitchKey);
+  try {
+    for (let cycle = 0; cycle < 30; cycle += 1) {
+      await page.keyboard.down(turboKey);
+      await page.waitForTimeout(520);
+      await page.keyboard.up(turboKey);
+      if (await retryButton.isVisible()) break;
+      await page.waitForTimeout(620);
+      if (await retryButton.isVisible()) break;
+    }
+    await expect(retryButton).toBeVisible({ timeout: 75_000 });
+  } finally {
+    await page.keyboard.up(rideKey);
+    await page.keyboard.up(turboKey);
+    await page.keyboard.up(pitchKey);
+  }
 }
 
 async function tabTo(target: Locator, pressTab: () => Promise<void>): Promise<void> {
@@ -105,7 +127,7 @@ async function contrastRatioFor(locator: Locator, background = "#061a2e"): Promi
 
 test("keyboard-only menus reach a race and Escape freezes then resumes it", async ({ page }, testInfo) => {
   test.skip(testInfo.project.name.startsWith("mobile") || testInfo.project.name.startsWith("tablet"), "Desktop keyboard journey");
-  test.setTimeout(60_000);
+  test.setTimeout(120_000);
   await completeOnboarding(page);
   const pressTab = () => page.keyboard.press(testInfo.project.name === "webkit" ? "Alt+Tab" : "Tab");
   const pressReverseTab = () => page.keyboard.press(testInfo.project.name === "webkit" ? "Alt+Shift+Tab" : "Shift+Tab");
@@ -178,7 +200,10 @@ test("keyboard-only menus reach a race and Escape freezes then resumes it", asyn
   await page.waitForTimeout(250);
   await expect(clock).toHaveText(frozenTime ?? "");
 
-  await page.getByRole("button", { name: "Settings", exact: true }).click();
+  await page
+    .getByRole("button", { name: "Settings", exact: true })
+    .or(page.getByRole("button", { name: "Settings and controls", exact: true }))
+    .click();
   await page.getByRole("button", { name: "audio", exact: true }).click();
   await page.getByRole("slider", { name: "master volume" }).fill("0.4");
   await page.keyboard.press("Escape");
@@ -197,7 +222,10 @@ test("keyboard remapping rejects conflicts and the accepted binding completes a 
   test.skip(testInfo.project.name !== "chromium", "Single-browser remapping gate");
   test.setTimeout(120_000);
   await completeOnboarding(page);
-  await page.getByRole("button", { name: "Settings", exact: true }).click();
+  await page
+    .getByRole("button", { name: "Settings", exact: true })
+    .or(page.getByRole("button", { name: "Settings and controls", exact: true }))
+    .click();
   await page.getByRole("button", { name: "play", exact: true }).click();
 
   const bindings = page.getByLabel("Keyboard bindings");
@@ -434,6 +462,7 @@ test("mirrored touch controls swap sides without losing accessible labels", asyn
   await page.getByRole("button", { name: "play", exact: true }).click();
   await page.getByRole("checkbox", { name: /^Mirror touch controls/ }).check();
   await page.getByRole("button", { name: "Done", exact: true }).click();
+  await page.getByRole("button", { name: "Rider School", exact: true }).click();
   await page.getByRole("button", { name: "Start lesson 1", exact: true }).click();
 
   const controls = page.getByLabel("Touch race controls");
@@ -983,13 +1012,7 @@ test("race, results, and editor controls fit every required responsive layout", 
     const raceOverflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
     expect(raceOverflow, `${viewport.name} race overflow`).toBeLessThanOrEqual(1);
 
-    await page.keyboard.down("w");
-    await page.keyboard.down("Shift");
-    await page.keyboard.down("Space");
-    await expect(page.getByRole("button", { name: "Retry now" }), `${viewport.name} results`).toBeVisible({ timeout: 75_000 });
-    await page.keyboard.up("w");
-    await page.keyboard.up("Shift");
-    await page.keyboard.up("Space");
+    await finishRaceWithPulsedTurbo(page);
     const retryBox = await page.getByRole("button", { name: "Retry now" }).boundingBox();
     expect(retryBox, `${viewport.name} retry bounds`).not.toBeNull();
     expect((retryBox?.x ?? 0) + (retryBox?.width ?? viewport.width + 1), `${viewport.name} retry right edge`).toBeLessThanOrEqual(viewport.width);

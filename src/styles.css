@@ -172,9 +172,9 @@ kbd {
 
 .title-panel { position: absolute; z-index: 2; top: clamp(1.25rem, 4.7vh, 3.7rem); left: clamp(1.2rem, 4.2vw, 4.5rem); width: min(41vw, 42rem); }
 .brand-mark { display: flex; flex-direction: column; width: max-content; transform: skewX(-5deg); font: 900 clamp(4.25rem, 8.65vw, 8.9rem)/.67 var(--display); letter-spacing: -.052em; text-transform: uppercase; filter: drop-shadow(.16rem .22rem 0 #020d18) drop-shadow(.34rem .42rem 0 #0005); }
-.brand-mark > span:first-child { color: var(--sand); -webkit-text-stroke: 1px #d9d2c4; }
-.brand-mark .brand-ridge { color: var(--coral); -webkit-text-stroke: 1px #d2463c; }
-.brand-mark .brand-rally { align-self: center; margin-top: .36em; color: var(--teal); font-size: .43em; letter-spacing: .23em; -webkit-text-stroke: 0; }
+.brand-mark > span:first-child { color: #fff4d6; -webkit-text-fill-color: #fff4d6; -webkit-text-stroke: 1px #5d351f; }
+.brand-mark .brand-ridge { color: #ff7c68; -webkit-text-fill-color: #ff7c68; -webkit-text-stroke: 1px #5f1d18; }
+.brand-mark .brand-rally { align-self: center; margin-top: .36em; color: #5ff7f2; -webkit-text-fill-color: #5ff7f2; font-size: .43em; letter-spacing: .23em; -webkit-text-stroke: 0; }
 .brand-rally::before, .brand-rally::after { content: ""; display: inline-block; width: 1.35em; height: .18em; margin: 0 .35em .18em; background: currentColor; clip-path: polygon(0 0, 100% 0, 75% 100%, 0 100%); }
 .brand-rally::after { transform: scaleX(-1); }
 .main-actions { display: grid; width: min(34rem, 100%); gap: .62rem; margin-top: clamp(1.25rem, 2.8vh, 2.5rem); }
@@ -187,7 +187,7 @@ kbd {
 .rider-summary { position: absolute; top: 3.6%; right: 3%; display: flex; align-items: center; gap: .75rem; padding: .7rem 1.3rem; border: 2px solid #d7b18e; background: #071f36e8; box-shadow: .35rem .4rem 0 #0004; text-transform: uppercase; }
 .rider-summary .helmet-icon { width: 3.4rem; color: var(--teal); }
 .rider-summary div { display: grid; gap: .25rem; }
-.rider-summary strong { font: 800 1.25rem var(--display); letter-spacing: .04em; }
+.rider-summary strong { color: #fff4d6; -webkit-text-fill-color: #fff4d6; font: 800 1.25rem var(--display); letter-spacing: .04em; }
 .rider-summary span { color: var(--sand); font: 800 1rem var(--display); }
 
 .campaign-rail { position: absolute; right: 3%; bottom: 4.6rem; left: 3%; display: grid; grid-template-columns: repeat(5, minmax(8.5rem, 1fr)); align-items: end; gap: .7rem; padding: 0; }

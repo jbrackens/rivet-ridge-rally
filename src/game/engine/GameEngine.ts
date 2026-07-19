@@ -309,7 +309,7 @@ const RIVAL_PACK_MAX_PRIMITIVES = 12;
 const RIVAL_PACK_MIN_TRIANGLES = 15_000;
 const RIVAL_PACK_MAX_TRIANGLES = 20_000;
 const RIVAL_PACK_VARIANT_NUMBERS = ["17", "31", "46", "58", "73"] as const;
-const CANYON_KIT_READINESS_TIMEOUT_MS = 12_000;
+const CANYON_KIT_READINESS_TIMEOUT_MS = 30_000;
 const CANYON_PANORAMA_READINESS_TIMEOUT_MS = 12_000;
 const CANYON_FESTIVAL_PANORAMA_URL = "/assets/art/canyon-festival-panorama.png";
 const MAX_AI_CLASSIFICATION_STEPS = 60 * 60 * 15;
@@ -4139,12 +4139,17 @@ export class GameEngine {
     delete this.canvas.dataset.canyonKitCoolingGateStyle;
     delete this.canvas.dataset.canyonKitCoolingGateArchCount;
     delete this.canvas.dataset.canyonKitTabletopRole;
+    delete this.canvas.dataset.canyonKitFailure;
+    delete this.canvas.dataset.canyonKitMissingRoot;
+    delete this.canvas.dataset.canyonKitAvailableRoots;
   }
 
-  private activateCanyonKitFallback(): void {
+  private activateCanyonKitFallback(reason = "unknown"): void {
     if (this.disposed) return;
     this.canvas.dataset.canyonKitAsset = "procedural-fallback";
+    this.canvas.dataset.canyonKitFailure = reason;
     this.clearCanyonKitMetrics();
+    this.canvas.dataset.canyonKitFailure = reason;
   }
 
   private async loadCanyonKit(): Promise<void> {
@@ -4164,7 +4169,10 @@ export class GameEngine {
       : loader.load(CANYON_KIT_URL)
     ).then(
       (gltf) => ({ kind: "loaded" as const, gltf }),
-      () => ({ kind: "failed" as const }),
+      (error: unknown) => ({
+        kind: "failed" as const,
+        reason: error instanceof Error ? error.message : String(error),
+      }),
     );
     let deadlineTimer = 0;
     const deadline = new Promise<{ kind: "timeout" }>((resolve) => {
@@ -4195,27 +4203,28 @@ export class GameEngine {
       void loadOutcome.then((lateOutcome) => {
         if (lateOutcome.kind === "loaded") disposeObjectResources(lateOutcome.gltf.scene);
       });
-      this.activateCanyonKitFallback();
+      this.activateCanyonKitFallback("timeout");
       return;
     }
     if (outcome.kind === "failed") {
       loader.dispose();
       if (this.canyonAssetLoader === loader) this.canyonAssetLoader = null;
-      this.activateCanyonKitFallback();
+      this.activateCanyonKitFallback(outcome.reason);
       return;
     }
 
     let installed: boolean;
     try {
       installed = this.installCanyonKit(outcome.gltf.scene);
-    } catch {
+    } catch (error) {
+      this.canvas.dataset.canyonKitFailure = error instanceof Error ? error.message : String(error);
       installed = false;
     }
     loader.dispose();
     if (this.canyonAssetLoader === loader) this.canyonAssetLoader = null;
     if (!installed) {
       disposeObjectResources(outcome.gltf.scene);
-      this.activateCanyonKitFallback();
+      this.activateCanyonKitFallback(this.canvas.dataset.canyonKitFailure ?? "install-validation");
       return;
     }
     this.canvas.dataset.canyonKitAsset = "ready";
@@ -4238,7 +4247,14 @@ export class GameEngine {
     const roots = new Map<string, THREE.Object3D>();
     for (const name of rootNames) {
       const asset = source.getObjectByName(name);
-      if (!asset) return false;
+      if (!asset) {
+        this.canvas.dataset.canyonKitMissingRoot = name;
+        this.canvas.dataset.canyonKitAvailableRoots = source.children
+          .map((child) => child.name)
+          .filter((childName) => childName.startsWith("CYN_"))
+          .join(",");
+        return false;
+      }
       roots.set(name, asset);
     }
 
@@ -4365,7 +4381,7 @@ export class GameEngine {
           this.courseRoute.sample(progress, placement.lateral, placement.elevation ?? 0, structuralPosition);
           if (festivalPocketPositions.some((pocket) => (
             structuralPosition.distanceTo(pocket) < FESTIVAL_SHOWCASE_CLEARANCE
-          ))) return false;
+          ))) continue;
         }
         placements.push({ ...placement, progress });
       }
