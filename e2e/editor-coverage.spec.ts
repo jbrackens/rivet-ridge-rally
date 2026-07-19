@@ -214,6 +214,9 @@ test("checkpoint route controls are bounded, undoable, and checkpoint-only", asy
 });
 
 test("concept-style inspector steppers update selected module and race settings", async ({ page }) => {
+  const canvas = page.getByLabel(/Interactive 3D track build camera/);
+  await expect(canvas).toHaveAttribute("data-builder-worksite-style", "route-following-prop-clusters-v1");
+  await expect(canvas).toHaveAttribute("data-builder-worksite-prop-count", "54");
   const placedModule = page.getByLabel("Placed module");
   const checkpointOption = placedModule.locator("option").filter({ hasText: "Checkpoint · lane 1 · 48 m" });
   const checkpointId = await checkpointOption.getAttribute("value");
