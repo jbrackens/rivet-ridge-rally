@@ -16,6 +16,7 @@ import {
   getAiDriveControl,
   getAiLaneChange,
   getAiPitchControl,
+  getObstacleContactOutcome,
   getObstaclePolicy,
   resolveRiderCollision,
   resolveRiderPairCollision,
@@ -302,8 +303,18 @@ describe("shared rider simulation contract", () => {
     expect(getObstaclePolicy("large-ramp").environment).toEqual({ surface: "ramp", rampImpulse: 9.5 });
     expect(getObstaclePolicy("jump-chain").environment).toEqual({ surface: "ramp", rampImpulse: 7.4 });
     expect(getObstaclePolicy("super-jump").environment).toEqual({ surface: "ramp", rampImpulse: 11.2 });
-    expect(getObstaclePolicy("barrier").crashesOnContact).toBe(true);
+    const barrier = getObstaclePolicy("barrier");
+    expect(barrier.crashesOnContact).toBe(true);
+    expect(barrier.retainedSpeed).toBe(0.6);
+    expect(getObstacleContactOutcome("barrier", barrier, false)).toBe("crash");
+    expect(getObstacleContactOutcome("barrier", barrier, true)).toBe("slowdown");
     expect(getObstaclePolicy("bump").retainedSpeed).toBe(0.7);
+    expect(getObstacleContactOutcome("bump", getObstaclePolicy("bump"), false)).toBe("slowdown");
+    expect(getObstacleContactOutcome("bump", getObstaclePolicy("bump"), true)).toBe("clear");
+    expect(getObstacleContactOutcome("medium-ramp", {
+      ...getObstaclePolicy("medium-ramp"),
+      crashesOnContact: true,
+    }, true)).toBe("crash");
   });
 
   it("starts an AI rider inside RaceSimulation and applies cooling entry exactly once", () => {

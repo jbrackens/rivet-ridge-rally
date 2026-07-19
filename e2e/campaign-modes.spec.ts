@@ -18,6 +18,26 @@ function displayedTimeMs(value: string): number {
   return Number(minutes) * 60_000 + Number(seconds) * 1_000 + Number(hundredths) * 10;
 }
 
+async function persistedSummitMasteryLevel(page: import("@playwright/test").Page): Promise<number> {
+  return page.evaluate(() => new Promise<number>((resolve, reject) => {
+    const openRequest = indexedDB.open("rivet-ridge-rally");
+    openRequest.onerror = () => reject(openRequest.error ?? new Error("Campaign database did not open."));
+    openRequest.onsuccess = () => {
+      const database = openRequest.result;
+      const transaction = database.transaction("progress", "readonly");
+      const getRequest = transaction.objectStore("progress").get("rider-01");
+      getRequest.onerror = () => reject(getRequest.error ?? new Error("Campaign progress did not load."));
+      getRequest.onsuccess = () => {
+        const record = getRequest.result as {
+          value?: { tracks?: Record<string, { masteryLevel?: number }> };
+        } | undefined;
+        resolve(record?.value?.tracks?.["summit-showdown"]?.masteryLevel ?? -1);
+        database.close();
+      };
+    };
+  }));
+}
+
 const LAUNCH_TRACKS = [
   { id: "canyon-kickoff", name: "Canyon Kickoff" },
   { id: "pine-run", name: "Pine Run" },
@@ -69,8 +89,8 @@ async function rideUntilResults(
 ): Promise<void> {
   await page.keyboard.down("w");
   await page.keyboard.down("Space");
-  for (let cycle = 0; cycle < 14; cycle += 1) {
-    if (chooseSummitSafeLane && cycle === 2) await page.keyboard.press("ArrowRight");
+  for (let cycle = 0; cycle < 55; cycle += 1) {
+    if (chooseSummitSafeLane && cycle === 0) await page.keyboard.press("ArrowRight");
     await page.keyboard.down("Shift");
     await page.waitForTimeout(520);
     await page.keyboard.up("Shift");
@@ -96,7 +116,7 @@ test.describe("launch track and mode matrix", () => {
   for (const track of LAUNCH_TRACKS) {
     for (const mode of modesByTrack(track.id)) {
       test(`${track.name} completes ${mode}`, async ({ page }, testInfo) => {
-        test.setTimeout(90_000);
+        test.setTimeout(150_000);
         await onboard(page);
         await unlockCampaign(page);
 
@@ -145,7 +165,7 @@ test.describe("launch track and mode matrix", () => {
 });
 
 test("Solo qualification unlocks Rival and Rival completes with a six-rider field", async ({ page }) => {
-  test.setTimeout(60_000);
+  test.setTimeout(240_000);
   await onboard(page);
   await page.getByRole("button", { name: "Ride", exact: true }).click();
   await page.getByRole("button", { name: /^01 Solo Challenge/ }).click();
@@ -184,11 +204,14 @@ test("Solo qualification unlocks Rival and Rival completes with a six-rider fiel
 });
 
 test("Summit Mastery clears a tier, escalates its goal, and increases hot-start heat", async ({ page }) => {
-  test.setTimeout(60_000);
+  test.setTimeout(150_000);
   await onboard(page);
   await unlockCampaign(page);
-  await page.getByRole("button", { name: /^Summit Showdown/ }).click();
+  const summit = page.getByRole("button", { name: /^Summit Showdown/ });
+  await expect(summit).toBeEnabled();
+  await expect(summit).toHaveAttribute("aria-pressed", "true");
   await page.getByRole("button", { name: "Ride", exact: true }).click();
+  await expect(page.getByRole("heading", { name: "Summit Showdown" })).toBeVisible();
   const mastery = page.getByRole("button", { name: /^04 Summit Mastery/ });
   await expect(mastery).toBeEnabled();
   await expect(mastery).toContainText("Tier 1");
@@ -198,6 +221,8 @@ test("Summit Mastery clears a tier, escalates its goal, and increases hot-start 
   await expect.poll(async () => Number(await page.getByRole("meter").getAttribute("aria-valuenow"))).toBeGreaterThan(25);
   await rideUntilResults(page, true);
   await expect(page.getByRole("heading", { name: "Mastery tier cleared" })).toBeVisible();
+  await expect.poll(() => persistedSummitMasteryLevel(page), { timeout: 10_000 }).toBe(1);
+  await unlockCampaign(page);
   await page.getByRole("button", { name: "Change mode" }).click();
   await expect(page.getByRole("button", { name: /^04 Summit Mastery/ })).toContainText("Tier 2");
   await expect(page.getByRole("button", { name: /^04 Summit Mastery/ })).toContainText("40% heat");

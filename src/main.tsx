@@ -8,7 +8,7 @@ import { getLifecycleDiagnostics } from "./game/qa/lifecycleDiagnostics";
 import "./styles.css";
 
 const root = document.getElementById("root");
-const OFFLINE_CACHE_NAME = "rivet-ridge-rally-shell-v30";
+const OFFLINE_CACHE_NAME = "rivet-ridge-rally-shell-v35";
 const OFFLINE_READINESS_EVENT = "rivet-ridge-rally:offline-readiness-change";
 const OFFLINE_PREPARATION_TIMEOUT_MS = 20_000;
 
@@ -33,6 +33,9 @@ if (import.meta.env.VITE_QA_MODE === "1") {
       if (!TRACK_IDS.includes(trackId as TrackId)) throw new Error(`Unknown QA track: ${trackId}`);
       useAppStore.getState().startRace(mode, trackId as TrackId);
     },
+    openEditor() {
+      useAppStore.getState().navigate("editor");
+    },
     unlockCampaign() {
       const progress = structuredClone(useAppStore.getState().progress);
       for (const trackId of TRACK_IDS) {
@@ -48,10 +51,41 @@ if (import.meta.env.VITE_QA_MODE === "1") {
 }
 
 if (import.meta.env.PROD && "serviceWorker" in navigator) {
-  navigator.serviceWorker.addEventListener("controllerchange", clearOfflineReadiness);
-  window.addEventListener("load", () => {
-    void prepareOfflineShell().catch(() => undefined);
+  navigator.serviceWorker.addEventListener("controllerchange", () => {
+    clearOfflineReadiness();
+    requestOfflinePreparation();
   });
+  window.addEventListener("load", () => {
+    requestOfflinePreparation();
+  });
+  window.addEventListener("online", () => {
+    if (!hasCurrentOfflineReadiness()) requestOfflinePreparation();
+  });
+}
+
+let offlinePreparation: Promise<void> | null = null;
+let offlinePreparationPending = false;
+
+function requestOfflinePreparation(): void {
+  if (offlinePreparation) {
+    offlinePreparationPending = true;
+    return;
+  }
+  offlinePreparationPending = false;
+  offlinePreparation = prepareOfflineShell()
+    .catch(() => undefined)
+    .finally(() => {
+      offlinePreparation = null;
+      if (offlinePreparationPending) {
+        offlinePreparationPending = false;
+        requestOfflinePreparation();
+      }
+    });
+}
+
+function hasCurrentOfflineReadiness(): boolean {
+  return document.documentElement.dataset.offlineReady === "true"
+    && document.documentElement.dataset.offlineCache === OFFLINE_CACHE_NAME;
 }
 
 function clearOfflineReadiness(): void {
@@ -76,8 +110,8 @@ async function prepareOfflineShell(): Promise<void> {
   if (routeChunks.some((result) => result.status === "rejected")) return;
 
   const resourceUrls = performance.getEntriesByType("resource")
-    .map((entry) => entry.name)
-    .filter((value) => new URL(value, window.location.href).origin === window.location.origin);
+    .map((entry) => offlineCacheResourceURL(entry.name))
+    .filter((value): value is string => value !== null);
   resourceUrls.push(
     new URL("/", window.location.origin).href,
     new URL("/index.html", window.location.origin).href,
@@ -88,6 +122,29 @@ async function prepareOfflineShell(): Promise<void> {
   document.documentElement.dataset.offlineCache = OFFLINE_CACHE_NAME;
   document.documentElement.dataset.offlineReady = "true";
   window.dispatchEvent(new Event(OFFLINE_READINESS_EVENT));
+}
+
+function offlineCacheResourceURL(value: string): string | null {
+  try {
+    const url = new URL(value, window.location.href);
+    if (
+      url.origin !== window.location.origin
+      || url.protocol !== window.location.protocol
+      || url.username
+      || url.password
+      || url.search
+      || url.hash
+      || !(
+        url.pathname === "/"
+        || url.pathname === "/index.html"
+        || url.pathname === "/manifest.webmanifest"
+        || url.pathname.startsWith("/assets/")
+      )
+    ) return null;
+    return url.href;
+  } catch {
+    return null;
+  }
 }
 
 async function cacheWithCurrentGeneration(

@@ -1,0 +1,204 @@
+{
+  "schemaVersion": 2,
+  "generator": "scripts/build-rival-pack-assets.mjs",
+  "design": {
+    "name": "Shared Rival Pack A",
+    "origin": "Original project-authored Blender-native geometry and generated number field",
+    "contract": "docs/design/RIVAL_PACK_VERTICAL_SLICE.md",
+    "authoringTool": "Blender 4.5.11 LTS",
+    "coordinateSystem": "1 unit = 1 meter; source +Y forward/+Z up; glTF +Y up/-Z forward",
+    "gameplayAuthority": "Presentation only; TypeScript AI simulation remains authoritative",
+    "sourcePairId": "c7b02b0e-1ae0-46ef-abc9-73547f432967",
+    "variants": [
+      "17",
+      "31",
+      "46",
+      "58",
+      "73"
+    ],
+    "runtimeStrategy": "Load once; clone five times with shared geometry and per-entrant materials"
+  },
+  "compression": {
+    "geometry": "EXT_meshopt_compression (required, high/filter mode)",
+    "quantization": "KHR_mesh_quantization (required)",
+    "rawGlbBytes": 1281044,
+    "optimizedGlbBytes": 193884,
+    "glbReductionPercent": 84.9,
+    "textures": "One embedded project-generated 128x64 opaque PNG number field"
+  },
+  "hierarchy": {
+    "scene": "RRR_RivalPackScene",
+    "root": "RRR_RivalPackBase",
+    "requiredNodes": [
+      "RRR_RivalPackBase",
+      "RRR_RivalBikeVisual",
+      "BikeStatic_Primary",
+      "BikeStatic_Accent",
+      "BikeStatic_Hardware",
+      "BikeStatic_NumberField",
+      "bike-steering-pivot",
+      "bike-front-suspension-pivot",
+      "FrontTire",
+      "FrontWheel_Wheel",
+      "bike-rear-suspension-pivot",
+      "RearTire",
+      "RearWheel_Wheel",
+      "rival-rider",
+      "rider-torso-pivot",
+      "RivalTorso_Primary",
+      "rider-head-pivot",
+      "RivalHead_Accent",
+      "rider-left-arm-pivot",
+      "RivalLeftArm_Accent",
+      "rider-right-arm-pivot",
+      "RivalRightArm_Accent",
+      "rider-left-leg-pivot",
+      "RivalLeftLeg_Primary",
+      "rider-right-leg-pivot",
+      "RivalRightLeg_Primary"
+    ],
+    "posePivots": [
+      "rider-torso-pivot",
+      "rider-head-pivot",
+      "rider-left-arm-pivot",
+      "rider-right-arm-pivot",
+      "rider-left-leg-pivot",
+      "rider-right-leg-pivot"
+    ]
+  },
+  "metrics": {
+    "source": {
+      "nodes": 26,
+      "meshBearingNodes": 12,
+      "renderPrimitives": 12,
+      "materials": 5,
+      "textures": 1,
+      "triangles": 19588
+    },
+    "production": {
+      "nodes": 26,
+      "meshBearingNodes": 12,
+      "renderPrimitives": 12,
+      "materials": 5,
+      "textures": 1,
+      "triangles": 19588
+    }
+  },
+  "dependencies": [
+    {
+      "package": "@gltf-transform/core",
+      "version": "4.4.1",
+      "license": "MIT",
+      "use": "glTF I/O and inspection"
+    },
+    {
+      "package": "@gltf-transform/extensions",
+      "version": "4.4.1",
+      "license": "MIT",
+      "use": "Meshopt and quantization extension I/O"
+    },
+    {
+      "package": "@gltf-transform/functions",
+      "version": "4.4.1",
+      "license": "MIT",
+      "use": "deduplication, pruning, and Meshopt transform"
+    },
+    {
+      "package": "meshoptimizer",
+      "version": "1.2.0",
+      "license": "MIT",
+      "use": "build-time geometry encoder"
+    }
+  ],
+  "pipeline": {
+    "assetBuilder": {
+      "path": "scripts/build-rival-pack-assets.mjs",
+      "bytes": 17207,
+      "sha256": "e34818e0fcc8ca056e3ea7d960dba9cc4de589cd6bd5801d55ab9436a3d6f777"
+    },
+    "independentVerifier": {
+      "path": "scripts/verify-rival-pack-assets.mjs",
+      "bytes": 13271,
+      "sha256": "187272eeefa0caaf1ec2af256b3433f8b6c44b0961537ff08bcbc14c0dbfd403"
+    },
+    "pngIntegrityInspector": {
+      "path": "scripts/lib/png-integrity.mjs",
+      "bytes": 4876,
+      "sha256": "215ee9f81a8025bea13cc05d6b4272e7869980daf19b77a907309bcbd9df85ca"
+    },
+    "packageManifest": {
+      "path": "package.json",
+      "bytes": 3106,
+      "sha256": "4b899c60d2de484cc52f4f1d15c3ec42e3538d782c23b04d17b1c07d68ab559e"
+    }
+  },
+  "files": {
+    "editableSource": {
+      "path": "art-source/blender/rival-pack/generated/rival-pack-source.blend",
+      "bytes": 1538617,
+      "sha256": "a3cf4b447bf072eb377066ee6a02af6902e7a6086ff1769fcce63fe936935a91"
+    },
+    "rawInterchange": {
+      "path": "art-source/blender/rival-pack/generated/rival-pack-raw.glb",
+      "bytes": 1281044,
+      "sha256": "0fbaa36869c659636a53608fc05a6d0656d61679ff4198d25880bfffda1ee0ce"
+    },
+    "sourcePreview": {
+      "path": "art-source/blender/rival-pack/generated/rival-pack-preview.png",
+      "bytes": 1236602,
+      "sha256": "5e75ff066df4e5ece2c90e475b3828cc3ccbdcae6be87294e99065962fb225cd"
+    },
+    "variantContactSheet": {
+      "path": "art-source/blender/rival-pack/generated/rival-pack-variants-contact-sheet.png",
+      "bytes": 1197501,
+      "sha256": "67af3ab31b6357c797f200663cb6c3368608303b93b4a0544172e69a9fe54f5d"
+    },
+    "variantPreviews": [
+      {
+        "path": "art-source/blender/rival-pack/generated/rival-pack-preview-17.png",
+        "bytes": 336362,
+        "sha256": "07bdb986838cda8cebf0d19caa9ae28f27170e6f391886a7820edcce3f9b3090"
+      },
+      {
+        "path": "art-source/blender/rival-pack/generated/rival-pack-preview-31.png",
+        "bytes": 336707,
+        "sha256": "12f7b843034fe9d70ea38f07d1a6432a5f21040c3bcd17fff4da45f39253087c"
+      },
+      {
+        "path": "art-source/blender/rival-pack/generated/rival-pack-preview-46.png",
+        "bytes": 331681,
+        "sha256": "f4026e9e0ce8e646858c61849d6249931b1a587cbae8367c5135d1f2808cfdaf"
+      },
+      {
+        "path": "art-source/blender/rival-pack/generated/rival-pack-preview-58.png",
+        "bytes": 337538,
+        "sha256": "e2f7bf33489d5652b2902d985176ee5681ac760806f278c38377c8e01f832e82"
+      },
+      {
+        "path": "art-source/blender/rival-pack/generated/rival-pack-preview-73.png",
+        "bytes": 337061,
+        "sha256": "b0728dda349bb3b862badff93971fb6e866899e7f4a8e22267879cfe9e06946d"
+      }
+    ],
+    "sourceReadme": {
+      "path": "art-source/blender/rival-pack/README.md",
+      "bytes": 3127,
+      "sha256": "2f1eca07c5232f4fc43fa3f5ae50b44854b8572edd4913a3987f67cd4243a35a"
+    },
+    "authoringProcedure": {
+      "path": "art-source/blender/rival-pack/build_rival_pack.py",
+      "bytes": 36337,
+      "sha256": "afce3aeedc16b04d9575d60bec7e2c200c1e8f5e15987824db62d36e2ad54543"
+    },
+    "contract": {
+      "path": "docs/design/RIVAL_PACK_VERTICAL_SLICE.md",
+      "bytes": 4516,
+      "sha256": "aa6077001ff3df3d0527f4ba71a39964abf6f4a573181db15e5cf6eaf188399c"
+    },
+    "runtime": {
+      "path": "public/assets/rivals/rival-pack.glb",
+      "bytes": 193884,
+      "sha256": "09043547981c80d66fca23aa208971b6b2f457890cafabeed4258dbc0fdbb805"
+    }
+  }
+}

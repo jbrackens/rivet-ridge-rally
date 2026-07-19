@@ -119,6 +119,25 @@ export interface TrackDefinition {
   readonly authoredCourse?: AuthoredCourseDefinition;
 }
 
+const MASTERY_TARGET_REFERENCE_SECONDS = 259;
+const MASTERY_TARGET_SECONDS = [257, 255, 253, 251, 249, 248, 247] as const;
+export const MASTERY_TARGET_TIER_COUNT = MASTERY_TARGET_SECONDS.length;
+
+/**
+ * Seven Summit tiers tighten while the hot-start modifier rises.
+ * The floor stays above a clean standard-Ride completion at production length;
+ * resumed deterministic tuning runs must qualify any future reduction.
+ */
+export function getMasteryTargetMs(baseTargetMs: number, completedTiers: number): number {
+  const masteryLevel = Number.isFinite(completedTiers)
+    ? Math.max(0, Math.floor(completedTiers))
+    : 0;
+  const targetSeconds = MASTERY_TARGET_SECONDS[
+    Math.min(masteryLevel, MASTERY_TARGET_SECONDS.length - 1)
+  ] ?? MASTERY_TARGET_SECONDS[0];
+  return Math.round(baseTargetMs * targetSeconds / MASTERY_TARGET_REFERENCE_SECONDS);
+}
+
 const allLanes = [0, 1, 2, 3] as const;
 
 export const TRACKS: readonly TrackDefinition[] = [
@@ -130,15 +149,15 @@ export const TRACKS: readonly TrackDefinition[] = [
     theme: "Sunlit red-rock festival",
     skillFocus: "Lane choice, heat, and clean landings",
     courseLength: 1_260,
-    soloTargetMs: 148_000,
-    parTimeMs: 132_000,
+    soloTargetMs: 190_000,
+    parTimeMs: 181_000,
     palette: {
       sky: 0x69c8f3,
       fog: 0xd8eff7,
-      dirt: 0xa95d32,
-      dirtDark: 0x6f3827,
-      grass: 0x78a345,
-      rock: 0xb94f32,
+      dirt: 0x7c432f,
+      dirtDark: 0x4d2d25,
+      grass: 0x668f41,
+      rock: 0xae482f,
       accent: 0x22d5dc,
     },
     obstacles: [
@@ -164,8 +183,8 @@ export const TRACKS: readonly TrackDefinition[] = [
     theme: "Alpine logging festival",
     skillFocus: "Wheelies, bumps, and quick lane transitions",
     courseLength: 1_380,
-    soloTargetMs: 154_000,
-    parTimeMs: 138_000,
+    soloTargetMs: 208_000,
+    parTimeMs: 198_000,
     palette: {
       sky: 0x8ed7ef,
       fog: 0xd8f0e7,
@@ -198,8 +217,8 @@ export const TRACKS: readonly TrackDefinition[] = [
     theme: "Bright cliffside boardwalk",
     skillFocus: "Long jumps, cross-lane setup, and turbo timing",
     courseLength: 1_490,
-    soloTargetMs: 160_000,
-    parTimeMs: 144_000,
+    soloTargetMs: 224_000,
+    parTimeMs: 214_000,
     palette: {
       sky: 0x66d5ee,
       fog: 0xdaf5f1,
@@ -232,8 +251,8 @@ export const TRACKS: readonly TrackDefinition[] = [
     theme: "Colorful reclaimed metalworks",
     skillFocus: "Technical jump chains, heat planning, and recovery",
     courseLength: 1_590,
-    soloTargetMs: 166_000,
-    parTimeMs: 150_000,
+    soloTargetMs: 239_000,
+    parTimeMs: 228_000,
     palette: {
       sky: 0x7abed4,
       fog: 0xd3e2df,
@@ -266,9 +285,9 @@ export const TRACKS: readonly TrackDefinition[] = [
     theme: "High-altitude festival finale",
     skillFocus: "Mastery of every system under pressure",
     courseLength: 1_720,
-    soloTargetMs: 174_000,
-    parTimeMs: 157_000,
-    masteryModifier: "Hot Start: begin at 35% heat and chase a tighter target",
+    soloTargetMs: 259_000,
+    parTimeMs: 247_000,
+    masteryModifier: "Hot Start: each tier raises starting heat and tightens the target",
     palette: {
       sky: 0x98c9eb,
       fog: 0xe6eef4,

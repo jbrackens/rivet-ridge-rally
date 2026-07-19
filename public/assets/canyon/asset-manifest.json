@@ -1,0 +1,147 @@
+{
+  "schemaVersion": 2,
+  "generator": "scripts/build-canyon-assets.mjs",
+  "sourcePairId": "6d3823dd-f118-42fb-8bed-6cb2e3b2becf",
+  "design": {
+    "name": "Canyon Modular Kit A",
+    "origin": "Original project-authored Blender-native geometry and solid-color PBR materials",
+    "reference": "docs/design/concepts/canyon-production-asset-reference.png",
+    "referenceOrigin": "Project-specific original modeling reference generated with OpenAI ImageGen from project-owned gameplay concepts; no third-party model or texture was supplied",
+    "referenceUsage": "Modeling and material guide only; not sampled, projected, or shipped as a runtime texture",
+    "contract": "docs/design/CANYON_VERTICAL_SLICE.md",
+    "authoringProcedure": "art-source/blender/canyon-kit/build_canyon_kit.py",
+    "authoringTool": "Blender 4.5.11 LTS",
+    "coordinateSystem": "1 unit = 1 meter; source +Y forward/+Z up; glTF +Y up/-Z forward",
+    "gameplayAuthority": "Presentation only; TypeScript simulation/contact/course data remain authoritative"
+  },
+  "compression": {
+    "geometry": "EXT_meshopt_compression (required, high/filter mode)",
+    "quantization": "KHR_mesh_quantization (required)",
+    "rawGlbBytes": 2310368,
+    "optimizedGlbBytes": 427028,
+    "glbReductionPercent": 81.5,
+    "textures": "None; solid-color glTF PBR materials only"
+  },
+  "roots": [
+    "CYN_CoolingGate_A",
+    "CYN_WheelieBarrier_A",
+    "CYN_TabletopRamp_A",
+    "CYN_RockCluster_A",
+    "CYN_Pine_A",
+    "CYN_DesertPlants_A",
+    "CYN_SpectatorStand_A",
+    "CYN_FestivalTent_A",
+    "CYN_Workshop_A",
+    "CYN_MarshalTower_A",
+    "CYN_ServiceProps_A"
+  ],
+  "metrics": {
+    "reference": {
+      "width": 1672,
+      "height": 941,
+      "bitDepth": 8,
+      "colorType": 2
+    },
+    "source": {
+      "nodes": 275,
+      "meshes": 264,
+      "materials": 20,
+      "triangles": 32008
+    },
+    "production": {
+      "nodes": 73,
+      "meshes": 62,
+      "materials": 20,
+      "triangles": 32008
+    }
+  },
+  "dependencies": [
+    {
+      "package": "@gltf-transform/core",
+      "version": "4.4.1",
+      "license": "MIT",
+      "use": "glTF I/O and inspection"
+    },
+    {
+      "package": "@gltf-transform/extensions",
+      "version": "4.4.1",
+      "license": "MIT",
+      "use": "glTF extension I/O"
+    },
+    {
+      "package": "@gltf-transform/functions",
+      "version": "4.4.1",
+      "license": "MIT",
+      "use": "material deduplication, draw-call joining, pruning, and Meshopt transform"
+    },
+    {
+      "package": "meshoptimizer",
+      "version": "1.2.0",
+      "license": "MIT",
+      "use": "build-time geometry encoder"
+    }
+  ],
+  "pipeline": {
+    "assetBuilder": {
+      "path": "scripts/build-canyon-assets.mjs",
+      "bytes": 12944,
+      "sha256": "779c1ef683ecc75b9e63100b5bc29dd815c96371e95be08e1bf0671efbc6bc52"
+    },
+    "independentVerifier": {
+      "path": "scripts/verify-canyon-assets.mjs",
+      "bytes": 16450,
+      "sha256": "dd08e6d9e9f943959c73b969cd0646eb5988fb7907e8fcf5c31f51579d44723e"
+    },
+    "pngIntegrityInspector": {
+      "path": "scripts/lib/png-integrity.mjs",
+      "bytes": 4876,
+      "sha256": "215ee9f81a8025bea13cc05d6b4272e7869980daf19b77a907309bcbd9df85ca"
+    },
+    "packageManifest": {
+      "path": "package.json",
+      "bytes": 3106,
+      "sha256": "4b899c60d2de484cc52f4f1d15c3ec42e3538d782c23b04d17b1c07d68ab559e"
+    }
+  },
+  "files": {
+    "referenceConcept": {
+      "path": "docs/design/concepts/canyon-production-asset-reference.png",
+      "bytes": 2013293,
+      "sha256": "eb987cbaf9ca501141d88eab25cb0233217a5b1642b022b86ae623c3ea0ea677",
+      "width": 1672,
+      "height": 941,
+      "bitDepth": 8,
+      "colorType": 2
+    },
+    "contract": {
+      "path": "docs/design/CANYON_VERTICAL_SLICE.md",
+      "bytes": 8997,
+      "sha256": "3b8268705be46d850621ee3d196b6a40f92c2059e7cae1284c088341fea1d3fd"
+    },
+    "sourceReadme": {
+      "path": "art-source/blender/canyon-kit/README.md",
+      "bytes": 2526,
+      "sha256": "a4ba93d77f434fc69e8059156c8f31b3863728ed0b5c01a9961082d5f5d2c6f0"
+    },
+    "authoringProcedure": {
+      "path": "art-source/blender/canyon-kit/build_canyon_kit.py",
+      "bytes": 32357,
+      "sha256": "db8189e63bf0365d5da84c5a2a1ecdc678ddcc69f2bd59cc88bb91ae43d2ad75"
+    },
+    "editableSource": {
+      "path": "art-source/blender/canyon-kit/generated/canyon-kit-source.blend",
+      "bytes": 3556922,
+      "sha256": "6eb95c6828cecc086e339ca862d451888e965101d8e897297decdd9b97fd33ef"
+    },
+    "rawInterchange": {
+      "path": "art-source/blender/canyon-kit/generated/canyon-kit-raw.glb",
+      "bytes": 2310368,
+      "sha256": "f35edfe72d6071fefaf20370335120a0047f9b707abcb9929001b7c5d50655cb"
+    },
+    "runtime": {
+      "path": "public/assets/canyon/canyon-kit.glb",
+      "bytes": 427028,
+      "sha256": "283be67d91cce4b0dc7b0f7e291811c62c77384f5e3f226cca71d41ce890ff7d"
+    }
+  }
+}

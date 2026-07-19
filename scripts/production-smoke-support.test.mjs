@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import test from "node:test";
+import { gzipSync } from "node:zlib";
 
 import {
   normalizeProductionBaseURL,
@@ -15,11 +16,16 @@ function sha256(contents) {
 
 function fixtureManifest(contentsByPath) {
   const files = [...contentsByPath.entries()]
-    .map(([path, contents]) => ({
-      path,
-      bytes: contents.length,
-      sha256: sha256(contents),
-    }))
+    .map(([path, contents]) => {
+      const gzipContents = gzipSync(contents, { level: 9 });
+      return {
+        path,
+        bytes: contents.length,
+        gzipBytes: gzipContents.length,
+        gzipSha256: sha256(gzipContents),
+        sha256: sha256(contents),
+      };
+    })
     .toSorted((left, right) => left.path.localeCompare(right.path));
   const aggregate = createHash("sha256");
   for (const record of files) aggregate.update(`${record.sha256}  ${record.path}\n`);
@@ -38,6 +44,18 @@ function fixtureManifest(contentsByPath) {
       nodeExecutableSha256: "e".repeat(64),
       npm: "11.17.0",
       npmCliSha256: "c".repeat(64),
+      npmPackage: {
+        treeFormat: 1,
+        name: "npm",
+        version: "11.17.0",
+        cliRelativePath: "bin/npm-cli.js",
+        packageJsonSha256: "a".repeat(64),
+        directoryCount: 12,
+        regularFileCount: 42,
+        symlinkCount: 2,
+        totalRegularFileBytes: 123_456,
+        treeSha256: "b".repeat(64),
+      },
       platform: "darwin",
       arch: "arm64",
       packageLockSha256: "d".repeat(64),
@@ -50,7 +68,9 @@ function fixtureManifest(contentsByPath) {
       npmConfig: "isolated-empty-user-and-global",
       installScripts: "enabled",
     },
+    compression: { algorithm: "gzip", level: 9 },
     totalBytes: files.reduce((sum, record) => sum + record.bytes, 0),
+    totalGzipBytes: files.reduce((sum, record) => sum + record.gzipBytes, 0),
     fileCount: files.length,
     aggregateSha256: aggregate.digest("hex"),
     files,
@@ -107,6 +127,7 @@ test("binds every served production file to a valid format-2 manifest", async ()
   assert.equal(evidence.verified, true);
   assert.equal(evidence.fileCount, manifest.fileCount);
   assert.equal(evidence.totalBytes, manifest.totalBytes);
+  assert.equal(evidence.totalGzipBytes, manifest.totalGzipBytes);
   assert.equal(evidence.aggregateSha256, manifest.aggregateSha256);
   assert.equal(evidence.baseURL, "https://rally.example/");
   assert.equal(evidence.entrypoint.requestedURL, "https://rally.example/");
@@ -188,9 +209,21 @@ test("rejects unsafe paths and internally inconsistent manifest aggregates", () 
   inconsistent.aggregateSha256 = "0".repeat(64);
   assert.throws(() => validateFormat2ReleaseManifest(inconsistent), /aggregate SHA-256 does not match/);
 
+  const inconsistentGzip = structuredClone(manifest);
+  inconsistentGzip.files[0].gzipBytes += 1;
+  assert.throws(() => validateFormat2ReleaseManifest(inconsistentGzip), /total gzip byte count does not match/);
+
   const missingNodeIdentity = structuredClone(manifest);
   delete missingNodeIdentity.toolchain.nodeExecutableSha256;
   assert.throws(() => validateFormat2ReleaseManifest(missingNodeIdentity), /Node executable SHA-256 is invalid/);
+
+  const missingNpmTree = structuredClone(manifest);
+  delete missingNpmTree.toolchain.npmPackage;
+  assert.throws(() => validateFormat2ReleaseManifest(missingNpmTree), /npmPackage fields do not match/);
+
+  const mismatchedNpmTreeVersion = structuredClone(manifest);
+  mismatchedNpmTreeVersion.toolchain.npmPackage.version = "11.16.0";
+  assert.throws(() => validateFormat2ReleaseManifest(mismatchedNpmTreeVersion), /npm package version does not match npm/);
 });
 
 test("bounds an unsettled production-smoke operation", async () => {

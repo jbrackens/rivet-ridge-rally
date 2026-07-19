@@ -246,6 +246,14 @@ describe("custom track JSON serialization", () => {
     );
   });
 
+  it("reports a safe human-readable reason for an external thumbnail", () => {
+    const track = { ...cloneExample(), thumbnail: "https://invalid.example/track.png" };
+
+    expect(() => importCustomTrack(JSON.stringify(track))).toThrow(
+      "Track file is incompatible or invalid: Thumbnail must be an embedded image data URL.",
+    );
+  });
+
   it("rejects excessive nesting before JSON allocation", () => {
     let nested: unknown = "value";
     for (let depth = 0; depth < 21; depth += 1) nested = [nested];

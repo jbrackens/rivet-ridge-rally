@@ -73,6 +73,8 @@ export interface AiObstaclePolicy {
   readonly retainedSpeed: number;
 }
 
+export type ObstacleContactOutcome = "clear" | "slowdown" | "crash";
+
 const DIRT_POLICY: AiObstaclePolicy = {
   environment: { surface: "dirt" },
   avoidable: false,
@@ -133,7 +135,7 @@ const OBSTACLE_POLICIES: Readonly<Record<ObstacleKind, AiObstaclePolicy>> = {
     environment: { surface: "dirt" },
     avoidable: true,
     crashesOnContact: true,
-    retainedSpeed: 1,
+    retainedSpeed: 0.6,
   },
   bank: DIRT_POLICY,
   "super-jump": {
@@ -150,6 +152,18 @@ export function getAiDifficultyProfile(difficulty: Difficulty): AiDifficultyProf
 
 export function getObstaclePolicy(kind?: ObstacleKind): AiObstaclePolicy {
   return kind ? OBSTACLE_POLICIES[kind] : DIRT_POLICY;
+}
+
+export function getObstacleContactOutcome(
+  kind: ObstacleKind,
+  policy: AiObstaclePolicy,
+  wheelie: boolean,
+): ObstacleContactOutcome {
+  if (policy.crashesOnContact) {
+    return kind === "barrier" && wheelie ? "slowdown" : "crash";
+  }
+  if (policy.retainedSpeed < 1) return wheelie ? "clear" : "slowdown";
+  return "clear";
 }
 
 export function isRampObstacle(kind?: ObstacleKind): boolean {

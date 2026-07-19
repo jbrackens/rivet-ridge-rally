@@ -13,6 +13,7 @@ interface Window {
   }>;
   __RRR_QA__?: {
     startTrack: (trackId: string, mode?: import("./app/types").RaceMode) => void;
+    openEditor: () => void;
     unlockCampaign: () => void;
     lifecycle: () => import("./game/qa/lifecycleDiagnostics").LifecycleDiagnostics;
   };

@@ -101,6 +101,30 @@ describe("InputManager", () => {
     manager.disconnect();
   });
 
+  it("delivers a quick keyboard lane tap to the next sample", () => {
+    const manager = new InputManager(settings);
+    manager.connect();
+
+    window.dispatchEvent(new KeyboardEvent("keydown", { code: "ArrowLeft" }));
+    window.dispatchEvent(new KeyboardEvent("keyup", { code: "ArrowLeft" }));
+
+    expect(manager.sample().laneChange).toBe(-1);
+    expect(manager.sample().laneChange).toBe(0);
+    manager.disconnect();
+  });
+
+  it("clears an unsampled lane tap when input is suspended", () => {
+    const manager = new InputManager(settings);
+    manager.connect();
+
+    window.dispatchEvent(new KeyboardEvent("keydown", { code: "ArrowRight" }));
+    window.dispatchEvent(new KeyboardEvent("keyup", { code: "ArrowRight" }));
+    manager.suspend();
+
+    expect(manager.sample().laneChange).toBe(0);
+    manager.disconnect();
+  });
+
   it("does not consume gameplay keys from an interactive control", () => {
     const manager = new InputManager(settings);
     const retry = document.createElement("button");
@@ -135,6 +159,50 @@ describe("InputManager", () => {
     window.dispatchEvent(unrelatedKey);
     expect(unrelatedKey.defaultPrevented).toBe(false);
     window.dispatchEvent(new KeyboardEvent("keyup", { code: "KeyZ" }));
+    manager.disconnect();
+  });
+
+  it("does not claim keyboard prompts for unrelated keys", () => {
+    const manager = new InputManager(settings, "touch");
+    manager.connect();
+
+    window.dispatchEvent(new KeyboardEvent("keydown", { code: "KeyZ" }));
+
+    expect(manager.activeDevice).toBe("touch");
+    expect(manager.sample()).toMatchObject({ throttle: false, laneChange: 0 });
+    manager.disconnect();
+  });
+
+  it("does not retain the UI-handled pause key as gameplay input", () => {
+    const manager = new InputManager(settings);
+    manager.connect();
+
+    const pause = new KeyboardEvent("keydown", { cancelable: true, code: "Escape", repeat: true });
+    window.dispatchEvent(pause);
+    expect(pause.defaultPrevented).toBe(true);
+
+    manager.updateSettings({
+      ...settings,
+      keyBindings: { ...settings.keyBindings, throttle: "Escape", pause: "KeyP" },
+    });
+    expect(manager.sample().throttle).toBe(false);
+    manager.disconnect();
+  });
+
+  it("rejects mapped gameplay commands while Control, Meta, or Alt is held", () => {
+    const manager = new InputManager(settings);
+    manager.connect();
+
+    for (const modifier of ["ctrlKey", "metaKey", "altKey"] as const) {
+      window.dispatchEvent(new KeyboardEvent("keydown", { code: "KeyW", [modifier]: true }));
+      expect(manager.sample().throttle).toBe(false);
+      window.dispatchEvent(new KeyboardEvent("keyup", { code: "KeyW" }));
+    }
+
+    window.dispatchEvent(new KeyboardEvent("keydown", { code: "KeyW" }));
+    expect(manager.sample().throttle).toBe(true);
+    window.dispatchEvent(new KeyboardEvent("keydown", { code: "ControlLeft", ctrlKey: true }));
+    expect(manager.sample().throttle).toBe(false);
     manager.disconnect();
   });
 

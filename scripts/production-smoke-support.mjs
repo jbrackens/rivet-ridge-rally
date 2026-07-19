@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
+import { gzipSync } from "node:zlib";
 
 import { REPO_ROOT } from "./performance/common.mjs";
 
@@ -34,6 +35,54 @@ function requireManifest(condition, message) {
   if (!condition) throw new Error(`Production smoke manifest is invalid: ${message}`);
 }
 
+function requireExactManifestKeys(value, keys, label) {
+  requireManifest(
+    value !== null
+      && typeof value === "object"
+      && !Array.isArray(value)
+      && Object.keys(value).length === keys.length
+      && keys.every((key) => Object.hasOwn(value, key)),
+    `${label} fields do not match the release schema`,
+  );
+}
+
+function validateNpmPackageProvenance(value, npmVersion) {
+  requireExactManifestKeys(value, [
+    "treeFormat",
+    "name",
+    "version",
+    "cliRelativePath",
+    "packageJsonSha256",
+    "directoryCount",
+    "regularFileCount",
+    "symlinkCount",
+    "totalRegularFileBytes",
+    "treeSha256",
+  ], "npmPackage");
+  requireManifest(value.treeFormat === 1, "npm package tree format must be 1");
+  requireManifest(value.name === "npm", "npm package name is invalid");
+  requireManifest(value.version === npmVersion, "npm package version does not match npm");
+  requireManifest(value.cliRelativePath === "bin/npm-cli.js", "npm package CLI path is invalid");
+  requireManifest(SHA256_PATTERN.test(value.packageJsonSha256), "npm package.json SHA-256 is invalid");
+  requireManifest(
+    Number.isSafeInteger(value.directoryCount) && value.directoryCount > 0,
+    "npm package directory count is invalid",
+  );
+  requireManifest(
+    Number.isSafeInteger(value.regularFileCount) && value.regularFileCount > 0,
+    "npm package regular-file count is invalid",
+  );
+  requireManifest(
+    Number.isSafeInteger(value.symlinkCount) && value.symlinkCount >= 0,
+    "npm package symbolic-link count is invalid",
+  );
+  requireManifest(
+    Number.isSafeInteger(value.totalRegularFileBytes) && value.totalRegularFileBytes > 0,
+    "npm package byte count is invalid",
+  );
+  requireManifest(SHA256_PATTERN.test(value.treeSha256), "npm package tree SHA-256 is invalid");
+}
+
 function validateReleasePath(value) {
   requireManifest(typeof value === "string" && value.length > 0, "file path is missing");
   requireManifest(!value.startsWith("/"), `file path must be relative: ${value}`);
@@ -63,6 +112,7 @@ export function validateFormat2ReleaseManifest(value) {
   );
   requireManifest(typeof value.toolchain.npm === "string" && value.toolchain.npm.length > 0, "npm identity is missing");
   requireManifest(SHA256_PATTERN.test(value.toolchain.npmCliSha256 ?? ""), "npm CLI SHA-256 is invalid");
+  validateNpmPackageProvenance(value.toolchain.npmPackage, value.toolchain.npm);
   requireManifest(SHA256_PATTERN.test(value.toolchain.packageLockSha256 ?? ""), "package-lock SHA-256 is invalid");
   requireManifest(typeof value.toolchain.platform === "string" && value.toolchain.platform.length > 0, "platform is missing");
   requireManifest(typeof value.toolchain.arch === "string" && value.toolchain.arch.length > 0, "architecture is missing");
@@ -73,27 +123,35 @@ export function validateFormat2ReleaseManifest(value) {
   requireManifest(value.build.viteQaMode === "0", "build is not the non-QA candidate");
   requireManifest(value.build.npmConfig === "isolated-empty-user-and-global", "npm config provenance is invalid");
   requireManifest(value.build.installScripts === "enabled", "install-script provenance is invalid");
+  requireManifest(value.compression?.algorithm === "gzip", "compression algorithm must be gzip");
+  requireManifest(value.compression?.level === 9, "compression level must be 9");
   requireManifest(SHA256_PATTERN.test(value.aggregateSha256 ?? ""), "aggregate SHA-256 is invalid");
   requireManifest(Array.isArray(value.files) && value.files.length > 0, "file list is empty");
   requireManifest(Number.isSafeInteger(value.fileCount), "file count is invalid");
   requireManifest(Number.isSafeInteger(value.totalBytes) && value.totalBytes >= 0, "total byte count is invalid");
+  requireManifest(Number.isSafeInteger(value.totalGzipBytes) && value.totalGzipBytes >= 0, "total gzip byte count is invalid");
 
   const paths = new Set();
   let totalBytes = 0;
+  let totalGzipBytes = 0;
   const aggregate = createHash("sha256");
   for (const record of value.files) {
     requireManifest(record !== null && typeof record === "object", "file record must be an object");
     validateReleasePath(record.path);
     requireManifest(!paths.has(record.path), `duplicate file path: ${record.path}`);
     requireManifest(Number.isSafeInteger(record.bytes) && record.bytes >= 0, `invalid byte count: ${record.path}`);
+    requireManifest(Number.isSafeInteger(record.gzipBytes) && record.gzipBytes >= 0, `invalid gzip byte count: ${record.path}`);
+    requireManifest(SHA256_PATTERN.test(record.gzipSha256 ?? ""), `invalid gzip SHA-256: ${record.path}`);
     requireManifest(SHA256_PATTERN.test(record.sha256 ?? ""), `invalid SHA-256: ${record.path}`);
     paths.add(record.path);
     totalBytes += record.bytes;
+    totalGzipBytes += record.gzipBytes;
     aggregate.update(`${record.sha256}  ${record.path}\n`);
   }
 
   requireManifest(value.fileCount === value.files.length, "file count does not match the file list");
   requireManifest(totalBytes === value.totalBytes, "total byte count does not match the file list");
+  requireManifest(totalGzipBytes === value.totalGzipBytes, "total gzip byte count does not match the file list");
   requireManifest(
     aggregate.digest("hex") === value.aggregateSha256,
     "aggregate SHA-256 does not match the file list",
@@ -184,12 +242,21 @@ export async function verifyServedRelease(
 
     const contents = Buffer.from(await response.arrayBuffer());
     const actualSha256 = sha256(contents);
-    if (contents.length !== record.bytes || actualSha256 !== record.sha256) {
+    const gzipContents = gzipSync(contents, { level: 9 });
+    const actualGzipSha256 = sha256(gzipContents);
+    if (
+      contents.length !== record.bytes
+      || actualSha256 !== record.sha256
+      || gzipContents.length !== record.gzipBytes
+      || actualGzipSha256 !== record.gzipSha256
+    ) {
       throw new Error(`Production smoke served bytes do not match the release manifest: ${record.path}`);
     }
     return {
       path: record.path,
       bytes: contents.length,
+      gzipBytes: gzipContents.length,
+      gzipSha256: actualGzipSha256,
       sha256: actualSha256,
     };
   }));
@@ -239,6 +306,7 @@ export async function verifyServedRelease(
     origin: rootURL.origin,
     fileCount: files.length,
     totalBytes: files.reduce((sum, record) => sum + record.bytes, 0),
+    totalGzipBytes: files.reduce((sum, record) => sum + record.gzipBytes, 0),
     aggregateSha256,
     entrypoint: {
       requestedURL: normalizedBaseURL,

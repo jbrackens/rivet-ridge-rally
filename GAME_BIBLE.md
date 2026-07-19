@@ -36,7 +36,7 @@ Crashes and overheating have clear causes, strong audiovisual feedback, and boun
 
 The editor is a complete local creative mode, not an online platform. Tracks can be saved, validated, test-played, and exported as bounded JSON without accounts, public browsing, comments, chat, or public sharing services.
 
-Release safety follows the same honest-local principle. The shell-v30 cache is populated from fresh same-origin responses, stores one freshly fetched index response under both root entry keys, and includes the bundled display fonts; it is discarded if installation leaves a partial current-generation cache. Production smoke binds its runtime commit and browser evidence to every byte recorded by the exact format-2 release manifest, verifies served bytes before and after the journey, separately proves that the served root is the same index on the same credential-free origin, exercises cached Practice while offline, and atomically retains each run under its manifest identity instead of overwriting historical proof. Those latest safeguards are implemented in source but remain `UNVERIFIED` until the paused qualification run resumes.
+Release safety follows the same honest-local principle. The shell-v35 cache is populated from fresh same-origin responses, stores one freshly fetched index response under both root entry keys, and includes the bundled display fonts, `/assets/3d/hero-bike-rider.glb`, `/assets/rivals/rival-pack.glb`, and the Canyon modular GLB; it is discarded if installation leaves a partial current-generation cache. Production smoke binds its runtime commit and browser evidence to every byte recorded by the exact format-2 release manifest, verifies served bytes before and after the journey, separately proves that the served root is the same index on the same credential-free origin, exercises cached Practice while offline, and atomically retains each run under its manifest identity instead of overwriting historical proof. Those latest safeguards are implemented in source but remain `UNVERIFIED` until the paused qualification run resumes.
 
 ## Audience and session shape
 
@@ -73,6 +73,7 @@ Three additional polished example tracks must be created with the shipping edito
 - No direct AI interference.
 - Shows current lap, lap and checkpoint splits, final time, personal best, best time, and a visible third-place qualification target. A completed Solo run keeps its current timings visible beside signed comparisons with the standing personal-best lap/split timings; only a faster final time replaces that saved timing set.
 - Beating the third-place target unlocks that track's Rival Main Race.
+- Production targets are calibrated against a clean standard-Ride two-lap reference with human margin rather than an impossible maximum-speed fantasy. Current Solo targets are 190, 208, 224, 239, and 259 seconds in campaign order; tighter values require recorded full-course deterministic qualification.
 
 ### Rival Main Race
 
@@ -88,7 +89,7 @@ Three additional polished example tracks must be created with the shipping edito
 
 ### Summit mastery
 
-Summit Showdown remains replayable after campaign completion with escalating, clearly disclosed goals or modifiers. Mastery must not rely on hidden rule changes.
+Summit Showdown remains replayable after campaign completion with escalating, clearly disclosed goals or modifiers. Mastery must not rely on hidden rule changes. One shared configuration supplies both the HUD and progression gate: the seven current targets are 257, 255, 253, 251, 249, 248, and 247 seconds while starting heat rises from 35% to 65%.
 
 ## Core riding language
 
@@ -101,6 +102,7 @@ Four clearly marked lanes create discrete, intentional choices. Lane changes are
 - Standard Ride approaches a fixed 62% safe heat ceiling without exceeding it on its own.
 - Turbo provides an obvious speed advantage and continuously adds heat.
 - Turbo can push beyond that safe ceiling into warning and overheat territory.
+- Turbo remains controllable for at least 11 seconds from cold and at least 4 seconds from the normal 62% operating ceiling before lockout.
 - A prominent meter and escalating visual/audio warnings precede overheating; gamepad warning feedback is optional where supported.
 - Overheating forces a short, readable loss-of-control or recovery state until cooling completes.
 - Cooling zones are visible before entry and reduce heat immediately.
@@ -111,6 +113,7 @@ Four clearly marked lanes create discrete, intentional choices. Lane changes are
 - Pulling back raises the front wheel; pushing forward lowers it.
 - Airborne pitch changes trajectory, landing angle, retained speed, and crash risk.
 - Short wheelies clear small bumps; holding them too long becomes unsafe.
+- A controlled grounded wheelie clears a striped barrier but retains only 60% of entry speed; a front-wheel-down barrier hit still causes a crash, for player and rivals alike.
 - Clean two-wheel landings preserve momentum.
 - Bad landings cause a readable crash or meaningful speed penalty.
 
@@ -141,10 +144,10 @@ The interactive tutorial begins paused behind an input-adaptive rider-school map
 6. Hold a controlled wheelie over a bump.
 7. Command nose-up and nose-down airborne pitch, then release toward neutral.
 8. Land nearly level on both wheels.
-9. Read the named striped lane-choice barrier and move to an open lane; an unrelated avoided hazard does not count.
+9. Read the named striped lane-choice barrier and either move to an open lane for full speed or use a controlled wheelie to clear it with heavy speed loss; an unrelated avoided hazard does not count.
 10. Experience mud slowdown.
 11. Experience grass/off-track slowdown and return to the marked dirt.
-12. Hit the final training barrier and hold Recover through a real crash-and-recovery cycle.
+12. Lower the front wheel, hit the final training barrier, and hold Recover through a real crash-and-recovery cycle.
 
 Each riding lesson requires fresh evidence after that lesson becomes active; an earlier lane move, jump input, surface touch, or crash may remain in the recap but cannot clear a later lesson. Multi-part lessons enforce their stated order. A completed lesson freezes the simulation for the 550 ms presentation handoff without discarding held Ride or Turbo input, so the next release-based lesson still requires the player to release the control deliberately.
 
@@ -167,7 +170,7 @@ Two contact-rule drills follow the riding lessons. Prompts and the final six-con
 
 ## Track editor fantasy
 
-Players operate a readable 3D build camera and place lane-aware modules on a four-lane route surface. Checkpoints can shape a smooth local turn and rise; the Builder surface, lane guides, modules, camera, saved thumbnail, and Test Ride must consume the same deterministic centerline. The editor offers at least 19 original modules spanning ramps, bumps, jump chains, mud, cooling, barriers, curves/banks, and a high-risk super jump. Placement preview, duplicate, delete, rename, thumbnail, one-to-nine laps, 50-action undo/redo, confirmation-based clear, validation, save, test play, and a local library are mandatory. If device saving becomes unavailable, a valid draft still launches as an in-memory Test Ride while the editor keeps its session-mode and Export guidance honest.
+Players operate a readable 3D build camera and place lane-aware modules on a four-lane route surface. Checkpoints can shape a smooth local turn and rise; the Builder surface, lane guides, modules, camera, saved thumbnail, and Test Ride must consume the same deterministic centerline. The editor offers at least 19 original modules spanning ramps, bumps, jump chains, mud, cooling, barriers, curves/banks, and a high-risk super jump. Placement preview, duplicate, delete, rename, thumbnail, one-to-nine laps, 50-action undo/redo, confirmation-based clear, validation, save, test play, and a local library are mandatory. Invalid red-preview or keyboard candidates never enter the draft. A keyboard-only rider can choose a module, route-view position, and lane and place it without the canvas. Phone layouts retain Export/Import, inspection/repair controls, validation detail, and live notices rather than hiding core authoring or recovery paths. If device saving becomes unavailable, a valid draft still launches as an in-memory Test Ride while the editor keeps its session-mode and Export guidance honest.
 
 Import/export is intentionally defensive: corrupt, malicious, oversized, incompatible, overlapping, or otherwise invalid JSON is rejected with actionable errors. Imported content never executes code or loads arbitrary network resources.
 

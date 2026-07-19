@@ -8,6 +8,7 @@ import {
   validateCustomTrack,
   validateLegacyCustomTrack,
 } from "../editor/validation";
+import { REPLAY_FORMAT_VERSION, validateReplay } from "../replay/replayCodec";
 import type {
   CampaignProgress,
   GameSettings,
@@ -33,6 +34,8 @@ const MAX_QUARANTINE_RECORDS = 100;
 const MAX_QUARANTINE_RECORD_BYTES = 1_000_000;
 const MAX_QUARANTINE_TOTAL_BYTES = 10_000_000;
 const MAX_REPLAY_SAMPLE_BYTES = 512_000;
+export const MAX_REPLAYS_PER_COURSE = 20;
+export const MAX_REPLAY_RECORDS = 100;
 
 export type PersistenceFailureReason = "unavailable" | "quota" | "upgrade" | "blocked" | "write";
 export type PersistenceOperation = "load" | "settings" | "progress" | "custom-tracks" | "replay" | "recovery" | "retry";
@@ -121,6 +124,9 @@ interface ProfileData {
 
 export interface RetryPersistenceOptions {
   preserveExistingProfile: boolean;
+  baseSettings?: GameSettings | undefined;
+  baseProgress?: CampaignProgress | undefined;
+  replaceProgress?: boolean | undefined;
 }
 
 export interface CustomTrackModule {
@@ -180,15 +186,38 @@ export interface CustomTrackLibrary {
   recoveries: CustomTrackRecovery[];
 }
 
-interface ReplayRecord {
+export interface CustomTrackSaveResult {
+  track: CustomTrackData;
+  conflictCopy: boolean;
+}
+
+export interface CustomTrackDeleteResult {
+  deleted: boolean;
+  conflict: boolean;
+}
+
+export interface ReplayRecord {
   id: string;
-  schemaVersion: 1;
+  schemaVersion: 2;
+  codecVersion: typeof REPLAY_FORMAT_VERSION;
+  courseKey: string;
   trackId: TrackId | "custom";
+  customTrackId?: string | undefined;
+  customTrackRevision?: string | undefined;
   mode: RaceResult["mode"];
   result: RaceResult;
   samples: Uint8Array;
   createdAt: number;
 }
+
+interface LegacyReplayRecord extends Omit<
+  ReplayRecord,
+  "schemaVersion" | "codecVersion" | "courseKey" | "customTrackId" | "customTrackRevision"
+> {
+  schemaVersion: 1;
+}
+
+type StoredReplayRecord = LegacyReplayRecord | ReplayRecord;
 
 interface QuarantineRecord {
   key?: number;
@@ -428,6 +457,161 @@ const progressRecordSchema = z.object({
   updatedAt: z.number().int().positive(),
 }).strict();
 
+function sameStructuredValue(left: unknown, right: unknown): boolean {
+  return JSON.stringify(left) === JSON.stringify(right);
+}
+
+function mergeChangedSetting<T>(base: T, current: T, next: T): T {
+  return sameStructuredValue(base, next) ? current : next;
+}
+
+type RequiredKeyBindings = z.infer<typeof keyBindingsSchema>;
+
+function mergeKeyBindingChanges(
+  baseBindings: GameSettings["controls"]["keyBindings"],
+  currentBindings: GameSettings["controls"]["keyBindings"],
+  nextBindings: GameSettings["controls"]["keyBindings"],
+): RequiredKeyBindings {
+  const base = keyBindingsSchema.parse(baseBindings);
+  const current = keyBindingsSchema.parse(currentBindings);
+  const next = keyBindingsSchema.parse(nextBindings);
+  const locallyChanged = new Set(
+    REQUIRED_KEY_BINDING_ACTIONS.filter((action) => base[action] !== next[action]),
+  );
+  const merged: RequiredKeyBindings = { ...current };
+  for (const action of locallyChanged) merged[action] = next[action];
+
+  // Current and next are independently unique. Any duplicate introduced by
+  // combining them therefore belongs to a remote-only action displaced by a
+  // local action. Restore that action, and any resulting chain, to its base
+  // binding so the local remap wins without discarding unrelated remaps.
+  const fixedCodes = new Set([...locallyChanged].map((action) => next[action]));
+  const resetQueue = REQUIRED_KEY_BINDING_ACTIONS.filter((action) => (
+    !locallyChanged.has(action) && fixedCodes.has(merged[action])
+  ));
+  const scheduled = new Set(resetQueue);
+  for (let index = 0; index < resetQueue.length; index += 1) {
+    const action = resetQueue[index];
+    if (action === undefined) continue;
+    const fallback = base[action];
+    const displaced = REQUIRED_KEY_BINDING_ACTIONS.find((candidate) => (
+      candidate !== action && merged[candidate] === fallback
+    ));
+    merged[action] = fallback;
+    if (
+      displaced !== undefined
+      && !locallyChanged.has(displaced)
+      && !scheduled.has(displaced)
+    ) {
+      scheduled.add(displaced);
+      resetQueue.push(displaced);
+    }
+  }
+  return keyBindingsSchema.parse(merged);
+}
+
+export function mergeSettingsChanges(
+  base: GameSettings,
+  current: GameSettings,
+  next: GameSettings,
+): GameSettings {
+  return settingsSchema.parse({
+    quality: mergeChangedSetting(base.quality, current.quality, next.quality),
+    difficulty: mergeChangedSetting(base.difficulty, current.difficulty, next.difficulty),
+    accessibility: {
+      reducedMotion: mergeChangedSetting(base.accessibility.reducedMotion, current.accessibility.reducedMotion, next.accessibility.reducedMotion),
+      reducedShake: mergeChangedSetting(base.accessibility.reducedShake, current.accessibility.reducedShake, next.accessibility.reducedShake),
+      highContrast: mergeChangedSetting(base.accessibility.highContrast, current.accessibility.highContrast, next.accessibility.highContrast),
+      captions: mergeChangedSetting(base.accessibility.captions, current.accessibility.captions, next.accessibility.captions),
+      colorblindSafe: mergeChangedSetting(base.accessibility.colorblindSafe, current.accessibility.colorblindSafe, next.accessibility.colorblindSafe),
+      uiScale: mergeChangedSetting(base.accessibility.uiScale, current.accessibility.uiScale, next.accessibility.uiScale),
+    },
+    audio: {
+      master: mergeChangedSetting(base.audio.master, current.audio.master, next.audio.master),
+      music: mergeChangedSetting(base.audio.music, current.audio.music, next.audio.music),
+      sfx: mergeChangedSetting(base.audio.sfx, current.audio.sfx, next.audio.sfx),
+    },
+    controls: {
+      mirroredTouch: mergeChangedSetting(base.controls.mirroredTouch, current.controls.mirroredTouch, next.controls.mirroredTouch),
+      retroRecovery: mergeChangedSetting(base.controls.retroRecovery, current.controls.retroRecovery, next.controls.retroRecovery),
+      vibration: mergeChangedSetting(base.controls.vibration, current.controls.vibration, next.controls.vibration),
+      keyBindings: mergeKeyBindingChanges(
+        base.controls.keyBindings,
+        current.controls.keyBindings,
+        next.controls.keyBindings,
+      ),
+    },
+  });
+}
+
+function advancedBoolean(base: boolean, next: boolean): boolean {
+  return !base && next;
+}
+
+function mergeTrackProgressChanges(
+  base: TrackProgress,
+  current: TrackProgress,
+  next: TrackProgress,
+): TrackProgress {
+  const merged: TrackProgress = structuredClone(current);
+  if (advancedBoolean(base.soloQualified, next.soloQualified)) merged.soloQualified = true;
+  if (advancedBoolean(base.rivalUnlocked, next.rivalUnlocked)) merged.rivalUnlocked = true;
+
+  const localBestImproved = next.bestSoloMs !== undefined
+    && (base.bestSoloMs === undefined || next.bestSoloMs < base.bestSoloMs);
+  if (
+    localBestImproved
+    && (merged.bestSoloMs === undefined || next.bestSoloMs! < merged.bestSoloMs)
+  ) {
+    merged.bestSoloMs = next.bestSoloMs;
+    merged.bestSoloLapTimesMs = next.bestSoloLapTimesMs
+      ? [...next.bestSoloLapTimesMs]
+      : undefined;
+    merged.bestSoloSplitTimesMs = next.bestSoloSplitTimesMs
+      ? [...next.bestSoloSplitTimesMs]
+      : undefined;
+  }
+
+  const localPositionImproved = next.bestRivalPosition !== undefined
+    && (base.bestRivalPosition === undefined || next.bestRivalPosition < base.bestRivalPosition);
+  if (
+    localPositionImproved
+    && (merged.bestRivalPosition === undefined || next.bestRivalPosition! < merged.bestRivalPosition)
+  ) {
+    merged.bestRivalPosition = next.bestRivalPosition;
+  }
+
+  const localMasteryImproved = next.masteryLevel > base.masteryLevel;
+  if (localMasteryImproved) {
+    merged.masteryLevel = Math.max(merged.masteryLevel, next.masteryLevel);
+  }
+  if (localBestImproved || localPositionImproved || localMasteryImproved) {
+    if (next.soloQualified) merged.soloQualified = true;
+    if (next.rivalUnlocked) merged.rivalUnlocked = true;
+  }
+  return merged;
+}
+
+export function mergeProgressChanges(
+  base: CampaignProgress,
+  current: CampaignProgress,
+  next: CampaignProgress,
+): CampaignProgress {
+  const tracks = Object.fromEntries(TRACK_IDS.map((trackId) => [
+    trackId,
+    mergeTrackProgressChanges(base.tracks[trackId], current.tracks[trackId], next.tracks[trackId]),
+  ])) as Record<TrackId, TrackProgress>;
+  return progressSchema.parse({
+    version: 1,
+    tutorialComplete: current.tutorialComplete
+      || advancedBoolean(base.tutorialComplete, next.tutorialComplete),
+    selectedTrackId: base.selectedTrackId === next.selectedTrackId
+      ? current.selectedTrackId
+      : next.selectedTrackId,
+    tracks,
+  });
+}
+
 const legacyCustomTrackModuleSchema = z.object({
   id: z.string().min(1).max(80),
   moduleId: z.string().min(1).max(80),
@@ -509,14 +693,17 @@ function parseCustomTrackRecord(record: unknown): CustomTrackParseResult {
     ? Reflect.get(record, "schemaVersion")
     : undefined;
   const error = schemaVersion === 1 ? legacy.error : current.error;
-  return { success: false, reason: error.message };
+  return {
+    success: false,
+    reason: error.issues[0]?.message ?? "The track record does not match a supported schema.",
+  };
 }
 
 class GameDatabase extends Dexie {
   settings!: EntityTable<SettingsRecord, "id">;
   progress!: EntityTable<ProgressRecord, "id">;
   customTracks!: EntityTable<StoredCustomTrackData, "id">;
-  replays!: EntityTable<ReplayRecord, "id">;
+  replays!: EntityTable<StoredReplayRecord, "id">;
   quarantine!: EntityTable<QuarantineRecord, "key">;
 
   constructor() {
@@ -552,6 +739,13 @@ class GameDatabase extends Dexie {
       replays: "id,schemaVersion,trackId,createdAt",
       quarantine: "++key,kind,createdAt",
     }).upgrade(migrateToVersion5);
+    this.version(6).stores({
+      settings: "id,schemaVersion,updatedAt",
+      progress: "id,schemaVersion,updatedAt",
+      customTracks: "id,schemaVersion,name,updatedAt",
+      replays: "id,schemaVersion,trackId,courseKey,createdAt",
+      quarantine: "++key,kind,createdAt",
+    });
   }
 }
 
@@ -709,10 +903,54 @@ async function putProgressRecord(progress: CampaignProgress): Promise<void> {
   });
 }
 
-async function putProfileData(settings: GameSettings, progress: CampaignProgress): Promise<void> {
-  await gameDatabase.transaction("rw", gameDatabase.settings, gameDatabase.progress, async () => {
-    await Promise.all([putSettingsRecord(settings), putProgressRecord(progress)]);
-  });
+function currentSettingsValue(record: unknown): GameSettings {
+  if (record === undefined) return structuredClone(DEFAULT_SETTINGS);
+  if (isFutureProfileRecord(record)) throw incompatibleProfileError("settings");
+  return settingsRecordSchema.parse(record).value;
+}
+
+function currentProgressValue(record: unknown): CampaignProgress {
+  if (record === undefined) return createDefaultProgress();
+  if (isFutureProfileRecord(record)) throw incompatibleProfileError("progress");
+  return progressRecordSchema.parse(record).value;
+}
+
+async function reconcileProfileData(
+  baseSettings: GameSettings,
+  nextSettings: GameSettings,
+  baseProgress: CampaignProgress,
+  nextProgress: CampaignProgress,
+  replaceProgress: boolean,
+): Promise<ProfileData> {
+  const parsedBaseSettings = settingsSchema.parse(baseSettings);
+  const parsedNextSettings = settingsSchema.parse(nextSettings);
+  const parsedBaseProgress = progressSchema.parse(baseProgress);
+  const parsedNextProgress = progressSchema.parse(nextProgress);
+  return gameDatabase.transaction(
+    "rw",
+    gameDatabase.settings,
+    gameDatabase.progress,
+    async () => {
+      const [settingsRecord, progressRecord] = await Promise.all([
+        gameDatabase.settings.get(ACTIVE_PROFILE_ID),
+        gameDatabase.progress.get(ACTIVE_PROFILE_ID),
+      ]);
+      const settings = mergeSettingsChanges(
+        parsedBaseSettings,
+        currentSettingsValue(settingsRecord),
+        parsedNextSettings,
+      );
+      const progress = replaceProgress
+        ? parsedNextProgress
+        : mergeProgressChanges(
+          parsedBaseProgress,
+          currentProgressValue(progressRecord),
+          parsedNextProgress,
+        );
+      await Promise.all([putSettingsRecord(settings), putProgressRecord(progress)]);
+      return { settings, progress, recovered: false };
+    },
+  );
 }
 
 async function readProfileData(
@@ -773,12 +1011,48 @@ export async function loadGameData(): Promise<ProfileData> {
   ));
 }
 
-export async function saveSettings(settings: GameSettings): Promise<void> {
-  await capturePersistenceFailure("settings", () => putSettingsRecord(settings));
+export async function saveSettings(
+  base: GameSettings,
+  next: GameSettings,
+): Promise<GameSettings> {
+  return capturePersistenceFailure("settings", () => gameDatabase.transaction(
+    "rw",
+    gameDatabase.settings,
+    async () => {
+      const parsedBase = settingsSchema.parse(base);
+      const parsedNext = settingsSchema.parse(next);
+      const current = currentSettingsValue(await gameDatabase.settings.get(ACTIVE_PROFILE_ID));
+      const merged = mergeSettingsChanges(parsedBase, current, parsedNext);
+      await putSettingsRecord(merged);
+      return merged;
+    },
+  ));
 }
 
-export async function saveProgress(progress: CampaignProgress): Promise<void> {
-  await capturePersistenceFailure("progress", () => putProgressRecord(progress));
+export async function saveProgress(
+  base: CampaignProgress,
+  next: CampaignProgress,
+): Promise<CampaignProgress> {
+  return capturePersistenceFailure("progress", () => gameDatabase.transaction(
+    "rw",
+    gameDatabase.progress,
+    async () => {
+      const parsedBase = progressSchema.parse(base);
+      const parsedNext = progressSchema.parse(next);
+      const current = currentProgressValue(await gameDatabase.progress.get(ACTIVE_PROFILE_ID));
+      const merged = mergeProgressChanges(parsedBase, current, parsedNext);
+      await putProgressRecord(merged);
+      return merged;
+    },
+  ));
+}
+
+export async function resetProgress(
+  next: CampaignProgress = createDefaultProgress(),
+): Promise<CampaignProgress> {
+  const parsed = progressSchema.parse(next);
+  await capturePersistenceFailure("progress", () => putProgressRecord(parsed));
+  return parsed;
 }
 
 export async function retryPersistence(
@@ -792,8 +1066,13 @@ export async function retryPersistence(
     if (options.preserveExistingProfile) {
       return readProfileData(settings, progress);
     }
-    await putProfileData(settings, progress);
-    return { settings, progress, recovered: false };
+    return reconcileProfileData(
+      options.baseSettings ?? settings,
+      settings,
+      options.baseProgress ?? progress,
+      progress,
+      options.replaceProgress === true,
+    );
   });
 }
 
@@ -908,27 +1187,63 @@ export async function listCustomTracks(): Promise<CustomTrackLibrary> {
   });
 }
 
-export async function saveCustomTrack(track: CustomTrackData): Promise<void> {
+function createTrackConflictCopy(track: CustomTrackData): CustomTrackData {
+  const suffix = " Conflict Copy";
+  const timestamp = Date.now();
+  return customTrackSchema.parse({
+    ...structuredClone(track),
+    id: crypto.randomUUID(),
+    name: `${track.name.slice(0, CUSTOM_TRACK_NAME_MAX_CHARS - suffix.length).trimEnd()}${suffix}`,
+    createdAt: timestamp,
+    updatedAt: timestamp,
+  });
+}
+
+export async function saveCustomTrack(
+  track: CustomTrackData,
+  persistedBase: CustomTrackData | null = null,
+): Promise<CustomTrackSaveResult> {
   const parsed = customTrackSchema.parse(track);
+  const parsedBase = persistedBase === null ? null : customTrackSchema.parse(persistedBase);
   const validation = validateCustomTrack(parsed);
   if (!validation.valid) throw new Error(validation.errors[0] ?? "Custom track route is invalid.");
-  const recordBytes = new Blob([JSON.stringify(parsed)]).size;
-  if (recordBytes > MAX_CUSTOM_TRACK_RECORD_BYTES) {
-    throw storageLimitError("Track data exceeds the 750 KB local-record safety limit.");
-  }
-  await capturePersistenceFailure("custom-tracks", () => gameDatabase.transaction(
+  return capturePersistenceFailure("custom-tracks", () => gameDatabase.transaction(
     "rw",
     gameDatabase.customTracks,
     async () => {
       const existing = await gameDatabase.customTracks.get(parsed.id);
       if (isFutureCustomTrackRecord(existing)) throw incompatibleCustomTrackError();
-      if (!existing && await gameDatabase.customTracks.count() >= MAX_CUSTOM_TRACK_RECORDS) {
+      const parsedExisting = existing === undefined ? null : parseCustomTrackRecord(existing);
+      if (parsedExisting && !parsedExisting.success) {
+        throw new Error("The saved track changed into an invalid record and was left untouched for recovery.");
+      }
+      const current = parsedExisting?.success ? parsedExisting.track : null;
+      if (current && sameStructuredValue(current, parsed)) {
+        return { track: current, conflictCopy: false };
+      }
+      const baseStillCurrent = current !== null
+        && parsedBase !== null
+        && sameStructuredValue(current, parsedBase);
+      const target = current === null && parsedBase === null
+        ? parsed
+        : baseStillCurrent
+          ? parsed
+          : createTrackConflictCopy(parsed);
+      const conflictCopy = target.id !== parsed.id;
+      const recordBytes = new Blob([JSON.stringify(target)]).size;
+      if (recordBytes > MAX_CUSTOM_TRACK_RECORD_BYTES) {
+        throw storageLimitError("Track data exceeds the 750 KB local-record safety limit.");
+      }
+      if (!current && !conflictCopy && await gameDatabase.customTracks.count() >= MAX_CUSTOM_TRACK_RECORDS) {
+        throw storageLimitError(`Track library limit reached. Export or delete a track before adding more than ${MAX_CUSTOM_TRACK_RECORDS}.`);
+      }
+      if (conflictCopy && await gameDatabase.customTracks.count() >= MAX_CUSTOM_TRACK_RECORDS) {
         throw storageLimitError(`Track library limit reached. Export or delete a track before adding more than ${MAX_CUSTOM_TRACK_RECORDS}.`);
       }
       const records = await gameDatabase.customTracks.toArray();
       let storedBytes = 0;
       for (const storedRecord of records) {
-        if (storedRecord.id === parsed.id) continue;
+        if (storedRecord.id === target.id) continue;
         let storedRecordBytes: number;
         try {
           const serialized = JSON.stringify(storedRecord);
@@ -948,13 +1263,32 @@ export async function saveCustomTrack(track: CustomTrackData): Promise<void> {
       if (recordBytes > MAX_CUSTOM_TRACK_TOTAL_BYTES - storedBytes) {
         throw storageLimitError("Track library has reached its 25 MB safety limit. Export or delete a track before saving another copy.");
       }
-      await gameDatabase.customTracks.put(parsed);
+      await gameDatabase.customTracks.put(target);
+      return { track: target, conflictCopy };
     },
   ));
 }
 
-export async function deleteCustomTrack(trackId: string): Promise<void> {
-  await capturePersistenceFailure("custom-tracks", () => gameDatabase.customTracks.delete(trackId));
+export async function deleteCustomTrack(
+  trackId: string,
+  persistedBase: CustomTrackData,
+): Promise<CustomTrackDeleteResult> {
+  const parsedBase = customTrackSchema.parse(persistedBase);
+  return capturePersistenceFailure("custom-tracks", () => gameDatabase.transaction(
+    "rw",
+    gameDatabase.customTracks,
+    async () => {
+      const existing = await gameDatabase.customTracks.get(trackId);
+      if (existing === undefined) return { deleted: false, conflict: false };
+      if (isFutureCustomTrackRecord(existing)) throw incompatibleCustomTrackError();
+      const parsedExisting = parseCustomTrackRecord(existing);
+      if (!parsedExisting.success || !sameStructuredValue(parsedExisting.track, parsedBase)) {
+        return { deleted: false, conflict: true };
+      }
+      await gameDatabase.customTracks.delete(trackId);
+      return { deleted: true, conflict: false };
+    },
+  ));
 }
 
 export async function deleteCustomTrackRecovery(key: number): Promise<void> {
@@ -1548,14 +1882,87 @@ export function importCustomTrack(serialized: string): CustomTrackData {
   return parsed.track;
 }
 
+function fnv1a64(value: string): string {
+  let hash = 0xcbf2_9ce4_8422_2325n;
+  const prime = 0x0000_0100_0000_01b3n;
+  for (const byte of new TextEncoder().encode(value)) {
+    hash ^= BigInt(byte);
+    hash = BigInt.asUintN(64, hash * prime);
+  }
+  return hash.toString(16).padStart(16, "0");
+}
+
+/**
+ * Identifies the exact authored course consumed by a custom race without
+ * retaining its thumbnail or a second full track snapshot in every replay.
+ */
+export function getCustomTrackReplayRevision(track: CustomTrackData): string {
+  const serialized = JSON.stringify({
+    schemaVersion: track.schemaVersion,
+    id: track.id,
+    laps: track.laps,
+    updatedAt: track.updatedAt,
+    modules: track.modules.map((module) => ({
+      id: module.id,
+      moduleId: module.moduleId,
+      lane: module.lane,
+      gridPosition: module.gridPosition,
+      rotation: module.rotation,
+      height: module.height,
+      ...(module.routeAnchor === undefined ? {} : {
+        routeAnchor: {
+          lateralOffset: module.routeAnchor.lateralOffset,
+          elevation: module.routeAnchor.elevation,
+        },
+      }),
+    })),
+  });
+  if (serialized === undefined) {
+    throw new Error("The custom replay course revision could not be encoded.");
+  }
+  return `v${track.schemaVersion}-${track.updatedAt}-${fnv1a64(serialized)}`;
+}
+
+function newestReplayFirst(
+  first: Pick<StoredReplayRecord, "id" | "createdAt">,
+  second: Pick<StoredReplayRecord, "id" | "createdAt">,
+  preferredId: string,
+): number {
+  const timeOrder = second.createdAt - first.createdAt;
+  if (timeOrder !== 0) return timeOrder;
+  if (first.id === preferredId && second.id !== preferredId) return -1;
+  if (second.id === preferredId && first.id !== preferredId) return 1;
+  if (first.id === second.id) return 0;
+  return first.id < second.id ? 1 : -1;
+}
+
 export async function saveReplay(
   result: RaceResult,
   samples: Uint8Array,
+  customTrack?: CustomTrackData | undefined,
 ): Promise<void> {
+  let courseKey: string = result.trackId;
+  let customTrackId: string | undefined;
+  let customTrackRevision: string | undefined;
+  if (result.mode === "custom") {
+    if (customTrack === undefined) {
+      throw new Error("A custom replay requires its exact authored course revision.");
+    }
+    const parsedCustomTrack = customTrackSchema.parse(customTrack);
+    customTrackId = parsedCustomTrack.id;
+    customTrackRevision = getCustomTrackReplayRevision(parsedCustomTrack);
+    courseKey = `custom:${customTrackId}:${customTrackRevision}`;
+  } else if (customTrack !== undefined) {
+    throw new Error("A built-in replay cannot be bound to a custom course.");
+  }
+
   const record: ReplayRecord = {
     id: crypto.randomUUID(),
-    schemaVersion: 1,
+    schemaVersion: 2,
+    codecVersion: REPLAY_FORMAT_VERSION,
+    courseKey,
     trackId: result.mode === "custom" ? "custom" : result.trackId,
+    ...(customTrackId === undefined ? {} : { customTrackId, customTrackRevision }),
     mode: result.mode,
     result,
     samples,
@@ -1565,15 +1972,41 @@ export async function saveReplay(
     if (samples.byteLength > MAX_REPLAY_SAMPLE_BYTES) {
       throw storageLimitError("Replay exceeds the 512 KB local-storage safety limit and was not saved.");
     }
+    const frames = validateReplay(samples);
+    const terminalFrame = frames.at(-1);
+    if (!terminalFrame?.terminal) {
+      throw new Error("Replay does not contain a terminal sample.");
+    }
+    if (!Number.isSafeInteger(result.finishTimeMs) || result.finishTimeMs < 0) {
+      throw new Error("Replay result finish time is invalid.");
+    }
+    const terminalTimeMs = Math.round(terminalFrame.timeSeconds * 1_000);
+    if (terminalTimeMs !== result.finishTimeMs) {
+      throw new Error("Replay terminal time does not match the race result.");
+    }
     await gameDatabase.transaction("rw", gameDatabase.replays, async () => {
       await gameDatabase.replays.put(record);
 
-      const older = await gameDatabase.replays
-        .where("trackId")
-        .equals(record.trackId)
-        .reverse()
-        .sortBy("createdAt");
-      await gameDatabase.replays.bulkDelete(older.slice(20).map((replay) => replay.id));
+      const sameCourse = await gameDatabase.replays
+        .where("courseKey")
+        .equals(record.courseKey)
+        .toArray();
+      const removals = new Set(
+        sameCourse
+          .sort((first, second) => newestReplayFirst(first, second, record.id))
+          .slice(MAX_REPLAYS_PER_COURSE)
+          .map((replay) => replay.id),
+      );
+
+      const globallyNewest = (await gameDatabase.replays.toArray())
+        .filter((replay) => !removals.has(replay.id))
+        .sort((first, second) => newestReplayFirst(first, second, record.id));
+      for (const replay of globallyNewest.slice(MAX_REPLAY_RECORDS)) {
+        removals.add(replay.id);
+      }
+      if (removals.size > 0) {
+        await gameDatabase.replays.bulkDelete([...removals]);
+      }
     });
   });
 }

@@ -1,5 +1,8 @@
 import { defineConfig, devices } from '@playwright/test';
 
+const port = process.env.RRR_PLAYWRIGHT_PORT ?? '4173';
+const baseURL = `http://127.0.0.1:${port}`;
+
 export default defineConfig({
   testDir: './e2e',
   fullyParallel: false,
@@ -7,16 +10,18 @@ export default defineConfig({
   retries: process.env.CI ? 2 : 0,
   workers: 1,
   reporter: process.env.CI ? [['html', { open: 'never' }], ['list']] : 'list',
+  updateSnapshots: 'none',
   use: {
-    baseURL: 'http://127.0.0.1:4173',
+    baseURL,
+    launchOptions: { args: ['--mute-audio'] },
     screenshot: 'only-on-failure',
     trace: 'on-first-retry',
     video: 'retain-on-failure',
   },
   webServer: {
-    command: 'VITE_QA_MODE=1 npm run build && npm run preview -- --host 127.0.0.1',
-    url: 'http://127.0.0.1:4173',
-    reuseExistingServer: !process.env.CI,
+    command: `VITE_QA_MODE=1 npm run build && npm run preview -- --host 127.0.0.1 --port ${port}`,
+    url: baseURL,
+    reuseExistingServer: process.env.RRR_REUSE_SERVER === '1',
     timeout: 120_000,
   },
   projects: [

@@ -40,7 +40,7 @@ describe("AudioManager mix buses", () => {
   it("creates separate master, SFX, and music buses and applies live volume changes", async () => {
     vi.stubGlobal("AudioContext", FakeAudioContext);
     const audio = new AudioManager({ master: 0.8, music: 0.55, sfx: 0.7 });
-    await audio.unlock();
+    await expect(audio.unlock()).resolves.toBe(true);
 
     const context = FakeAudioContext.latest;
     expect(context?.gains.map((gain) => gain.gain.value)).toEqual([0.8, 0.7, 0.55]);
@@ -56,7 +56,7 @@ describe("AudioManager mix buses", () => {
   it("keeps the game usable when Web Audio is unavailable", async () => {
     vi.stubGlobal("AudioContext", undefined);
     const audio = new AudioManager({ master: 1, music: 1, sfx: 1 });
-    await expect(audio.unlock()).resolves.toBeUndefined();
+    await expect(audio.unlock()).resolves.toBe(false);
     expect(() => audio.play("crash")).not.toThrow();
     audio.dispose();
   });

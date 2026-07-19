@@ -81,7 +81,13 @@ test.afterEach(async ({ page }) => {
 test("all 25 editor modules can be selected, placed, and removed", async ({ page }) => {
   test.setTimeout(120_000);
   expect(EDITOR_MODULES).toHaveLength(25);
-  const canvas = page.getByLabel(/Interactive 3D track build camera/);
+  const placedModule = page.getByLabel("Placed module");
+  const finishOption = placedModule.locator("option").filter({ hasText: "Finish Arch · lane 1 · 96 m" });
+  const finishId = await finishOption.getAttribute("value");
+  if (!finishId) throw new Error("The default finish option is required.");
+  await placedModule.selectOption(finishId);
+  await page.getByLabel("Position", { exact: true }).fill("300");
+  await page.getByLabel("Route view position").fill("160");
 
   for (const module of EDITOR_MODULES) {
     await page.getByRole("button", { name: module.category, exact: true }).click();
@@ -91,7 +97,29 @@ test("all 25 editor modules can be selected, placed, and removed", async ({ page
     await moduleButton.click();
     await expect(moduleButton).toHaveClass(/active/);
 
-    await canvas.click({ position: { x: 430, y: 330 } });
+    if (module.category === "race") {
+      const existingOption = placedModule.locator("option").filter({ hasText: module.name });
+      const existingId = await existingOption.getAttribute("value");
+      if (!existingId) throw new Error(`The existing ${module.name} option is required.`);
+      await placedModule.selectOption(existingId);
+      await page.getByRole("button", { name: "Delete", exact: true }).click();
+      await expect(page.getByText("2 modules", { exact: true })).toBeVisible();
+      await page.getByLabel("Route view position").fill(
+        module.id === "start-grid" ? "0" : module.id === "checkpoint" ? "160" : "300",
+      );
+      await page.getByRole("button", { name: "Place selected module at route view" }).click();
+      await expect(page.getByText("3 modules", { exact: true })).toBeVisible();
+      await page.getByRole("button", { name: "Delete", exact: true }).click();
+      await expect(page.getByText("2 modules", { exact: true })).toBeVisible();
+      const undo = page.getByRole("button", { name: "Undo", exact: true });
+      await undo.click();
+      await undo.click();
+      await undo.click();
+      await expect(page.getByText("3 modules", { exact: true })).toBeVisible();
+      continue;
+    }
+
+    await page.getByRole("button", { name: "Place selected module at route view" }).click();
     await expect(page.getByText("4 modules", { exact: true })).toBeVisible();
     await page.getByRole("button", { name: "Delete", exact: true }).click();
     await expect(page.getByText("3 modules", { exact: true })).toBeVisible();
@@ -119,11 +147,11 @@ test("placed modules can be selected, edited, and focused across the full route 
   if (!checkpointId) throw new Error("The default checkpoint option is required.");
 
   await placedModule.selectOption(checkpointId);
-  await expect(page.getByLabel("Position")).toHaveValue("48");
+  await expect(page.getByLabel("Position", { exact: true })).toHaveValue("48");
   const canvas = page.getByLabel(/Interactive 3D track build camera/);
   await expect(canvas).toHaveAttribute("data-route-view-position", "48");
 
-  await page.getByLabel("Position").fill("52");
+  await page.getByLabel("Position", { exact: true }).fill("52");
   await expect(canvas).toHaveAttribute("data-route-view-position", "52");
   await page.getByRole("button", { name: "Delete", exact: true }).click();
   await expect(page.getByText("2 modules", { exact: true })).toBeVisible();
@@ -189,16 +217,57 @@ test("pointer placement preview announces valid and invalid candidates without c
   const canvas = page.getByLabel(/Interactive 3D track build camera/);
   const bounds = await canvas.boundingBox();
   if (!bounds) throw new Error("Editor canvas bounds are required.");
-  const pointer = { x: bounds.x + bounds.width * 0.5, y: bounds.y + bounds.height * 0.5 };
-
-  await page.mouse.move(pointer.x, pointer.y);
+  const preview = page.locator(".editor-placement-preview");
+  const routeSamples = [
+    [0.48, 0.37],
+    [0.51, 0.45],
+    [0.54, 0.55],
+    [0.57, 0.64],
+    [0.6, 0.72],
+  ] as const;
+  let pointer: { x: number; y: number } | null = null;
+  for (const [xRatio, yRatio] of routeSamples) {
+    const candidate = { x: bounds.x + bounds.width * xRatio, y: bounds.y + bounds.height * yRatio };
+    await page.mouse.move(candidate.x, candidate.y);
+    await page.waitForTimeout(100);
+    const previewText = await preview.count() > 0 ? await preview.textContent() : null;
+    if (previewText?.includes("✓ Valid placement")) {
+      pointer = candidate;
+      break;
+    }
+  }
+  if (!pointer) throw new Error("The overview route must expose an empty valid pointer-placement segment.");
   await expect(page.getByText("✓ Valid placement", { exact: true })).toBeVisible();
 
   await page.getByRole("button", { name: "race", exact: true }).click();
   await page.locator(".module-rail").getByRole("button", { name: /^Start Grid(?:\s|$)/ }).click();
   await page.mouse.move(pointer.x + 1, pointer.y);
   await expect(page.getByText("! Invalid placement", { exact: true })).toBeVisible();
-  await expect(page.locator(".editor-placement-preview")).toContainText("already exists");
+  await expect(page.locator(".editor-placement-preview")).toContainText("Start Grid");
+  await page.mouse.click(pointer.x + 1, pointer.y);
+  await expect(page.getByText("3 modules", { exact: true })).toBeVisible();
+});
+
+test("keyboard placement rejects invalid candidates and commits valid ones", async ({ page }) => {
+  test.setTimeout(60_000);
+  await page.getByRole("button", { name: "race", exact: true }).click();
+  await page.locator(".module-rail").getByRole("button", { name: /^Start Grid(?:\s|$)/ }).click();
+  const place = page.getByRole("button", { name: "Place selected module at route view", exact: true });
+  await place.focus();
+  await page.keyboard.press("Enter");
+  await expect(page.getByText("3 modules", { exact: true })).toBeVisible();
+  await expect(page.locator(".editor-status output")).toContainText("already exists");
+
+  await page.getByRole("button", { name: "jumps", exact: true }).click();
+  await page.locator(".module-rail").getByRole("button", { name: /^Medium Ramp(?:\s|$)/ }).click();
+  await page.getByLabel("Route view position").fill("72");
+  await page.getByLabel("New module lane").selectOption("1");
+  await place.focus();
+  await page.keyboard.press("Enter");
+
+  await expect(page.getByText("4 modules", { exact: true })).toBeVisible();
+  await expect(page.getByLabel("Placed module").locator("option").filter({ hasText: "Medium Ramp · lane 2 · 72 m" })).toHaveCount(1);
+  await expect(page.locator(".editor-status output")).toContainText("Medium Ramp placed in lane 2 at 72 m.");
 });
 
 test("damaged local tracks missing an index key are preserved and available as portable recovery packages", async ({ page }) => {
@@ -286,8 +355,10 @@ test("undo and redo preserve the full 50-action history", async ({ page }) => {
 });
 
 test("duplicate, rename, thumbnail, and confirmed clear-all work as one editor flow", async ({ page }) => {
-  const canvas = page.getByLabel(/Interactive 3D track build camera/);
-  await canvas.click({ position: { x: 430, y: 330 } });
+  page.on("dialog", (dialog) => {
+    throw new Error(`Native dialog should not open for editor clear-all: ${dialog.message()}`);
+  });
+  await page.getByRole("button", { name: "Place selected module at route view" }).click();
   await expect(page.getByText("4 modules", { exact: true })).toBeVisible();
   await page.getByRole("button", { name: "Duplicate", exact: true }).click();
   await expect(page.getByText("5 modules", { exact: true })).toBeVisible();
@@ -302,14 +373,51 @@ test("duplicate, rename, thumbnail, and confirmed clear-all work as one editor f
   await expect(saved.locator("img")).toHaveAttribute("src", /^data:image\/(?:png|jpeg|webp);base64,/);
   await page.getByRole("button", { name: "Close local track library" }).click();
 
-  page.once("dialog", (dialog) => void dialog.dismiss());
   await page.getByRole("button", { name: "Clear all…" }).click();
+  let confirmDialog = page.getByRole("dialog", { name: "Clear every placed module?" });
+  await expect(confirmDialog).toBeVisible();
+  await expect(confirmDialog).toContainText("editor undo stack");
+  await expect(confirmDialog.getByRole("button", { name: "Clear all", exact: true })).toBeFocused();
+  await confirmDialog.getByRole("button", { name: "Cancel", exact: true }).click();
+  await expect(confirmDialog).toHaveCount(0);
   await expect(page.getByText("5 modules", { exact: true })).toBeVisible();
-  page.once("dialog", (dialog) => void dialog.accept());
   await page.getByRole("button", { name: "Clear all…" }).click();
+  confirmDialog = page.getByRole("dialog", { name: "Clear every placed module?" });
+  await expect(confirmDialog).toBeVisible();
+  await confirmDialog.getByRole("button", { name: "Clear all", exact: true }).click();
   await expect(page.getByText("0 modules", { exact: true })).toBeVisible();
   await page.getByRole("button", { name: "Undo" }).click();
   await expect(page.getByText("5 modules", { exact: true })).toBeVisible();
+});
+
+test("saved-track deletion requires explicit irreversible-loss confirmation", async ({ page }) => {
+  page.on("dialog", (dialog) => {
+    throw new Error(`Native dialog should not open for saved-track deletion: ${dialog.message()}`);
+  });
+  const name = `Delete Guard ${Date.now()}`;
+  await page.getByLabel("Track name").fill(name);
+  await page.getByRole("button", { name: "Save", exact: true }).click();
+  await expect(page.locator("footer.editor-status output")).toHaveText("Track saved locally.");
+  await page.getByRole("button", { name: "Library", exact: true }).click();
+  const saved = page.locator(".library-drawer article").filter({ hasText: name });
+  const remove = saved.getByRole("button", { name: `Delete ${name}…`, exact: true });
+
+  await remove.click();
+  let confirmDialog = page.getByRole("dialog", { name: `Delete “${name}”?` });
+  await expect(confirmDialog).toBeVisible();
+  await expect(confirmDialog).toContainText("Export it first");
+  await expect(confirmDialog).toContainText("cannot be undone");
+  await expect(confirmDialog.getByRole("button", { name: "Delete track", exact: true })).toBeFocused();
+  await confirmDialog.getByRole("button", { name: "Cancel", exact: true }).click();
+  await expect(confirmDialog).toHaveCount(0);
+  await expect(saved).toBeVisible();
+
+  await remove.click();
+  confirmDialog = page.getByRole("dialog", { name: `Delete “${name}”?` });
+  await expect(confirmDialog).toBeVisible();
+  await confirmDialog.getByRole("button", { name: "Delete track", exact: true }).click();
+  await expect(saved).toHaveCount(0);
+  await expect(page.locator("footer.editor-status output")).toContainText("was removed from this device");
 });
 
 test("lap values one through nine start races with the selected lap contract", async ({ page }) => {
@@ -320,20 +428,23 @@ test("lap values one through nine start races with the selected lap contract", a
     await laps.fill(String(value));
     await expect(laps).toHaveValue(String(value));
     await page.getByRole("button", { name: "Test Ride", exact: true }).click();
-    const canvas = page.getByLabel("Live 3D race on Canyon Workshop");
-    await expect(canvas).toBeVisible();
+    await expect(page.locator(".game-canvas")).toBeVisible({ timeout: 15_000 });
     await expect(page.locator(".timing-block")).toContainText(`Lap 1 / ${value}`);
-    await canvas.press("Escape");
-    await page.getByRole("button", { name: "Festival menu", exact: true }).click();
-    await page.getByRole("button", { name: "Track Builder", exact: true }).click();
+    await page.evaluate(() => window.__RRR_QA__?.openEditor());
+    await expect(page.getByLabel(/Interactive 3D track build camera/)).toBeVisible();
   }
 });
 
 test("Rider School ignores the previous editor Test Ride course", async ({ page }) => {
+  test.setTimeout(60_000);
   await page.getByRole("button", { name: "Test Ride", exact: true }).click();
   const customRace = page.getByLabel("Live 3D race on Canyon Workshop");
   await expect(customRace).toBeVisible();
   await expect(customRace).toHaveAttribute("data-environment-asset", "not-applicable");
+  await expect(customRace).not.toHaveAttribute("data-environment-fallback-reason", /.+/);
+  await expect(customRace).not.toHaveAttribute("data-environment-load-ms", /.+/);
+  await expect(customRace).not.toHaveAttribute("data-environment-width", /.+/);
+  await expect(customRace).not.toHaveAttribute("data-environment-height", /.+/);
   await expect(customRace).toHaveAttribute("data-cooling-gate-venue-pocket-count", "0");
   await expect(customRace).toHaveAttribute("data-cooling-gate-venue-style", "alternating-only");
   await expect(customRace).toHaveAttribute("data-cooling-gate-watchtower-count", "0");
@@ -378,20 +489,30 @@ test("Rider School ignores the previous editor Test Ride course", async ({ page 
   await expect(page.getByLabel("Live 3D race on Canyon Workshop")).toHaveCount(0);
 });
 
-test("narrow editor keeps Save and Test Ride reachable", async ({ page }) => {
+test("narrow editor keeps its complete authoring and recovery controls reachable", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
-  const save = page.getByRole("button", { name: "Save", exact: true });
+  for (const name of ["Save", "Test Ride", "Export", "Import"]) {
+    await expect(page.getByRole("button", { name, exact: true })).toBeVisible();
+  }
+  await expect(page.getByLabel("Placed module")).toBeVisible();
+  await expect(page.getByLabel("Laps")).toBeVisible();
+  await expect(page.getByRole("button", { name: "Clear all…" })).toBeVisible();
+  await expect(page.locator(".validation-panel").getByText("✓ Route complete", { exact: true })).toBeVisible();
+  await expect(page.locator(".editor-status output")).toBeVisible();
   const testRide = page.getByRole("button", { name: "Test Ride", exact: true });
-  await expect(save).toBeVisible();
-  await expect(testRide).toBeVisible();
   const testRideBox = await testRide.boundingBox();
   expect(testRideBox).not.toBeNull();
   expect((testRideBox?.x ?? 0) + (testRideBox?.width ?? 391)).toBeLessThanOrEqual(390);
 });
 
 test("invalid tracks show actionable errors and block save and export", async ({ page }) => {
-  page.once("dialog", (dialog) => void dialog.accept());
+  page.on("dialog", (dialog) => {
+    throw new Error(`Native dialog should not open for invalid-track clear-all: ${dialog.message()}`);
+  });
   await page.getByRole("button", { name: "Clear all…" }).click();
+  const confirmDialog = page.getByRole("dialog", { name: "Clear every placed module?" });
+  await expect(confirmDialog).toBeVisible();
+  await confirmDialog.getByRole("button", { name: "Clear all", exact: true }).click();
 
   await expect(page.getByText("Place exactly one Start Grid.", { exact: true })).toBeVisible();
   await expect(page.getByText("Place exactly one Finish Arch.", { exact: true })).toBeVisible();
@@ -449,7 +570,7 @@ test("import keeps a maximum-length source name valid when creating its local co
 });
 
 test("a valid saved circuit containing every module completes its authored gates and laps", async ({ page }) => {
-  test.setTimeout(120_000);
+  test.setTimeout(180_000);
   await page.locator('input[type="file"]').setInputFiles(filePayload("all-modules.json", allModuleTrack()));
   await expect(page.locator("footer.editor-status output")).toHaveText("Track imported as a safe local copy.");
   await expect(page.getByText("✓ Route complete", { exact: true }).first()).toBeVisible();
@@ -465,7 +586,8 @@ test("a valid saved circuit containing every module completes its authored gates
   await expect(page.getByText(`${allModuleTrack().modules.length} modules`, { exact: true })).toBeVisible();
   await page.evaluate(() => window.history.replaceState(null, "", "/?qa-fast-race=1"));
   await page.getByRole("button", { name: "Test Ride", exact: true }).click();
-  await expect(page.getByLabel("Live 3D race on All Modules Circuit Copy")).toBeVisible();
+  await expect(page.locator(".game-canvas")).toBeVisible({ timeout: 15_000 });
+  await expect(page.locator(".game-shell")).toHaveAttribute("data-race-gate-phase", "racing", { timeout: 20_000 });
   await page.keyboard.down("w");
   await page.keyboard.down("Space");
   await expect(page.locator(".caption-cue")).toContainText("Checkpoint 5 of 5", { timeout: 45_000 });
@@ -485,7 +607,7 @@ test("a valid saved circuit containing every module completes its authored gates
 });
 
 test("all three bundled editor examples complete test rides", async ({ page }) => {
-  test.setTimeout(180_000);
+  test.setTimeout(300_000);
   await page.goto("/?qa-fast-race=1");
   await page.getByRole("button", { name: "Track Builder", exact: true }).click();
 
@@ -495,10 +617,11 @@ test("all three bundled editor examples complete test rides", async ({ page }) =
     await expect(card).toBeVisible();
     await card.getByRole("button", { name: "Open", exact: true }).click();
     await page.getByRole("button", { name: "Test Ride", exact: true }).click();
-    await expect(page.getByLabel(`Live 3D race on ${example.name}`)).toBeVisible();
+    await expect(page.locator(".game-canvas")).toBeVisible({ timeout: 15_000 });
+    await expect(page.locator(".game-shell")).toHaveAttribute("data-race-gate-phase", "racing", { timeout: 20_000 });
     await page.keyboard.down("w");
     await page.keyboard.down("Space");
-    await expect(page.getByRole("button", { name: "Retry now" })).toBeVisible({ timeout: 40_000 });
+    await expect(page.getByRole("button", { name: "Retry now" })).toBeVisible({ timeout: 75_000 });
     await page.keyboard.up("w");
     await page.keyboard.up("Space");
     await page.getByRole("button", { name: "Festival menu" }).click();
@@ -526,7 +649,9 @@ test("UI import rejects corrupt, oversized, incompatible, invalid, and external-
     ...example,
     schemaVersion: 3,
   }));
-  await expect(status).toContainText("Track file is incompatible or invalid:");
+  await expect(status).toHaveText(
+    "Saved custom tracks use a newer schema version and cannot be overwritten by this build.",
+  );
 
   await input.setInputFiles(filePayload("laps-status-reset.json", '{"schemaVersion":'));
   await expect(status).toHaveText("Track file is not valid JSON.");

@@ -257,27 +257,39 @@ describe("campaign progression", () => {
 
 describe("Summit mastery", () => {
   it("escalates its target and hot-start modifier through seven tiers", () => {
+    expect(Array.from({ length: MASTERY_TIER_COUNT }, (_, masteryLevel) => {
+      const goal = getMasteryGoal(masteryLevel);
+      return { targetMs: goal.targetMs, startingHeat: goal.startingHeat };
+    })).toEqual([
+      { targetMs: 257_000, startingHeat: 35 },
+      { targetMs: 255_000, startingHeat: 40 },
+      { targetMs: 253_000, startingHeat: 45 },
+      { targetMs: 251_000, startingHeat: 50 },
+      { targetMs: 249_000, startingHeat: 55 },
+      { targetMs: 248_000, startingHeat: 60 },
+      { targetMs: 247_000, startingHeat: 65 },
+    ]);
     expect(getMasteryGoal(0)).toMatchObject({
       tier: 1,
       tierCount: 7,
-      targetMs: 163_560,
+      targetMs: 257_000,
       startingHeat: 35,
       isMaxTierReplay: false,
     });
     expect(getMasteryGoal(1)).toMatchObject({
       tier: 2,
-      targetMs: 159_210,
+      targetMs: 255_000,
       startingHeat: 40,
     });
     expect(getMasteryGoal(6)).toMatchObject({
       tier: 7,
-      targetMs: 139_200,
+      targetMs: 247_000,
       startingHeat: 65,
       isMaxTierReplay: false,
     });
     expect(getMasteryGoal(MASTERY_TIER_COUNT)).toMatchObject({
       tier: 7,
-      targetMs: 139_200,
+      targetMs: 247_000,
       startingHeat: 65,
       isMaxTierReplay: true,
     });

@@ -30,6 +30,7 @@ export function isInteractiveInputTarget(target: EventTarget | null): boolean {
 
 export class InputManager {
   private readonly keys = new Set<string>();
+  private pendingKeyboardLane: LaneChange = 0;
   private settings: ControlSettings;
   private readonly touch: TouchState = {
     throttle: false,
@@ -79,6 +80,7 @@ export class InputManager {
 
   updateSettings(settings: ControlSettings): void {
     this.settings = settings;
+    this.pendingKeyboardLane = 0;
   }
 
   markGamepadCommand(): void {
@@ -100,11 +102,12 @@ export class InputManager {
 
   sample(): SimulationInput {
     const binding = this.settings.keyBindings;
-    const keyboardLane: LaneChange = this.keys.has(binding.laneLeft ?? "ArrowLeft")
+    const heldKeyboardLane: LaneChange = this.keys.has(binding.laneLeft ?? "ArrowLeft")
       ? -1
       : this.keys.has(binding.laneRight ?? "ArrowRight")
         ? 1
         : 0;
+    const keyboardLane = heldKeyboardLane || this.pendingKeyboardLane;
     const keyboardPitch = this.keys.has(binding.pitchUp ?? "ArrowUp")
       ? 1
       : this.keys.has(binding.pitchDown ?? "ArrowDown")
@@ -140,6 +143,7 @@ export class InputManager {
     if (gamepad) return gamepad;
 
     if (keyboardActive) {
+      this.pendingKeyboardLane = 0;
       this.device = "keyboard";
       this.fallbackDevice = "keyboard";
       return keyboardInput;
@@ -168,6 +172,7 @@ export class InputManager {
   private readonly handleKeyDown = (event: KeyboardEvent): void => {
     if (isInteractiveInputTarget(event.target)) return;
     const binding = this.settings.keyBindings;
+    const pauseKey = binding.pause ?? "Escape";
     const mappedGameplayKeys = [
       binding.throttle ?? "KeyW",
       binding.turbo ?? "ShiftLeft",
@@ -176,10 +181,25 @@ export class InputManager {
       binding.pitchUp ?? "ArrowUp",
       binding.pitchDown ?? "ArrowDown",
       binding.recover ?? "Space",
-      binding.pause ?? "Escape",
     ];
-    if (mappedGameplayKeys.includes(event.code)) {
+    if (event.ctrlKey || event.metaKey || event.altKey) {
+      this.keys.clear();
+      this.pendingKeyboardLane = 0;
+      this.updateHeldInputCount();
+      return;
+    }
+    if (event.code === pauseKey) {
       event.preventDefault();
+      return;
+    }
+    if (!mappedGameplayKeys.includes(event.code)) return;
+    event.preventDefault();
+    if (!event.repeat && !this.keys.has(event.code)) {
+      if (event.code === (binding.laneLeft ?? "ArrowLeft")) {
+        this.pendingKeyboardLane = -1;
+      } else if (event.code === (binding.laneRight ?? "ArrowRight")) {
+        this.pendingKeyboardLane = 1;
+      }
     }
     this.keys.add(event.code);
     this.device = "keyboard";
@@ -194,6 +214,7 @@ export class InputManager {
 
   private readonly clearInputState = (): void => {
     this.keys.clear();
+    this.pendingKeyboardLane = 0;
     this.touch.throttle = false;
     this.touch.turbo = false;
     this.touch.laneChange = 0;

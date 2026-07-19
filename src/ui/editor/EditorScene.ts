@@ -1920,6 +1920,10 @@ export class EditorScene {
       this.updatePreview(candidate);
       return;
     }
+    if (this.currentTrack && !validateCustomTrackPlacement(this.currentTrack, candidate).valid) {
+      this.updatePreview(candidate);
+      return;
+    }
     this.onPlace(candidate.lane, candidate.gridPosition);
   }
 

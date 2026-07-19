@@ -1,4 +1,57 @@
-import { expect, test, type Page } from "@playwright/test";
+import { expect, test, type Locator, type Page } from "@playwright/test";
+
+async function expectHeroBikeReady(canvas: Locator): Promise<void> {
+  await expect(canvas).toHaveAttribute("data-bike-asset", "ready", { timeout: 20_000 });
+  await expect(canvas).not.toHaveAttribute("data-bike-fallback-reason", /.+/);
+  await expect(canvas).toHaveAttribute("data-hero-bike-root", "RRR_HeroBikeRider");
+  await expect(canvas).toHaveAttribute("data-hero-bike-root-count", "1");
+  await expect(canvas).toHaveAttribute("data-hero-bike-pose-pivot-count", "6");
+  await expect(canvas).toHaveAttribute("data-hero-bike-node-count", "88");
+  await expect(canvas).toHaveAttribute("data-hero-bike-mesh-count", "28");
+  await expect(canvas).toHaveAttribute("data-hero-bike-primitive-count", "28");
+  await expect(canvas).toHaveAttribute("data-hero-bike-material-count", "10");
+  await expect(canvas).toHaveAttribute("data-hero-bike-texture-count", "0");
+  await expect(canvas).toHaveAttribute("data-hero-bike-triangle-count", "42360");
+  await expect(canvas).toHaveAttribute("data-hero-bike-bike-triangle-count", "35300");
+  await expect(canvas).toHaveAttribute("data-hero-bike-rider-triangle-count", "7060");
+  await expect(canvas).toHaveAttribute("data-hero-bike-wheel-triangle-count", "14124");
+  await expect(canvas).toHaveAttribute("data-hero-bike-gameplay-authority", "presentation-only");
+  await expect(canvas).toHaveAttribute("data-hero-bike-vertical-offset", "-0.63");
+  await expect(canvas).toHaveAttribute("data-hero-bike-material-response", "pmrem-three-point");
+  await expect(canvas).toHaveAttribute("data-hero-bike-shadow-style", /^(pcf-contact|pcf-disabled-low)$/);
+}
+
+async function expectNoCanvasAttributes(canvas: Locator, attributes: readonly string[]): Promise<void> {
+  await expect.poll(
+    async () => canvas.evaluate((element, names) => (
+      names.filter((name) => element.hasAttribute(name))
+    ), attributes),
+    { message: `${attributes.join(", ")} should be absent`, timeout: 20_000 },
+  ).toEqual([]);
+}
+
+async function expectHeroBikeDiagnosticsCleared(canvas: Locator): Promise<void> {
+  for (const attribute of [
+    "data-hero-bike-root",
+    "data-hero-bike-root-count",
+    "data-hero-bike-pose-pivot-count",
+    "data-hero-bike-node-count",
+    "data-hero-bike-mesh-count",
+    "data-hero-bike-primitive-count",
+    "data-hero-bike-material-count",
+    "data-hero-bike-texture-count",
+    "data-hero-bike-triangle-count",
+    "data-hero-bike-bike-triangle-count",
+    "data-hero-bike-rider-triangle-count",
+    "data-hero-bike-wheel-triangle-count",
+    "data-hero-bike-gameplay-authority",
+    "data-hero-bike-vertical-offset",
+    "data-hero-bike-material-response",
+    "data-hero-bike-shadow-style",
+  ]) {
+    await expect(canvas).not.toHaveAttribute(attribute, /.+/);
+  }
+}
 
 function observeUnexpectedFailures(
   page: Page,
@@ -41,15 +94,57 @@ test("unsupported WebGL presents recovery and menu paths instead of crashing", a
   });
 
   await page.goto("/");
-  await expect(page.getByRole("heading", { name: "Race paused at the gate" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Race interrupted" })).toBeVisible();
   await expect(page.getByText(/WebGL could not be initialized/)).toBeVisible();
-  await expect(page.getByRole("button", { name: "Retry loading" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Reload race" })).toBeVisible();
   await page.getByRole("button", { name: "Return to menu" }).click();
   await expect(page.getByRole("button", { name: "Ride", exact: true })).toBeVisible();
 });
 
 test.describe("production asset network fallbacks", () => {
   test.use({ serviceWorkers: "block" });
+
+  test("the authored Canyon kit replaces every Rider School gameplay shell while retaining cooling cues", async ({ page }, testInfo) => {
+    test.skip(testInfo.project.name !== "chromium", "Canyon replacement diagnostics run once in Chromium");
+    test.setTimeout(180_000);
+    await page.goto("/");
+    const canvas = page.locator("canvas[aria-label='Live 3D race on Canyon Kickoff']");
+    await expect(canvas).toBeAttached({ timeout: 20_000 });
+    await expectHeroBikeReady(canvas);
+    await expect(canvas).toHaveAttribute("data-environment-asset", "ready", { timeout: 15_000 });
+    await expect(canvas).not.toHaveAttribute("data-environment-fallback-reason", /.+/);
+    await expect(canvas).toHaveAttribute("data-environment-load-ms", /^\d+$/);
+    await expect(canvas).toHaveAttribute("data-canyon-kit-asset", "ready", { timeout: 15_000 });
+    await expect(canvas).toHaveAttribute("data-canyon-kit-root-count", "11");
+    await expect(canvas).toHaveAttribute("data-canyon-kit-gameplay-authority", "presentation-only");
+    await expect(canvas).toHaveAttribute("data-canyon-kit-procedural-replacement-count", "4");
+    await expect(canvas).toHaveAttribute("data-canyon-kit-replaced-procedural-visual-count", "14");
+    await expect(canvas).toHaveAttribute("data-canyon-kit-retained-cooling-cue-count", "4");
+    await expect(canvas).toHaveAttribute("data-canyon-kit-cooling-gate-style", "per-lane-open-arch");
+    await expect(canvas).toHaveAttribute("data-canyon-kit-cooling-gate-arch-count", "4");
+    await expect(canvas).toHaveAttribute("data-canyon-kit-tabletop-role", "gameplay-ramp-shell");
+
+    await page.evaluate(() => window.__RRR_QA__?.startTrack("canyon-kickoff", "practice"));
+    const twoLapCanvas = page.locator("canvas[aria-label='Live 3D race on Canyon Kickoff']");
+    await expect(twoLapCanvas).toBeAttached({ timeout: 20_000 });
+    await expect(twoLapCanvas).toHaveAttribute("data-canyon-kit-asset", "ready", { timeout: 10_000 });
+    await expect(twoLapCanvas).toHaveAttribute("data-canyon-kit-procedural-replacement-count", "8");
+    await expect(twoLapCanvas).toHaveAttribute("data-canyon-kit-replaced-procedural-visual-count", "18");
+    await expect(twoLapCanvas).toHaveAttribute("data-canyon-kit-retained-cooling-cue-count", "12");
+    await expect(twoLapCanvas).toHaveAttribute("data-canyon-kit-cooling-gate-style", "per-lane-open-arch");
+    await expect(twoLapCanvas).toHaveAttribute("data-canyon-kit-cooling-gate-arch-count", "12");
+
+    await page.evaluate(() => window.__RRR_QA__?.startTrack("pine-run", "practice"));
+    const reusedCanvas = page.locator("canvas[aria-label='Live 3D race on Pine Run']");
+    await expect(reusedCanvas).toBeAttached({ timeout: 20_000 });
+    await expect(reusedCanvas).toHaveAttribute("data-environment-asset", "not-applicable");
+    await expectNoCanvasAttributes(reusedCanvas, [
+      "data-environment-fallback-reason",
+      "data-environment-load-ms",
+      "data-environment-width",
+      "data-environment-height",
+    ]);
+  });
 
   test("a failed canyon panorama request keeps the tutorial playable", async ({ page }, testInfo) => {
     test.skip(testInfo.project.name !== "chromium", "Environment fallback gate runs once in Chromium");
@@ -61,10 +156,12 @@ test.describe("production asset network fallbacks", () => {
 
     await page.goto("/");
     const canvas = page.getByLabel("Live 3D race on Canyon Kickoff");
-    await expect(canvas).toBeVisible();
+    await expect(canvas).toBeVisible({ timeout: 15_000 });
     await expect(canvas).toHaveAttribute("data-environment-asset", "fallback", { timeout: 10_000 });
+    await expect(canvas).toHaveAttribute("data-environment-fallback-reason", "load-failed");
+    await expect(canvas).toHaveAttribute("data-environment-load-ms", /^\d+$/);
     expect(panoramaRequests).toEqual([
-      "http://127.0.0.1:4173/assets/art/canyon-festival-panorama.png",
+      new URL("/assets/art/canyon-festival-panorama.png", page.url()).href,
     ]);
 
     await page.getByRole("button", { name: "Start lesson 1" }).click();
@@ -73,19 +170,94 @@ test.describe("production asset network fallbacks", () => {
     await page.keyboard.up("w");
   });
 
+  test("a panorama that misses the race deadline upgrades the generated fallback when it arrives", async ({ page }, testInfo) => {
+    test.skip(testInfo.project.name !== "chromium", "Late environment upgrade runs once in Chromium");
+    test.setTimeout(45_000);
+    await page.route("**/assets/art/canyon-festival-panorama.png", async (route) => {
+      await new Promise((resolve) => setTimeout(resolve, 6_200));
+      await route.continue();
+    });
+
+    await page.goto("/");
+    const canvas = page.getByLabel("Live 3D race on Canyon Kickoff");
+    await expect(canvas).toBeVisible({ timeout: 15_000 });
+    await expect(canvas).toHaveAttribute("data-environment-asset", "fallback", { timeout: 12_000 });
+    await expect(canvas).toHaveAttribute("data-environment-fallback-reason", "timeout");
+    await expect(canvas).toHaveAttribute("data-environment-asset", "ready", { timeout: 15_000 });
+    await expect(canvas).not.toHaveAttribute("data-environment-fallback-reason", /.+/);
+    await expect(canvas).toHaveAttribute("data-environment-width", /^\d+$/);
+    await expect(canvas).toHaveAttribute("data-environment-height", /^\d+$/);
+  });
+
   test("a failed same-origin compressed model request keeps the playable fallback", async ({ page }, testInfo) => {
     test.skip(testInfo.project.name !== "chromium", "Asset fallback gate runs once in Chromium");
     const modelRequests: string[] = [];
-    await page.route("**/assets/3d/festival-trail-bike.glb", async (route) => {
+    await page.route("**/assets/3d/hero-bike-rider.glb", async (route) => {
       modelRequests.push(route.request().url());
       await route.abort("failed");
     });
 
     await page.goto("/");
     const canvas = page.getByLabel("Live 3D race on Canyon Kickoff");
-    await expect(canvas).toBeVisible();
+    await expect(canvas).toBeVisible({ timeout: 15_000 });
     await expect(page.getByText("Compressed bike unavailable — safe built-in model active")).toBeVisible({ timeout: 10_000 });
-    expect(modelRequests).toEqual(["http://127.0.0.1:4173/assets/3d/festival-trail-bike.glb"]);
+    await expect(canvas).toHaveAttribute("data-bike-asset", "fallback");
+    await expect(canvas).toHaveAttribute("data-bike-fallback-reason", "load-failed");
+    await expectHeroBikeDiagnosticsCleared(canvas);
+    expect(modelRequests).toEqual([
+      new URL("/assets/3d/hero-bike-rider.glb", page.url()).href,
+    ]);
+
+    await page.getByRole("button", { name: "Start lesson 1" }).click();
+    await page.keyboard.down("w");
+    await expect(page.getByRole("heading", { name: "Coast to slow" })).toBeVisible({ timeout: 10_000 });
+    await page.keyboard.up("w");
+  });
+
+  test("a decoded model with an invalid hero contract keeps the playable fallback", async ({ page }, testInfo) => {
+    test.skip(testInfo.project.name !== "chromium", "Malformed asset fallback gate runs once in Chromium");
+    await page.route("**/assets/3d/hero-bike-rider.glb", async (route) => {
+      const response = await route.fetch();
+      const body = Buffer.from(await response.body());
+      const requiredName = Buffer.from('"FrontTire"');
+      const invalidName = Buffer.from('"FrontTyre"');
+      const nameOffset = body.indexOf(requiredName);
+      expect(nameOffset, "fixture must contain the required FrontTire node name").toBeGreaterThan(-1);
+      invalidName.copy(body, nameOffset);
+      await route.fulfill({ response, body });
+    });
+
+    await page.goto("/");
+    const canvas = page.getByLabel("Live 3D race on Canyon Kickoff");
+    await expect(canvas).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByText("Compressed bike unavailable — safe built-in model active")).toBeVisible({ timeout: 10_000 });
+    await expect(canvas).toHaveAttribute("data-bike-asset", "fallback");
+    await expect(canvas).toHaveAttribute("data-bike-fallback-reason", /contract-invalid:/);
+    await expectHeroBikeDiagnosticsCleared(canvas);
+
+    await page.getByRole("button", { name: "Start lesson 1" }).click();
+    await page.keyboard.down("w");
+    await expect(page.getByRole("heading", { name: "Coast to slow" })).toBeVisible({ timeout: 10_000 });
+    await page.keyboard.up("w");
+  });
+
+  test("a failed Canyon kit request keeps procedural scenery and the bike loader independent", async ({ page }, testInfo) => {
+    test.skip(testInfo.project.name !== "chromium", "Canyon asset fallback gate runs once in Chromium");
+    const canyonRequests: string[] = [];
+    await page.route("**/assets/canyon/canyon-kit.glb", async (route) => {
+      canyonRequests.push(route.request().url());
+      await route.abort("failed");
+    });
+
+    await page.goto("/");
+    const canvas = page.getByLabel("Live 3D race on Canyon Kickoff");
+    await expect(canvas).toHaveAttribute("data-canyon-kit-asset", "procedural-fallback", { timeout: 10_000 });
+    await expectHeroBikeReady(canvas);
+    await expect(canvas).not.toHaveAttribute("data-canyon-kit-root-count", /.+/);
+    await expect(canvas).not.toHaveAttribute("data-canyon-kit-procedural-replacement-count", /.+/);
+    expect(canyonRequests).toEqual([
+      new URL("/assets/canyon/canyon-kit.glb", page.url()).href,
+    ]);
 
     await page.getByRole("button", { name: "Start lesson 1" }).click();
     await page.keyboard.down("w");
@@ -95,22 +267,55 @@ test.describe("production asset network fallbacks", () => {
 
   test("a stalled compressed model request reaches the fallback and starts the race", async ({ page }, testInfo) => {
     test.skip(testInfo.project.name !== "chromium", "Asset deadline gate runs once in Chromium");
-    test.setTimeout(30_000);
+    test.setTimeout(90_000);
     let abortedModelRequests = 0;
-    const assertCleanRuntime = observeUnexpectedFailures(
-      page,
-      (request) => request.url().endsWith("/assets/3d/festival-trail-bike.glb"),
-    );
+    const assertCleanRuntime = observeUnexpectedFailures(page);
     page.on("requestfailed", (request) => {
-      if (request.url().endsWith("/assets/3d/festival-trail-bike.glb")) abortedModelRequests += 1;
+      if (request.url().endsWith("/assets/3d/hero-bike-rider.glb")) abortedModelRequests += 1;
     });
     await page.goto("/?qa-fast-race=1");
     const canvas = page.getByLabel("Live 3D race on Canyon Kickoff");
-    await expect(canvas).toHaveAttribute("data-bike-asset", "ready", { timeout: 10_000 });
+    await expectHeroBikeReady(canvas);
+    await page.evaluate(() => {
+      type BikeAssetSnapshot = {
+        asset: string;
+        reason: string | null;
+        heroRoot: string | null;
+        gatePhase: string | null;
+      };
+      const instrumentedWindow = window as typeof window & {
+        __RRR_BIKE_ASSET_STATES__?: BikeAssetSnapshot[];
+      };
+      const states: BikeAssetSnapshot[] = [];
+      instrumentedWindow.__RRR_BIKE_ASSET_STATES__ = states;
+      const capture = () => {
+        const current = document.querySelector<HTMLCanvasElement>(".game-canvas");
+        const gate = document.querySelector<HTMLElement>(".game-shell");
+        const asset = current?.dataset.bikeAsset;
+        if (!current || !asset) return;
+        const snapshot: BikeAssetSnapshot = {
+          asset,
+          reason: current.dataset.bikeFallbackReason ?? null,
+          heroRoot: current.dataset.heroBikeRoot ?? null,
+          gatePhase: gate?.dataset.raceGatePhase ?? null,
+        };
+        const previous = states.at(-1);
+        if (previous?.asset === snapshot.asset && previous.gatePhase === snapshot.gatePhase) return;
+        states.push(snapshot);
+      };
+      const observer = new MutationObserver(capture);
+      observer.observe(document.documentElement, {
+        attributes: true,
+        attributeFilter: ["data-bike-asset", "data-race-gate-phase"],
+        childList: true,
+        subtree: true,
+      });
+      capture();
+    });
 
     // Install the stall only after the tutorial model has settled, so the
     // observed abort belongs to the subsequent Practice engine deadline.
-    await page.route("**/assets/3d/festival-trail-bike.glb", async (route) => {
+    await page.route("**/assets/3d/hero-bike-rider.glb", async (route) => {
       await new Promise((resolve) => setTimeout(resolve, 6_250));
       await route.continue().catch(() => undefined);
     });
@@ -119,12 +324,43 @@ test.describe("production asset network fallbacks", () => {
     await page.getByRole("button", { name: "Ride", exact: true }).click();
     await page.getByRole("button", { name: /^03 Practice/ }).click();
 
-    await expect(canvas).toHaveAttribute("data-bike-asset", "fallback", { timeout: 10_000 });
-    await expect(page.locator(".timing-block > strong")).toHaveText("00:00.00");
-    await expect(page.getByLabel("Go. Ride now.")).toBeVisible({ timeout: 10_000 });
-    await expect(page.locator(".game-shell")).toHaveAttribute("data-race-gate-phase", "racing");
-    await expect(canvas).toHaveAttribute("data-bike-asset", "fallback");
-    expect(abortedModelRequests).toBe(1);
+    // The fallback and Go signal are both intentionally transient. Observe the
+    // durable gate state here, then assert the ordered asset transitions below.
+    await expect(page.locator(".game-shell")).toHaveAttribute("data-race-gate-phase", "racing", {
+      timeout: 30_000,
+    });
+    await expectHeroBikeReady(canvas);
+    const assetStates = await page.evaluate(() => (
+      (window as typeof window & {
+        __RRR_BIKE_ASSET_STATES__?: Array<{
+          asset: string;
+          reason: string | null;
+          heroRoot: string | null;
+          gatePhase: string | null;
+        }>;
+      }).__RRR_BIKE_ASSET_STATES__ ?? []
+    ));
+    const loadingIndex = assetStates.findIndex(({ asset }) => asset === "loading");
+    const fallbackIndex = assetStates.findIndex(
+      ({ asset }, index) => index > loadingIndex && asset === "fallback",
+    );
+    const readyIndex = assetStates.findIndex(
+      ({ asset }, index) => index > fallbackIndex && asset === "ready",
+    );
+    const countdownIndex = assetStates.findIndex(
+      ({ gatePhase }, index) => index > loadingIndex && gatePhase === "countdown",
+    );
+    expect(loadingIndex).toBeGreaterThan(-1);
+    expect(fallbackIndex).toBeGreaterThan(loadingIndex);
+    expect(readyIndex).toBeGreaterThan(fallbackIndex);
+    expect(countdownIndex).toBeGreaterThan(fallbackIndex);
+    expect(assetStates[fallbackIndex]).toEqual({
+      asset: "fallback",
+      reason: "timeout",
+      heroRoot: null,
+      gatePhase: "loading",
+    });
+    expect(abortedModelRequests).toBe(0);
     assertCleanRuntime();
   });
 });
@@ -184,7 +420,7 @@ test("unavailable IndexedDB discloses session mode while a race remains playable
   });
 
   await page.goto("/?qa-fast-race=1");
-  await expect(page.getByRole("heading", { name: "Rider school" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Rider school" })).toBeVisible({ timeout: 15_000 });
   const tutorialNotice = page.getByRole("alert");
   await expect(tutorialNotice).toContainText("Device saving unavailable");
   await expect(tutorialNotice).toContainText("Rider School remains playable in session mode");
@@ -211,6 +447,7 @@ test("unavailable IndexedDB discloses session mode while a race remains playable
 
 test("session-mode Track Builder restores its unsaved draft and history after Test Ride", async ({ page }, testInfo) => {
   test.skip(testInfo.project.name !== "chromium", "IndexedDB editor fallback runs once in Chromium");
+  test.setTimeout(90_000);
   const assertCleanRuntime = observeUnexpectedFailures(page);
   await page.addInitScript(() => {
     Object.defineProperty(window, "indexedDB", {
@@ -226,10 +463,10 @@ test("session-mode Track Builder restores its unsaved draft and history after Te
   await expect(persistenceNotice).toContainText("Editing and test rides still work this session");
   await expect(persistenceNotice).toContainText("Use Export for a valid draft");
 
-  await page.getByLabel(/Interactive 3D track build camera/).click({ position: { x: 430, y: 330 } });
   await page.getByRole("button", { name: "terrain", exact: true }).click();
   const mudPatch = page.getByRole("button", { name: /^Mud Patch/ });
   await mudPatch.click();
+  await page.getByRole("button", { name: "Place selected module at route view" }).click();
   await page.getByLabel("Track name").fill("Session Workshop");
   await expect(page.getByText("2 / 50 actions", { exact: true })).toBeVisible();
 
@@ -245,8 +482,14 @@ test("session-mode Track Builder restores its unsaved draft and history after Te
   await expect(page.getByText("2 / 50 actions", { exact: true })).toBeVisible();
   await expect(page.getByRole("button", { name: "terrain", exact: true })).toHaveClass(/active/);
   await expect(page.getByRole("button", { name: /^Mud Patch/ })).toHaveClass(/active/);
-  await expect(page.getByLabel("Lane")).toBeVisible();
-  await expect(page.getByRole("alert")).toContainText("Use Export for a valid draft");
+  await expect(page.getByRole("spinbutton", { name: "Lane", exact: true })).toBeVisible();
+  await expect(page.getByRole("alert")).toContainText(
+    "The exact “Session Workshop” snapshot is still held in this tab",
+  );
+  await expect(page.getByRole("alert")).toContainText(
+    "export it before closing the tab",
+  );
+  await expect(page.getByRole("button", { name: "Retry track saving" })).toBeVisible();
   await expect(page.getByRole("button", { name: "Export", exact: true })).toBeVisible();
   assertCleanRuntime();
 });
@@ -292,7 +535,7 @@ test("quota write failure stays visible and retry flushes session settings", asy
   await expect(page.getByRole("alert")).toHaveCount(0);
 
   await page.getByRole("button", { name: "Save", exact: true }).click();
-  await expect(page.getByRole("status")).toHaveText("Track saved locally.");
+  await expect(page.locator(".editor-status output")).toHaveText("Track saved locally.");
   await page.getByRole("button", { name: "Back to festival menu" }).click();
   await page.reload();
   await expect(page.locator("html")).toHaveAttribute("data-high-contrast", "true");

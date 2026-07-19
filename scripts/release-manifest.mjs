@@ -1,18 +1,40 @@
 import { execFile } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { cp, lstat, mkdir, mkdtemp, readFile, readdir, rm, stat, writeFile } from 'node:fs/promises';
+import {
+  cp,
+  lstat,
+  mkdir,
+  mkdtemp,
+  readFile,
+  readdir,
+  readlink,
+  realpath,
+  rm,
+  stat,
+  writeFile,
+} from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { promisify } from 'node:util';
+import { isDeepStrictEqual, promisify } from 'node:util';
+import { gzipSync } from 'node:zlib';
 
 const root = process.cwd();
-const dist = path.join(root, 'dist');
-const output = path.join(root, 'artifacts', 'release-manifest.json');
+const profileIndex = process.argv.indexOf('--profile');
+const profile = profileIndex < 0 ? 'release' : process.argv[profileIndex + 1];
+if (!['release', 'visual-qa'].includes(profile)) {
+  throw new Error('Release guard failed: --profile must be release or visual-qa');
+}
+const visualQaProfile = profile === 'visual-qa';
+const visualCandidateRoot = path.join(root, 'artifacts', 'candidate-evidence', 'visual', 'current');
+const dist = visualQaProfile ? path.join(visualCandidateRoot, 'dist') : path.join(root, 'dist');
+const output = visualQaProfile
+  ? path.join(visualCandidateRoot, 'manifest.json')
+  : path.join(root, 'artifacts', 'release-manifest.json');
 const execFileAsync = promisify(execFile);
 const requiredNotice = 'THIRD_PARTY_NOTICES.txt';
 
-function releaseForbiddenByteSequences(sourceRoot, temporaryRoot, releaseWorktreePath) {
+function releaseForbiddenByteSequences(sourceRoot, temporaryRoot, releaseWorktreePath, allowQaMarker) {
   const entries = [
     { label: 'source checkout path', value: sourceRoot },
     { label: 'source checkout file URL', value: pathToFileURL(sourceRoot).href },
@@ -21,6 +43,8 @@ function releaseForbiddenByteSequences(sourceRoot, temporaryRoot, releaseWorktre
     { label: 'temporary release directory path', value: temporaryRoot },
     { label: 'temporary release directory file URL', value: pathToFileURL(temporaryRoot).href },
     { label: 'QA runtime marker __RRR_QA__', value: '__RRR_QA__' },
+    { label: 'injected performance capture marker __RRR_PERF_CAPTURE__', value: '__RRR_PERF_CAPTURE__' },
+    { label: 'product performance API marker __RRR_PERFORMANCE__', value: '__RRR_PERFORMANCE__' },
     { label: 'absolute local file URL', value: 'file:///Users/' },
     { label: 'absolute local file URL', value: 'file:///home/' },
     { label: 'absolute local file URL', value: 'file:///opt/' },
@@ -45,6 +69,7 @@ function releaseForbiddenByteSequences(sourceRoot, temporaryRoot, releaseWorktre
   ];
   const seen = new Set();
   return entries
+    .filter(({ value }) => !allowQaMarker || value !== '__RRR_QA__')
     .filter(({ value }) => {
       if (typeof value !== 'string' || value.length === 0 || seen.has(value)) return false;
       seen.add(value);
@@ -54,9 +79,7 @@ function releaseForbiddenByteSequences(sourceRoot, temporaryRoot, releaseWorktre
 }
 
 function compareNames(left, right) {
-  if (left.name < right.name) return -1;
-  if (left.name > right.name) return 1;
-  return 0;
+  return Buffer.compare(Buffer.from(left.name), Buffer.from(right.name));
 }
 
 function sha256(contents) {
@@ -165,6 +188,215 @@ async function assertNpmCliUnchanged(npmExecPath, expected) {
   }
 }
 
+function canonicalNpmRelativePath(value) {
+  if (
+    typeof value !== 'string'
+    || value.length === 0
+    || path.isAbsolute(value)
+    || value.includes('\\')
+    || /[\u0000-\u001f\u007f]/.test(value)
+  ) return null;
+  const segments = value.split('/');
+  if (segments.some((segment) => !segment || segment === '.' || segment === '..')) return null;
+  return value;
+}
+
+function npmTreeMode(entryStat) {
+  return Number(entryStat.mode & 0o7777n).toString(8).padStart(4, '0');
+}
+
+function updateNpmTreeRecord(treeHash, fields) {
+  for (const field of fields) {
+    treeHash.update(String(field));
+    treeHash.update('\0');
+  }
+}
+
+async function findNpmPackageRoot(npmCliRealPath) {
+  let current = path.dirname(npmCliRealPath);
+  while (true) {
+    const packageJsonPath = path.join(current, 'package.json');
+    try {
+      const packageJsonStat = await lstat(packageJsonPath);
+      if (!packageJsonStat.isFile() || packageJsonStat.isSymbolicLink()) {
+        throw new Error('Release guard failed: nearest npm package.json is not a regular file');
+      }
+      return { packageRoot: current, packageJsonPath };
+    } catch (error) {
+      if (!error || typeof error !== 'object' || !('code' in error) || error.code !== 'ENOENT') {
+        throw error;
+      }
+    }
+    const parent = path.dirname(current);
+    if (parent === current) {
+      throw new Error('Release guard failed: npm package root is unavailable');
+    }
+    current = parent;
+  }
+}
+
+async function inventoryNpmPackageTree(packageRoot) {
+  const physicalRoot = await realpath(packageRoot);
+  if (physicalRoot !== packageRoot) {
+    throw new Error('Release guard failed: npm package root is not a physical directory');
+  }
+
+  const treeHash = createHash('sha256');
+  let directoryCount = 0;
+  let regularFileCount = 0;
+  let symlinkCount = 0;
+  let totalRegularFileBytes = 0;
+
+  async function walk(absolute, relative) {
+    const entryStat = await lstat(absolute, { bigint: true });
+    const mode = npmTreeMode(entryStat);
+    if (entryStat.isDirectory()) {
+      directoryCount += 1;
+      updateNpmTreeRecord(treeHash, ['D', relative, mode]);
+      const entries = (await readdir(absolute, { withFileTypes: true })).sort(compareNames);
+      for (const entry of entries) {
+        const entryRelative = relative === '.' ? entry.name : `${relative}/${entry.name}`;
+        await walk(path.join(absolute, entry.name), entryRelative);
+      }
+      return;
+    }
+    if (entryStat.isFile()) {
+      if (entryStat.size > BigInt(Number.MAX_SAFE_INTEGER)) {
+        throw new Error('Release guard failed: npm package contains an oversized regular file');
+      }
+      const contents = await readFile(absolute);
+      const size = Number(entryStat.size);
+      if (contents.byteLength !== size) {
+        throw new Error('Release guard failed: npm package file changed while it was being inventoried');
+      }
+      regularFileCount += 1;
+      totalRegularFileBytes += size;
+      if (!Number.isSafeInteger(totalRegularFileBytes)) {
+        throw new Error('Release guard failed: npm package byte total is unsafe');
+      }
+      updateNpmTreeRecord(treeHash, ['F', relative, mode, size, sha256(contents)]);
+      return;
+    }
+    if (entryStat.isSymbolicLink()) {
+      const targetBytes = await readlink(absolute, { encoding: 'buffer' });
+      const target = targetBytes.toString('utf8');
+      if (!Buffer.from(target).equals(targetBytes) || path.isAbsolute(target)) {
+        throw new Error('Release guard failed: npm package contains an invalid or absolute symbolic link');
+      }
+      let resolvedTarget;
+      try {
+        resolvedTarget = await realpath(path.resolve(path.dirname(absolute), target));
+      } catch {
+        throw new Error('Release guard failed: npm package contains a dangling symbolic link');
+      }
+      if (!isContainedPath(physicalRoot, resolvedTarget)) {
+        throw new Error('Release guard failed: npm package symbolic link escapes its package root');
+      }
+      symlinkCount += 1;
+      updateNpmTreeRecord(treeHash, [
+        'L',
+        relative,
+        mode,
+        targetBytes.byteLength,
+        sha256(targetBytes),
+      ]);
+      return;
+    }
+    throw new Error('Release guard failed: npm package contains a special filesystem entry');
+  }
+
+  await walk(physicalRoot, '.');
+  return {
+    treeFormat: 1,
+    directoryCount,
+    regularFileCount,
+    symlinkCount,
+    totalRegularFileBytes,
+    treeSha256: treeHash.digest('hex'),
+  };
+}
+
+async function inspectNpmPackage(npmExecPath, pinnedNpmVersion) {
+  let npmCliRealPath;
+  try {
+    npmCliRealPath = await realpath(npmExecPath);
+  } catch {
+    throw new Error('Release guard failed: npm_execpath cannot be resolved');
+  }
+  const { packageRoot, packageJsonPath } = await findNpmPackageRoot(npmCliRealPath);
+  const packageJsonContents = await readFile(packageJsonPath);
+  let packageManifest;
+  try {
+    packageManifest = JSON.parse(packageJsonContents.toString('utf8'));
+  } catch {
+    throw new Error('Release guard failed: npm package.json is invalid');
+  }
+  if (packageManifest === null || typeof packageManifest !== 'object' || Array.isArray(packageManifest)) {
+    throw new Error('Release guard failed: npm package.json is invalid');
+  }
+  if (packageManifest.name !== 'npm') {
+    throw new Error('Release guard failed: npm_execpath is not inside the npm package');
+  }
+  if (packageManifest.version !== pinnedNpmVersion) {
+    throw new Error('Release guard failed: npm package version does not match packageManager');
+  }
+  const declaredCliPath = canonicalNpmRelativePath(packageManifest.bin?.npm);
+  if (declaredCliPath !== 'bin/npm-cli.js') {
+    throw new Error('Release guard failed: npm package bin.npm is not the canonical bin/npm-cli.js entrypoint');
+  }
+  const declaredCliAbsolute = path.resolve(packageRoot, ...declaredCliPath.split('/'));
+  if (!isContainedPath(packageRoot, declaredCliAbsolute)) {
+    throw new Error('Release guard failed: npm package bin.npm escapes its package root');
+  }
+  let declaredCliRealPath;
+  try {
+    declaredCliRealPath = await realpath(declaredCliAbsolute);
+  } catch {
+    throw new Error('Release guard failed: npm package bin.npm entrypoint is unavailable');
+  }
+  if (declaredCliRealPath !== npmCliRealPath) {
+    throw new Error('Release guard failed: npm_execpath does not match npm package bin.npm');
+  }
+
+  const cliIdentity = await inspectNpmCli(npmCliRealPath);
+  const tree = await inventoryNpmPackageTree(packageRoot);
+  return {
+    packageRoot,
+    npmCliRealPath,
+    cliIdentity,
+    manifest: {
+      treeFormat: tree.treeFormat,
+      name: packageManifest.name,
+      version: packageManifest.version,
+      cliRelativePath: declaredCliPath,
+      packageJsonSha256: sha256(packageJsonContents),
+      directoryCount: tree.directoryCount,
+      regularFileCount: tree.regularFileCount,
+      symlinkCount: tree.symlinkCount,
+      totalRegularFileBytes: tree.totalRegularFileBytes,
+      treeSha256: tree.treeSha256,
+    },
+  };
+}
+
+async function assertNpmPackageUnchanged(npmExecPath, pinnedNpmVersion, expected) {
+  let current;
+  try {
+    current = await inspectNpmPackage(npmExecPath, pinnedNpmVersion);
+  } catch {
+    throw new Error('Release guard failed: exact npm package tree changed during the release build');
+  }
+  if (
+    current.packageRoot !== expected.packageRoot
+    || current.npmCliRealPath !== expected.npmCliRealPath
+    || current.cliIdentity.statIdentity !== expected.cliIdentity.statIdentity
+    || current.cliIdentity.sha256 !== expected.cliIdentity.sha256
+    || !isDeepStrictEqual(current.manifest, expected.manifest)
+  ) {
+    throw new Error('Release guard failed: exact npm package tree changed during the release build');
+  }
+}
+
 async function inspectNodeExecutable(nodeExecPath) {
   let executableStat;
   let executableContents;
@@ -252,7 +484,7 @@ async function walkRegularFiles(directory, base = directory) {
   return files;
 }
 
-function releaseEnvironment(tempRoot) {
+function releaseEnvironment(tempRoot, viteQaMode) {
   const tempDirectory = path.join(tempRoot, 'tmp');
   return {
     PATH: [path.dirname(process.execPath), process.env.PATH ?? '']
@@ -265,15 +497,15 @@ function releaseEnvironment(tempRoot) {
     LANG: 'C.UTF-8',
     LC_ALL: 'C.UTF-8',
     CI: '1',
-    VITE_QA_MODE: '0',
+    VITE_QA_MODE: viteQaMode,
     npm_config_audit: 'false',
     npm_config_fund: 'false',
     npm_config_update_notifier: 'false',
     npm_config_production: 'false',
     npm_config_ignore_scripts: 'false',
     npm_config_cache: path.join(tempRoot, 'npm-cache'),
-    npm_config_userconfig: path.join(tempRoot, 'empty.npmrc'),
-    npm_config_globalconfig: path.join(tempRoot, 'empty.npmrc'),
+    npm_config_userconfig: path.join(tempRoot, 'empty-user.npmrc'),
+    npm_config_globalconfig: path.join(tempRoot, 'empty-global.npmrc'),
   };
 }
 
@@ -400,9 +632,14 @@ async function assertReleaseInputsUnchanged(directory, expected, label) {
 }
 
 async function removeRootOutputs() {
-  await assertNoSymlinkAncestors(root, path.dirname(output), 'release sidecar parent');
+  const targets = visualQaProfile ? [visualCandidateRoot] : [output, dist];
+  await assertNoSymlinkAncestors(
+    root,
+    visualQaProfile ? path.dirname(visualCandidateRoot) : path.dirname(output),
+    visualQaProfile ? 'visual QA candidate parent' : 'release sidecar parent',
+  );
   let cleanupFailure = null;
-  for (const target of [output, dist]) {
+  for (const target of targets) {
     try {
       await rm(target, { recursive: true, force: true });
     } catch {
@@ -463,8 +700,10 @@ try {
   await mkdir(path.join(tempRoot, 'home'), { recursive: true });
   await mkdir(path.join(tempRoot, 'tmp'), { recursive: true });
   await mkdir(path.join(tempRoot, 'npm-cache'), { recursive: true });
-  await writeFile(path.join(tempRoot, 'empty.npmrc'), '');
-  const environment = releaseEnvironment(tempRoot);
+  await writeFile(path.join(tempRoot, 'empty-user.npmrc'), '');
+  await writeFile(path.join(tempRoot, 'empty-global.npmrc'), '');
+  const viteQaMode = visualQaProfile ? '1' : '0';
+  const environment = releaseEnvironment(tempRoot, viteQaMode);
 
   await git(
     ['worktree', 'add', '--detach', worktreePath, commit],
@@ -484,30 +723,49 @@ try {
 
   const expectedTag = `v${packageManifest.version}`;
   const tagReference = `refs/tags/${expectedTag}`;
-  const tagObject = await git(
-    ['rev-parse', tagReference],
-    `annotated tag ${expectedTag} is missing`,
-  );
-  const tagType = await git(
-    ['cat-file', '-t', tagObject],
-    `annotated tag ${expectedTag} is missing`,
-  );
-  if (tagType !== 'tag') {
-    throw new Error(`Release guard failed: ${expectedTag} must be an annotated tag`);
-  }
-  const taggedCommit = await git(
-    ['rev-parse', `${tagObject}^{commit}`],
-    `annotated tag ${expectedTag} cannot be resolved`,
-  );
-  if (taggedCommit !== commit) {
-    throw new Error(`Release guard failed: annotated tag ${expectedTag} does not point to HEAD`);
+  let tagObject = null;
+  let tagType = null;
+  let tagsAtCommit = [];
+  if (visualQaProfile) {
+    const tagsText = await git(
+      ['tag', '--points-at', commit],
+      'visual QA tags at HEAD cannot be inspected',
+    );
+    tagsAtCommit = tagsText ? tagsText.split('\n').filter(Boolean).toSorted() : [];
+    if (tagsAtCommit.includes(expectedTag)) {
+      throw new Error(
+        `Release guard failed: visual QA candidate must be captured before creating ${expectedTag}`,
+      );
+    }
+  } else {
+    tagObject = await git(
+      ['rev-parse', tagReference],
+      `annotated tag ${expectedTag} is missing`,
+    );
+    tagType = await git(
+      ['cat-file', '-t', tagObject],
+      `annotated tag ${expectedTag} is missing`,
+    );
+    if (tagType !== 'tag') {
+      throw new Error(`Release guard failed: ${expectedTag} must be an annotated tag`);
+    }
+    const taggedCommit = await git(
+      ['rev-parse', `${tagObject}^{commit}`],
+      `annotated tag ${expectedTag} cannot be resolved`,
+    );
+    if (taggedCommit !== commit) {
+      throw new Error(`Release guard failed: annotated tag ${expectedTag} does not point to HEAD`);
+    }
   }
 
   const npmExecPath = process.env.npm_execpath;
   if (!npmExecPath || !path.isAbsolute(npmExecPath)) {
     throw new Error('Release guard failed: npm_execpath must be an absolute path');
   }
-  const npmCliIdentity = await inspectNpmCli(npmExecPath);
+  const npmPackageIdentity = await inspectNpmPackage(npmExecPath, pinnedNpmVersion);
+  const npmPackage = npmPackageIdentity.manifest;
+  const npmInvocationPath = npmPackageIdentity.npmCliRealPath;
+  const npmCliIdentity = npmPackageIdentity.cliIdentity;
   const npmCliSha256 = npmCliIdentity.sha256;
   const processNodeIdentity = await inspectNodeExecutable(process.execPath);
   const buildNodeIdentity = await inspectResolvedBuildNode(environment);
@@ -525,13 +783,14 @@ try {
   const nodeExecutableSha256 = buildNodeIdentity.sha256;
 
   const npmVersionResult = await runNpm(
-    npmExecPath,
+    npmInvocationPath,
     ['--version'],
     root,
     environment,
     'the exact npm CLI could not report its version',
   );
   await assertNpmCliUnchanged(npmExecPath, npmCliIdentity);
+  await assertNpmPackageUnchanged(npmExecPath, pinnedNpmVersion, npmPackageIdentity);
   const actualNpmVersion = npmVersionResult.stdout.trim();
   if (actualNpmVersion !== pinnedNpmVersion) {
     throw new Error(
@@ -540,13 +799,14 @@ try {
   }
 
   await runNpm(
-    npmExecPath,
+    npmInvocationPath,
     ['ci', '--no-audit', '--no-fund'],
     worktreePath,
     environment,
     'isolated npm ci failed',
   );
   await assertNpmCliUnchanged(npmExecPath, npmCliIdentity);
+  await assertNpmPackageUnchanged(npmExecPath, pinnedNpmVersion, npmPackageIdentity);
   await assertResolvedBuildNodeUnchanged(environment, buildNodeIdentity);
   await assertDetachedCheckout(
     worktreePath,
@@ -556,13 +816,16 @@ try {
   );
   await assertReleaseInputsUnchanged(worktreePath, releaseInputs, 'Detached release checkout');
   await runNpm(
-    npmExecPath,
+    npmInvocationPath,
     ['run', 'build'],
     worktreePath,
-    { ...environment, NODE_ENV: 'production', VITE_QA_MODE: '0' },
-    'isolated non-QA npm run build failed',
+    { ...environment, NODE_ENV: 'production', VITE_QA_MODE: viteQaMode },
+    visualQaProfile
+      ? 'isolated visual QA npm run build failed'
+      : 'isolated non-QA npm run build failed',
   );
   await assertNpmCliUnchanged(npmExecPath, npmCliIdentity);
+  await assertNpmPackageUnchanged(npmExecPath, pinnedNpmVersion, npmPackageIdentity);
   await assertResolvedBuildNodeUnchanged(environment, buildNodeIdentity);
 
   await assertDetachedCheckout(
@@ -573,10 +836,16 @@ try {
   );
   await assertReleaseInputsUnchanged(worktreePath, releaseInputs, 'Detached release checkout');
   await assertSourceCheckout(root, commit, 'Source checkout');
-  await assertReleaseTagUnchanged(tagReference, expectedTag, tagObject, tagType, commit);
+  if (!visualQaProfile) {
+    await assertReleaseTagUnchanged(tagReference, expectedTag, tagObject, tagType, commit);
+  }
 
   const isolatedDist = path.join(worktreePath, 'dist');
   await walkRegularFiles(isolatedDist);
+  if (visualQaProfile) {
+    await mkdir(path.dirname(dist), { recursive: true });
+    await assertNoSymlinkAncestors(root, path.dirname(dist), 'visual QA distribution parent');
+  }
   await cp(isolatedDist, dist, {
     recursive: true,
     dereference: false,
@@ -596,62 +865,148 @@ try {
     throw new Error(`Release guard failed: source maps present: ${sourceMaps.join(', ')}`);
   }
 
-  const forbiddenByteSequences = releaseForbiddenByteSequences(root, tempRoot, worktreePath);
+  const forbiddenByteSequences = releaseForbiddenByteSequences(
+    root,
+    tempRoot,
+    worktreePath,
+    visualQaProfile,
+  );
+  const requiredQaMarker = Buffer.from('__RRR_QA__');
+  let qaMarkerFound = false;
   const records = [];
   for (const [index, absolute] of files.entries()) {
     const contents = await readFile(absolute);
+    const gzipContents = gzipSync(contents, { level: 9 });
     const relative = relativePaths[index];
+    qaMarkerFound ||= contents.includes(requiredQaMarker);
     for (const forbidden of forbiddenByteSequences) {
       if (contents.includes(forbidden.value)) {
         throw new Error(`Release guard failed: ${forbidden.label} found in dist/${relative}`);
       }
     }
-    records.push({
-      path: relative,
-      bytes: contents.length,
-      sha256: sha256(contents),
+    records.push(visualQaProfile
+      ? {
+        path: relative,
+        type: 'file',
+        bytes: contents.length,
+        gzipBytes: gzipContents.length,
+        gzipSha256: sha256(gzipContents),
+        sha256: sha256(contents),
+      }
+      : {
+        path: relative,
+        bytes: contents.length,
+        gzipBytes: gzipContents.length,
+        gzipSha256: sha256(gzipContents),
+        sha256: sha256(contents),
+      });
+  }
+  if (visualQaProfile && !qaMarkerFound) {
+    throw new Error('Release guard failed: visual QA build does not contain the required __RRR_QA__ marker');
+  }
+  if (visualQaProfile) {
+    records.sort((left, right) => {
+      if (left.path < right.path) return -1;
+      if (left.path > right.path) return 1;
+      return 0;
     });
   }
 
   const aggregate = createHash('sha256');
   for (const record of records) aggregate.update(`${record.sha256}  ${record.path}\n`);
+  const aggregateSha256 = aggregate.digest('hex');
+  const manifest = visualQaProfile
+    ? {
+      kind: 'visual-qa-candidate',
+      format: 1,
+      product: 'RIVET RIDGE RALLY',
+      version: packageManifest.version,
+      source: {
+        commit,
+        expectedVersionTag: expectedTag,
+        tagsAtCommit,
+        expectedVersionTagAtCommit: tagsAtCommit.includes(expectedTag),
+        expectedVersionTagObject: tagObject,
+        expectedVersionTagObjectType: tagType,
+      },
+      toolchain: {
+        node: buildNodeIdentity.version,
+        nodeExecutableSha256,
+        npm: actualNpmVersion,
+        npmCliSha256,
+        npmPackage,
+        platform: process.platform,
+        arch: process.arch,
+        packageLockSha256: sha256(packageLockContents),
+      },
+      build: {
+        source: 'detached-clean-git-worktree',
+        installCommand: 'npm ci --no-audit --no-fund',
+        buildCommand: 'npm run build',
+        viteQaMode: '1',
+        npmConfig: 'isolated-empty-user-and-global',
+        installScripts: 'enabled',
+      },
+      compression: {
+        algorithm: 'gzip',
+        level: 9,
+      },
+      totalBytes: records.reduce((sum, record) => sum + record.bytes, 0),
+      totalGzipBytes: records.reduce((sum, record) => sum + record.gzipBytes, 0),
+      fileCount: records.length,
+      aggregateSha256,
+      files: records,
+    }
+    : {
+      product: 'RIVET RIDGE RALLY',
+      version: packageManifest.version,
+      format: 2,
+      source: {
+        commit,
+        tag: expectedTag,
+        tagObject,
+        tagObjectType: tagType,
+      },
+      toolchain: {
+        node: buildNodeIdentity.version,
+        nodeExecutableSha256,
+        npm: actualNpmVersion,
+        npmCliSha256,
+        npmPackage,
+        platform: process.platform,
+        arch: process.arch,
+        packageLockSha256: sha256(packageLockContents),
+      },
+      build: {
+        source: 'detached-clean-git-worktree',
+        installCommand: 'npm ci --no-audit --no-fund',
+        buildCommand: 'npm run build',
+        viteQaMode: '0',
+        npmConfig: 'isolated-empty-user-and-global',
+        installScripts: 'enabled',
+      },
+      compression: {
+        algorithm: 'gzip',
+        level: 9,
+      },
+      totalBytes: records.reduce((sum, record) => sum + record.bytes, 0),
+      totalGzipBytes: records.reduce((sum, record) => sum + record.gzipBytes, 0),
+      fileCount: records.length,
+      aggregateSha256,
+      files: records,
+    };
 
-  const manifest = {
-    product: 'RIVET RIDGE RALLY',
-    version: packageManifest.version,
-    format: 2,
-    source: {
-      commit,
-      tag: expectedTag,
-      tagObject,
-      tagObjectType: tagType,
-    },
-    toolchain: {
-      node: buildNodeIdentity.version,
-      nodeExecutableSha256,
-      npm: actualNpmVersion,
-      npmCliSha256,
-      platform: process.platform,
-      arch: process.arch,
-      packageLockSha256: sha256(packageLockContents),
-    },
-    build: {
-      source: 'detached-clean-git-worktree',
-      installCommand: 'npm ci --no-audit --no-fund',
-      buildCommand: 'npm run build',
-      viteQaMode: '0',
-      npmConfig: 'isolated-empty-user-and-global',
-      installScripts: 'enabled',
-    },
-    totalBytes: records.reduce((sum, record) => sum + record.bytes, 0),
-    fileCount: records.length,
-    aggregateSha256: aggregate.digest('hex'),
-    files: records,
-  };
-
-  await assertNoSymlinkAncestors(root, path.dirname(output), 'release sidecar parent');
+  await assertNoSymlinkAncestors(
+    root,
+    path.dirname(output),
+    visualQaProfile ? 'visual QA manifest parent' : 'release sidecar parent',
+  );
   await mkdir(path.dirname(output), { recursive: true });
-  await assertNoSymlinkAncestors(root, path.dirname(output), 'release sidecar parent');
+  await assertNoSymlinkAncestors(
+    root,
+    path.dirname(output),
+    visualQaProfile ? 'visual QA manifest parent' : 'release sidecar parent',
+  );
   await writeFile(output, `${JSON.stringify(manifest, null, 2)}\n`);
   await assertDetachedCheckout(
     worktreePath,
@@ -661,17 +1016,23 @@ try {
   );
   await assertReleaseInputsUnchanged(worktreePath, releaseInputs, 'Detached release checkout');
   await assertSourceCheckout(root, commit, 'Source checkout');
-  await assertReleaseTagUnchanged(tagReference, expectedTag, tagObject, tagType, commit);
+  if (!visualQaProfile) {
+    await assertReleaseTagUnchanged(tagReference, expectedTag, tagObject, tagType, commit);
+  }
   await assertNpmCliUnchanged(npmExecPath, npmCliIdentity);
+  await assertNpmPackageUnchanged(npmExecPath, pinnedNpmVersion, npmPackageIdentity);
   await assertResolvedBuildNodeUnchanged(environment, buildNodeIdentity);
   completeRelease = async () => {
     await assertSourceCheckout(root, commit, 'Source checkout');
-    await assertReleaseTagUnchanged(tagReference, expectedTag, tagObject, tagType, commit);
+    if (!visualQaProfile) {
+      await assertReleaseTagUnchanged(tagReference, expectedTag, tagObject, tagType, commit);
+    }
     await assertNpmCliUnchanged(npmExecPath, npmCliIdentity);
+    await assertNpmPackageUnchanged(npmExecPath, pinnedNpmVersion, npmPackageIdentity);
     await assertResolvedBuildNodeUnchanged(environment, buildNodeIdentity);
-    console.log(`Release manifest: ${records.length} files, ${manifest.totalBytes} bytes`);
+    console.log(`${visualQaProfile ? 'Visual QA candidate' : 'Release manifest'}: ${records.length} files, ${manifest.totalBytes} bytes`);
     console.log(`Aggregate SHA-256: ${manifest.aggregateSha256}`);
-    console.log(`Source: ${manifest.source.tag} (${manifest.source.commit})`);
+    console.log(`Source: ${visualQaProfile ? manifest.source.commit : `${manifest.source.tag} (${manifest.source.commit})`}`);
     console.log(`Toolchain: Node ${manifest.toolchain.node}, npm ${manifest.toolchain.npm}`);
     releaseComplete = true;
   };

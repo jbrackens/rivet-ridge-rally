@@ -61,6 +61,7 @@ describe("Results presentation", () => {
       progress: createDefaultProgress(),
       latestResult: soloResult,
       latestResultAttempt: 1,
+      latestReplayFailureReason: null,
       raceAttempt: 1,
     });
   });
@@ -91,6 +92,21 @@ describe("Results presentation", () => {
     );
     expect(checkpointComparisons[0]).toBe("Prior PB 00:14.00 · −00:01.00");
     expect(checkpointComparisons.at(-1)).toBe("Prior PB 01:22.00 · +00:01.00");
+  });
+
+  it("discloses an unavailable replay without changing the result presentation", () => {
+    act(() => {
+      useAppStore.setState({ latestReplayFailureReason: "capacity" });
+      root.render(<ResultsScreen />);
+    });
+
+    expect(container.querySelector(".final-time")?.textContent).toBe("01:23.00");
+    expect(container.querySelector(".replay-unavailable-notice")?.textContent).toContain(
+      "Your official result and progress were kept, but no replay was saved",
+    );
+    expect(container.querySelector(".replay-unavailable-notice")?.textContent).toContain(
+      "byte capacity",
+    );
   });
 
   it("uses neutral completion copy for runs without a competitive field", () => {
