@@ -61,6 +61,16 @@ const outputDirectory = canonicalOutputDirectory(requestedOutputDirectory);
 const outputRoot = resolve(REPO_ROOT, outputDirectory);
 const artifactsRoot = resolve(REPO_ROOT, "artifacts");
 const visualReviewRoot = resolve(artifactsRoot, "visual-review");
+const KNOWN_VISUAL_DIAGNOSTIC_WARNING = new RegExp([
+  "^",
+  "(?:",
+  "Service Worker registration blocked by Playwright",
+  "|",
+  "(?:\\[\\.[^\\]]+\\])?GL Driver Message \\([^)]*\\).*ReadPixels",
+  "|",
+  "The resource http://127\\.0\\.0\\.1:\\d+/assets/art/title-background\\.png was preloaded using link preload but not used within a few seconds from the window's load event\\.",
+  ")",
+].join(""), "u");
 if (relative(REPO_ROOT, outputRoot).split(sep).join("/") !== outputDirectory) {
   throw new Error("--output-dir escapes the repository.");
 }
@@ -230,9 +240,12 @@ function createBrowserResponseAudit(page, candidate, navigationURL) {
       const request = response.request();
       const requestedURL = request.url();
       const finalURL = response.url();
+      let finalProtocol = null;
       let finalOrigin = null;
       try {
-        finalOrigin = new URL(finalURL).origin;
+        const parsedFinalURL = new URL(finalURL);
+        finalProtocol = parsedFinalURL.protocol;
+        finalOrigin = parsedFinalURL.origin;
       } catch {
         recordUnexpected("invalid-response-url", {
           requestedURL,
@@ -241,6 +254,7 @@ function createBrowserResponseAudit(page, candidate, navigationURL) {
         });
         return;
       }
+      if (!["http:", "https:"].includes(finalProtocol)) return;
       let actual = null;
       let bodyError = null;
       if (finalOrigin === navigationURL.origin) {
@@ -419,11 +433,17 @@ function createBrowserResponseAudit(page, candidate, navigationURL) {
 
 function attachDiagnostics(page) {
   const consoleMessages = [];
+  const knownConsoleMessages = [];
   const failedRequests = [];
   const httpErrors = [];
   page.on("console", (message) => {
     if (["error", "warning"].includes(message.type())) {
-      consoleMessages.push({ type: message.type(), text: message.text() });
+      const record = { type: message.type(), text: message.text() };
+      if (message.type() === "warning" && KNOWN_VISUAL_DIAGNOSTIC_WARNING.test(message.text())) {
+        knownConsoleMessages.push(record);
+      } else {
+        consoleMessages.push(record);
+      }
     }
   });
   page.on("pageerror", (error) => {
@@ -440,7 +460,7 @@ function attachDiagnostics(page) {
   page.on("response", (response) => {
     if (response.status() >= 400) httpErrors.push({ status: response.status(), url: response.url() });
   });
-  return { consoleMessages, failedRequests, httpErrors };
+  return { consoleMessages, knownConsoleMessages, failedRequests, httpErrors };
 }
 
 async function waitForShell(page) {
@@ -662,6 +682,7 @@ async function capture(browser, entry, candidate, baseURL) {
     responseSet,
     diagnostics: {
       consoleMessages: diagnostics.consoleMessages,
+      knownConsoleMessages: diagnostics.knownConsoleMessages,
       failedRequests: diagnostics.failedRequests,
       httpErrors: diagnostics.httpErrors,
     },
