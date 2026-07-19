@@ -5961,7 +5961,7 @@ export class GameEngine {
 
   private createDustPool(): void {
     const count = this.quality === "low" ? 12 : this.quality === "medium" ? 22 : 34;
-    const geometry = new THREE.PlaneGeometry(0.64, 0.46);
+    const geometry = new THREE.PlaneGeometry(0.88, 0.62);
     const dustTexture = createSoftDustTexture();
     this.ownedTextures.push(dustTexture);
     const dustColor = new THREE.Color(this.track.palette.dirtDark).offsetHSL(0.018, 0.02, 0.08).getHex();
@@ -6008,6 +6008,7 @@ export class GameEngine {
       const elapsed = Math.max(0, particle.maxLife - particle.life);
       const scale = particle.baseScale + elapsed * 2.1;
       particle.mesh.scale.setScalar(scale);
+      particle.mesh.lookAt(this.camera.position);
       const material = Array.isArray(particle.mesh.material) ? particle.mesh.material[0] : particle.mesh.material;
       if (material instanceof THREE.MeshBasicMaterial) {
         material.opacity = particle.baseOpacity * Math.pow(clamp(particle.life / particle.maxLife, 0, 1), 1.35);
@@ -6034,12 +6035,12 @@ export class GameEngine {
       this.dustCursor += 1;
       if (!particle) continue;
       const side = emissions === 1 ? baseSide : index === 0 ? -1 : 1;
-      const rearOffset = 0.92 + speedFactor * 0.42 + index * 0.1;
-      const laneOffset = side * (0.28 + speedFactor * 0.1);
+      const rearOffset = 1.08 + speedFactor * 0.52 + index * 0.14;
+      const laneOffset = side * (0.36 + speedFactor * 0.18);
       const orientation = this.courseRoute.sample(
         state.bike.forwardPosition - rearOffset,
         state.bike.lanePosition + laneOffset,
-        0.34 + this.authoredRouteHeight(
+        0.42 + this.authoredRouteHeight(
           state.bike.forwardPosition % this.track.courseLength,
           state.bike.lanePosition,
         ),
@@ -6049,9 +6050,10 @@ export class GameEngine {
       const rearDrift = -(0.22 + speedFactor * 0.34);
       particle.life = 0.62 + speedFactor * 0.16;
       particle.maxLife = particle.life;
-      particle.baseScale = (0.76 + speedFactor * 0.34) * surfaceFactor;
-      particle.baseOpacity = (0.34 + speedFactor * 0.12) * (state.bike.surface === "grass" ? 0.72 : 1);
+      particle.baseScale = (0.92 + speedFactor * 0.44) * surfaceFactor;
+      particle.baseOpacity = (0.42 + speedFactor * 0.14) * (state.bike.surface === "grass" ? 0.72 : 1);
       particle.mesh.scale.setScalar(particle.baseScale);
+      particle.mesh.lookAt(this.camera.position);
       const material = Array.isArray(particle.mesh.material) ? particle.mesh.material[0] : particle.mesh.material;
       if (material instanceof THREE.MeshBasicMaterial) material.opacity = particle.baseOpacity;
       particle.driftX = orientation.rightX * lateralDrift + orientation.forwardX * rearDrift;
@@ -6096,12 +6098,13 @@ export class GameEngine {
       const rearDrift = -(0.35 + (index % 3) * 0.14) * speedFactor;
       particle.life = life;
       particle.maxLife = life;
-      particle.baseScale = baseScale + spreadStep * 0.04;
-      particle.baseOpacity = kind === "crash" ? 0.54 : kind === "rough-landing" ? 0.46 : 0.36;
+      particle.baseScale = baseScale + spreadStep * 0.08;
+      particle.baseOpacity = kind === "crash" ? 0.62 : kind === "rough-landing" ? 0.54 : 0.42;
       particle.driftX = orientation.rightX * lateralDrift + orientation.forwardX * rearDrift;
       particle.driftY = kind === "crash" ? 0.58 + (index % 4) * 0.05 : 0.44 + (index % 3) * 0.04;
       particle.driftZ = orientation.rightZ * lateralDrift + orientation.forwardZ * rearDrift;
       particle.mesh.scale.setScalar(particle.baseScale);
+      particle.mesh.lookAt(this.camera.position);
       const material = Array.isArray(particle.mesh.material) ? particle.mesh.material[0] : particle.mesh.material;
       if (material instanceof THREE.MeshBasicMaterial) material.opacity = particle.baseOpacity;
       particle.mesh.visible = true;
