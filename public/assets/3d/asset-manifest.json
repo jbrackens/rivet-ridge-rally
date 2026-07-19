@@ -1,7 +1,7 @@
 {
   "schemaVersion": 2,
   "generator": "scripts/build-hero-bike-rider-assets.mjs",
-  "sourcePairId": "793e14d9-b198-45c0-b1ee-c5c4b0748953",
+  "sourcePairId": "31000dd4-2c42-4c74-ad5d-28b5e4aec32f",
   "design": {
     "name": "RIVET RIDGE RALLY Hero Bike and Rider A",
     "origin": "Original project-authored Blender-native geometry and solid-color PBR materials; no source model, texture, downloaded asset, or external resource",
@@ -165,9 +165,9 @@
   "compression": {
     "geometry": "EXT_meshopt_compression (required, high/filter mode)",
     "quantization": "KHR_mesh_quantization (required)",
-    "rawGlbBytes": 2353516,
-    "optimizedGlbBytes": 511736,
-    "glbReductionPercent": 78.3,
+    "rawGlbBytes": 2379208,
+    "optimizedGlbBytes": 517664,
+    "glbReductionPercent": 78.2,
     "textures": "None; solid-color glTF PBR materials only"
   },
   "budgets": {
@@ -204,7 +204,7 @@
       "min": [
         -0.699999988079071,
         0,
-        -1.8100000619888306
+        -1.8091378211975098
       ],
       "max": [
         0.699999988079071,
@@ -214,14 +214,14 @@
       "size": [
         1.399999976158142,
         2.57999986410141,
-        3.687000036239624
+        3.6861377954483032
       ]
     },
     "productionBounds": {
       "min": [
         -0.699999988079071,
         0,
-        -1.8100000619888306
+        -1.809154088912559
       ],
       "max": [
         0.699999988079071,
@@ -231,7 +231,7 @@
       "size": [
         1.399999976158142,
         2.5800116067400882,
-        3.687000036239624
+        3.6861540631633525
       ]
     },
     "source": {
@@ -244,11 +244,11 @@
       "cameras": 0,
       "skins": 0,
       "animations": 0,
-      "triangles": 49312,
+      "triangles": 49780,
       "trianglesByRegion": {
-        "bikeIncludingWheels": 39984,
-        "rider": 9328,
-        "wheelsCombined": 14428
+        "bikeIncludingWheels": 39912,
+        "rider": 9868,
+        "wheelsCombined": 14284
       }
     },
     "production": {
@@ -261,11 +261,11 @@
       "cameras": 0,
       "skins": 0,
       "animations": 0,
-      "triangles": 49312,
+      "triangles": 49780,
       "trianglesByRegion": {
-        "bikeIncludingWheels": 39984,
-        "rider": 9328,
-        "wheelsCombined": 14428
+        "bikeIncludingWheels": 39912,
+        "rider": 9868,
+        "wheelsCombined": 14284
       }
     },
     "productionMaterials": [
@@ -373,13 +373,13 @@
     },
     "authoringProcedure": {
       "path": "art-source/blender/hero-bike-rider/build_hero_bike_rider.py",
-      "bytes": 79728,
-      "sha256": "ee7551f5e339c921758620907829c41c583ba8f8ca9d3539e876bd7c01482b49"
+      "bytes": 81039,
+      "sha256": "ff87ffba7c4b0e60c32e5f9c4395dcb7f578ccc463dcab3581f9972d3940d00a"
     },
     "sourceReadme": {
       "path": "art-source/blender/hero-bike-rider/README.md",
-      "bytes": 7875,
-      "sha256": "303566649cf28ba326d330b2724234ee8c3ebb5d1db5a9ae58d1f1456c8935fd"
+      "bytes": 8152,
+      "sha256": "8ea49b213734573078ac3559e5eb075297c465447d835a5be056c0e4820c8da3"
     },
     "contract": {
       "path": "docs/design/HERO_BIKE_RIDER_VERTICAL_SLICE.md",
@@ -388,18 +388,18 @@
     },
     "editableSource": {
       "path": "art-source/blender/hero-bike-rider/generated/hero-bike-rider-source.blend",
-      "bytes": 2516739,
-      "sha256": "65160c18d1ebbac8cfe3a220735308d3f64d57fc99e40bc652628e84d37e06fe"
+      "bytes": 2532859,
+      "sha256": "423324a558e6e8bf912549961f244db56e36e1175326cd11e97eac089ba4906a"
     },
     "rawInterchange": {
       "path": "art-source/blender/hero-bike-rider/generated/hero-bike-rider-raw.glb",
-      "bytes": 2353516,
-      "sha256": "a81c7984442c3dcaa0b6dd5c4fba76994f3b66949e39e3abf779b7f5f965c976"
+      "bytes": 2379208,
+      "sha256": "f36e4ee94796f6cf4f8ac4875afdfc82f5cbc3a11a5e3badb37b96d7e406ed7b"
     },
     "sourcePreview": {
       "path": "art-source/blender/hero-bike-rider/generated/hero-bike-rider-preview.png",
-      "bytes": 1293942,
-      "sha256": "52edb9d514830dcfa3b9006d498dd9cbe85a388e63497e48979d6e887f492b64",
+      "bytes": 1296677,
+      "sha256": "4caad6de5455ef7cc7f209decf6ddaf5bfdbc90560186f8450ede61330aab047",
       "width": 1280,
       "height": 900,
       "bitDepth": 8,
@@ -407,8 +407,8 @@
     },
     "sourcePreviewContactSheet": {
       "path": "art-source/blender/hero-bike-rider/generated/hero-bike-rider-preview-contact-sheet.png",
-      "bytes": 1510434,
-      "sha256": "14fdd441a09156440dd627ac1fa6090be74e4670e6ee0700deb78f4d49f97fa6",
+      "bytes": 1512358,
+      "sha256": "f7bbfa9147b0a9ae805a1d9d0345bc8ba90980fd21022ffd1226f90d5ff341eb",
       "width": 1280,
       "height": 900,
       "bitDepth": 8,
@@ -417,8 +417,8 @@
     "sourcePreviewPanels": [
       {
         "path": "art-source/blender/hero-bike-rider/generated/hero-bike-rider-preview-rear-right.png",
-        "bytes": 355172,
-        "sha256": "f8f73fa37dbc59b3abcec8164f609a34eb388a539736c55b15316583e9454a57",
+        "bytes": 355438,
+        "sha256": "bcd40cad187ba85a016eb8da0c6db7e7c3ffffa8271d92d3903f407c949e2be4",
         "angle": "rear-right",
         "width": 640,
         "height": 450,
@@ -427,8 +427,8 @@
       },
       {
         "path": "art-source/blender/hero-bike-rider/generated/hero-bike-rider-preview-right-profile.png",
-        "bytes": 392810,
-        "sha256": "b6bf66639fb98641873ac57c16a11df336d45fe0b1d65cfd473f28057773cf28",
+        "bytes": 393157,
+        "sha256": "3fcc54ba573a57db1f05d521a00f403ce2d1bce0ef44541988c4a9466c88923f",
         "angle": "right-profile",
         "width": 640,
         "height": 450,
@@ -437,8 +437,8 @@
       },
       {
         "path": "art-source/blender/hero-bike-rider/generated/hero-bike-rider-preview-left-profile.png",
-        "bytes": 384529,
-        "sha256": "47970071e32f81345a5c6edf81e839cfb9ba8ff7d9a4b7fa342f0749c356cf23",
+        "bytes": 385105,
+        "sha256": "6763a7d6a1b513eb1cdf3c3031166493ac78069797930d9bdbe2ca0beecc9bfc",
         "angle": "left-profile",
         "width": 640,
         "height": 450,
@@ -447,8 +447,8 @@
       },
       {
         "path": "art-source/blender/hero-bike-rider/generated/hero-bike-rider-preview-front-left.png",
-        "bytes": 374701,
-        "sha256": "ceaee967c7a4fe99c6a2f53e293fbdc86d1bc9f812db06223d6df6025ca201d9",
+        "bytes": 374612,
+        "sha256": "d63013a2899f4529968dc11205ed06b091b5faa1f5e3fcc640922fb5078b2e46",
         "angle": "front-left",
         "width": 640,
         "height": 450,
@@ -458,8 +458,8 @@
     ],
     "runtime": {
       "path": "public/assets/3d/hero-bike-rider.glb",
-      "bytes": 511736,
-      "sha256": "5537ba34639053a1b28b40978853ceade33f9d3ac40d2d2c477e59ce206c024a"
+      "bytes": 517664,
+      "sha256": "538be4269927544fa91cfc405742523a60422d77d546ce9c8859f407deb2e6e8"
     }
   }
 }

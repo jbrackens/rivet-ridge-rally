@@ -831,7 +831,9 @@ def add_wheel(
             (start + 1, start + 5, start + 7, start + 3),
         ))
 
-    tread_count = 24
+    # Keep the wheel silhouette chunky while freeing a small triangle budget for
+    # larger gameplay-distance graphics on the focal bike.
+    tread_count = 22
     for index in range(tread_count):
         angle = index / tread_count * math.tau
         append_knob(0.0, angle, 0.598, 0.135, 0.078, 0.064)
@@ -1041,6 +1043,19 @@ def add_bike(root: bpy.types.Object) -> bpy.types.Object:
         bike,
         bevel_width=0.035,
     )
+    seat_detail_parts = []
+    for index, y_center in enumerate((-0.18, -0.36, -0.54, -0.72)):
+        seat_detail_parts.append(box(
+            "SeatCreamGripRib",
+            (0.275 - index * 0.018, 0.032, 0.021),
+            (0.0, y_center, 1.515 - index * 0.01),
+            "number_cream",
+            bike,
+            rotation=(0.02, 0.0, 0.0),
+            bevel_width=0.0,
+        ))
+    seat_grip = join_as("Bike_SeatGripRibs", seat_detail_parts)
+    seat_grip["readability_role"] = "gameplay-distance saddle ribs"
 
     left_panel_parts = [
         side_prism("LeftShroud", -0.29, 0.12, ((0.46, 1.39), (0.39, 1.06), (0.03, 0.93), (-0.37, 1.11), (-0.33, 1.34)), "teal", bike, bevel_width=0.028),
@@ -1259,6 +1274,8 @@ def add_bike(root: bpy.types.Object) -> bpy.types.Object:
         box("HandguardR", (0.24, 0.1, 0.12), (0.58, 0.02, 0.21), "coral", steering, bevel_width=0.035),
         box("HandguardCreamL", (0.13, 0.055, 0.055), (-0.6, 0.08, 0.235), "cream", steering, bevel_width=0.012),
         box("HandguardCreamR", (0.13, 0.055, 0.055), (0.6, 0.08, 0.235), "cream", steering, bevel_width=0.012),
+        box("GripEndFlashL", (0.036, 0.145, 0.058), (-0.64, -0.03, 0.2), "cream", steering, bevel_width=0.0),
+        box("GripEndFlashR", (0.036, 0.145, 0.058), (0.64, -0.03, 0.2), "cream", steering, bevel_width=0.0),
     ]
     join_as("Bike_Handlebar", handlebar_parts)
 
@@ -1362,6 +1379,8 @@ def add_leg(
         box("BootHeel", (0.2, 0.12, 0.13), (ankle[0], ankle[1] + 0.015, ankle[2] - 0.16), "teal", leg_group, bevel_width=0.024),
         box("BootBuckleUpper", (0.23, 0.04, 0.055), (ankle[0], ankle[1] + 0.09, ankle[2] + 0.07), "teal", leg_group, bevel_width=0.012),
         box("BootBuckleLower", (0.23, 0.04, 0.05), (ankle[0], ankle[1] + 0.14, ankle[2] - 0.04), "teal", leg_group, bevel_width=0.011),
+        box("BootCreamToeCap", (0.205, 0.105, 0.07), (ankle[0], ankle[1] + 0.365, ankle[2] - 0.158), "cream", leg_group, bevel_width=0.016),
+        box("BootCreamAnkleLatch", (0.18, 0.035, 0.05), (ankle[0], ankle[1] + 0.065, ankle[2] + 0.135), "cream", leg_group, bevel_width=0.009),
     ])
     joined = join_as(f"Rider_{'Left' if left else 'Right'}LegGeometry", parts)
     joined["neutral_contact"] = "footpeg"
@@ -1430,6 +1449,7 @@ def add_rider(root: bpy.types.Object) -> bpy.types.Object:
         tapered_box("HelmetChinGuard", (0.27, 0.11), (0.34, 0.145), 0.32, (0.0, 0.32, -0.07), "coral", head, bevel_width=0.03),
         box("HelmetGoggleBrow", (0.43, 0.048, 0.058), (0.0, 0.43, 0.255), "teal", head, rotation=(-0.04, 0.0, 0.0), bevel_width=0.013),
         box("HelmetGoggleLowerRail", (0.36, 0.04, 0.038), (0.0, 0.444, 0.095), "teal", head, rotation=(-0.08, 0.0, 0.0), bevel_width=0.011),
+        box("HelmetGoggleLensSplit", (0.045, 0.026, 0.13), (0.0, 0.463, 0.158), "visor", head, rotation=(-0.08, 0.0, 0.0), bevel_width=0.006),
         box("HelmetGoggleSideL", (0.045, 0.04, 0.15), (-0.215, 0.43, 0.17), "teal", head, rotation=(-0.05, 0.0, -0.08), bevel_width=0.011),
         box("HelmetGoggleSideR", (0.045, 0.04, 0.15), (0.215, 0.43, 0.17), "teal", head, rotation=(-0.05, 0.0, 0.08), bevel_width=0.011),
         box("HelmetJawInset", (0.22, 0.045, 0.088), (0.0, 0.475, -0.06), "teal", head, rotation=(-0.08, 0.0, 0.0), bevel_width=0.017),
