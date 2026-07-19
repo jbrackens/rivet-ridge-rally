@@ -385,7 +385,7 @@ test.describe("authored hero motion integration", () => {
     await page.keyboard.up("w");
     const crashed = await readMotionSnapshot(canvas);
     const crashDust = await readDustDiagnostics(canvas);
-    expect(crashDust.style).toBe("speed-reactive-twin-wheel-trail");
+    expect(crashDust.style).toBe("soft-speed-reactive-twin-wheel-plume");
     expect(crashDust.burstCount).toBeGreaterThanOrEqual(1);
     expect(crashed).toMatchObject({
       phase: "crashed",
@@ -436,7 +436,7 @@ test.describe("authored hero motion integration", () => {
     ).toBe("grounded");
     await page.keyboard.up("Space");
     const recoveredDust = await readDustDiagnostics(canvas);
-    expect(recoveredDust.style).toBe("speed-reactive-twin-wheel-trail");
+    expect(recoveredDust.style).toBe("soft-speed-reactive-twin-wheel-plume");
     expect(recoveredDust.burstCount).toBeGreaterThan(crashDust.burstCount);
 
     const history = await readMotionHistory(page);

@@ -595,6 +595,7 @@ interface DustParticle {
   life: number;
   maxLife: number;
   baseScale: number;
+  baseOpacity: number;
   driftX: number;
   driftY: number;
   driftZ: number;
@@ -1475,6 +1476,27 @@ function createSoftShadowTexture(): THREE.CanvasTexture {
     gradient.addColorStop(0, "#ffffff");
     gradient.addColorStop(0.38, "#d8d8d8");
     gradient.addColorStop(0.72, "#555555");
+    gradient.addColorStop(1, "#000000");
+    context.fillStyle = gradient;
+    context.fillRect(0, 0, canvas.width, canvas.height);
+  }
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.minFilter = THREE.LinearFilter;
+  texture.magFilter = THREE.LinearFilter;
+  texture.generateMipmaps = false;
+  return texture;
+}
+
+function createSoftDustTexture(): THREE.CanvasTexture {
+  const canvas = document.createElement("canvas");
+  canvas.width = 64;
+  canvas.height = 64;
+  const context = canvas.getContext("2d");
+  if (context) {
+    const gradient = context.createRadialGradient(32, 32, 1, 32, 32, 31);
+    gradient.addColorStop(0, "#ffffff");
+    gradient.addColorStop(0.34, "#eeeeee");
+    gradient.addColorStop(0.68, "#777777");
     gradient.addColorStop(1, "#000000");
     context.fillStyle = gradient;
     context.fillRect(0, 0, canvas.width, canvas.height);
@@ -3365,7 +3387,7 @@ export class GameEngine {
     );
     this.canvas.dataset.canyonKitAsset = this.usesAuthoredCanyonKit() ? "loading" : "not-applicable";
     this.clearCanyonKitMetrics();
-    this.canvas.dataset.groundedDustStyle = "speed-reactive-twin-wheel-trail";
+    this.canvas.dataset.groundedDustStyle = "soft-speed-reactive-twin-wheel-plume";
     this.canvas.dataset.groundedDustBurstCount = "0";
     this.visualProfile = WORLD_VISUAL_PROFILES[this.track.id];
     this.mode = options.mode;
@@ -3557,9 +3579,12 @@ export class GameEngine {
       particle.life = 0;
       particle.maxLife = 0.58;
       particle.baseScale = 0.7;
+      particle.baseOpacity = 0.42;
       particle.driftX = 0;
       particle.driftY = 0.42;
       particle.driftZ = 0;
+      const material = Array.isArray(particle.mesh.material) ? particle.mesh.material[0] : particle.mesh.material;
+      if (material instanceof THREE.MeshBasicMaterial) material.opacity = 0;
       particle.mesh.visible = false;
     }
 
@@ -5935,16 +5960,37 @@ export class GameEngine {
   }
 
   private createDustPool(): void {
-    const count = this.quality === "low" ? 10 : this.quality === "medium" ? 16 : 24;
-    const geometry = new THREE.DodecahedronGeometry(0.16, 0);
-    const material = makeMaterial(this.track.palette.dirtDark, 1);
+    const count = this.quality === "low" ? 12 : this.quality === "medium" ? 22 : 34;
+    const geometry = new THREE.PlaneGeometry(0.64, 0.46);
+    const dustTexture = createSoftDustTexture();
+    this.ownedTextures.push(dustTexture);
+    const dustColor = new THREE.Color(this.track.palette.dirtDark).offsetHSL(0.018, 0.02, 0.08).getHex();
     for (let index = 0; index < count; index += 1) {
+      const material = new THREE.MeshBasicMaterial({
+        color: dustColor,
+        transparent: true,
+        opacity: 0,
+        alphaMap: dustTexture,
+        depthWrite: false,
+        side: THREE.DoubleSide,
+        toneMapped: false,
+      });
       const mesh = new THREE.Mesh(geometry, material);
       mesh.visible = false;
       mesh.castShadow = false;
       mesh.receiveShadow = false;
+      mesh.renderOrder = 2;
       this.scene.add(mesh);
-      this.dustPool.push({ mesh, life: 0, maxLife: 0.58, baseScale: 0.7, driftX: 0, driftY: 0.42, driftZ: 0 });
+      this.dustPool.push({
+        mesh,
+        life: 0,
+        maxLife: 0.58,
+        baseScale: 0.7,
+        baseOpacity: 0.42,
+        driftX: 0,
+        driftY: 0.42,
+        driftZ: 0,
+      });
     }
   }
 
@@ -5962,6 +6008,10 @@ export class GameEngine {
       const elapsed = Math.max(0, particle.maxLife - particle.life);
       const scale = particle.baseScale + elapsed * 2.1;
       particle.mesh.scale.setScalar(scale);
+      const material = Array.isArray(particle.mesh.material) ? particle.mesh.material[0] : particle.mesh.material;
+      if (material instanceof THREE.MeshBasicMaterial) {
+        material.opacity = particle.baseOpacity * Math.pow(clamp(particle.life / particle.maxLife, 0, 1), 1.35);
+      }
     }
 
     if (
@@ -5989,7 +6039,7 @@ export class GameEngine {
       const orientation = this.courseRoute.sample(
         state.bike.forwardPosition - rearOffset,
         state.bike.lanePosition + laneOffset,
-        0.14 + this.authoredRouteHeight(
+        0.34 + this.authoredRouteHeight(
           state.bike.forwardPosition % this.track.courseLength,
           state.bike.lanePosition,
         ),
@@ -5997,10 +6047,13 @@ export class GameEngine {
       );
       const lateralDrift = side * (0.24 + speedFactor * 0.26);
       const rearDrift = -(0.22 + speedFactor * 0.34);
-      particle.life = 0.56 + speedFactor * 0.14;
+      particle.life = 0.62 + speedFactor * 0.16;
       particle.maxLife = particle.life;
-      particle.baseScale = (0.52 + speedFactor * 0.28) * surfaceFactor;
+      particle.baseScale = (0.76 + speedFactor * 0.34) * surfaceFactor;
+      particle.baseOpacity = (0.34 + speedFactor * 0.12) * (state.bike.surface === "grass" ? 0.72 : 1);
       particle.mesh.scale.setScalar(particle.baseScale);
+      const material = Array.isArray(particle.mesh.material) ? particle.mesh.material[0] : particle.mesh.material;
+      if (material instanceof THREE.MeshBasicMaterial) material.opacity = particle.baseOpacity;
       particle.driftX = orientation.rightX * lateralDrift + orientation.forwardX * rearDrift;
       particle.driftY = 0.34 + speedFactor * 0.18;
       particle.driftZ = orientation.rightZ * lateralDrift + orientation.forwardZ * rearDrift;
@@ -6033,7 +6086,7 @@ export class GameEngine {
       const orientation = this.courseRoute.sample(
         forwardBase - forwardOffset,
         state.bike.lanePosition + laneOffset,
-        0.14 + this.authoredRouteHeight(
+        0.28 + this.authoredRouteHeight(
           state.bike.forwardPosition % this.track.courseLength,
           state.bike.lanePosition,
         ),
@@ -6044,10 +6097,13 @@ export class GameEngine {
       particle.life = life;
       particle.maxLife = life;
       particle.baseScale = baseScale + spreadStep * 0.04;
+      particle.baseOpacity = kind === "crash" ? 0.54 : kind === "rough-landing" ? 0.46 : 0.36;
       particle.driftX = orientation.rightX * lateralDrift + orientation.forwardX * rearDrift;
       particle.driftY = kind === "crash" ? 0.58 + (index % 4) * 0.05 : 0.44 + (index % 3) * 0.04;
       particle.driftZ = orientation.rightZ * lateralDrift + orientation.forwardZ * rearDrift;
       particle.mesh.scale.setScalar(particle.baseScale);
+      const material = Array.isArray(particle.mesh.material) ? particle.mesh.material[0] : particle.mesh.material;
+      if (material instanceof THREE.MeshBasicMaterial) material.opacity = particle.baseOpacity;
       particle.mesh.visible = true;
     }
     this.dustEventBurstCount += 1;
