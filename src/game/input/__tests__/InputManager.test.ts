@@ -113,6 +113,37 @@ describe("InputManager", () => {
     manager.disconnect();
   });
 
+  it("queues multiple fast keyboard lane taps in order between samples", () => {
+    const manager = new InputManager(settings);
+    manager.connect();
+
+    window.dispatchEvent(new KeyboardEvent("keydown", { code: "ArrowLeft" }));
+    window.dispatchEvent(new KeyboardEvent("keyup", { code: "ArrowLeft" }));
+    window.dispatchEvent(new KeyboardEvent("keydown", { code: "ArrowRight" }));
+    window.dispatchEvent(new KeyboardEvent("keyup", { code: "ArrowRight" }));
+
+    expect(manager.sample().laneChange).toBe(-1);
+    expect(manager.sample().laneChange).toBe(1);
+    expect(manager.sample().laneChange).toBe(0);
+    manager.disconnect();
+  });
+
+  it("inserts a neutral sample between repeated fast same-direction lane taps", () => {
+    const manager = new InputManager(settings);
+    manager.connect();
+
+    window.dispatchEvent(new KeyboardEvent("keydown", { code: "ArrowLeft" }));
+    window.dispatchEvent(new KeyboardEvent("keyup", { code: "ArrowLeft" }));
+    window.dispatchEvent(new KeyboardEvent("keydown", { code: "ArrowLeft" }));
+    window.dispatchEvent(new KeyboardEvent("keyup", { code: "ArrowLeft" }));
+
+    expect(manager.sample().laneChange).toBe(-1);
+    expect(manager.sample().laneChange).toBe(0);
+    expect(manager.sample().laneChange).toBe(-1);
+    expect(manager.sample().laneChange).toBe(0);
+    manager.disconnect();
+  });
+
   it("clears an unsampled lane tap when input is suspended", () => {
     const manager = new InputManager(settings);
     manager.connect();

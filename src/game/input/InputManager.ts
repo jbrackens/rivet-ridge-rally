@@ -30,7 +30,7 @@ export function isInteractiveInputTarget(target: EventTarget | null): boolean {
 
 export class InputManager {
   private readonly keys = new Set<string>();
-  private pendingKeyboardLane: LaneChange = 0;
+  private readonly pendingKeyboardLanePulses: LaneChange[] = [];
   private settings: ControlSettings;
   private readonly touch: TouchState = {
     throttle: false,
@@ -80,7 +80,7 @@ export class InputManager {
 
   updateSettings(settings: ControlSettings): void {
     this.settings = settings;
-    this.pendingKeyboardLane = 0;
+    this.clearPendingKeyboardLanePulses();
   }
 
   markGamepadCommand(): void {
@@ -107,7 +107,8 @@ export class InputManager {
       : this.keys.has(binding.laneRight ?? "ArrowRight")
         ? 1
         : 0;
-    const keyboardLane = heldKeyboardLane || this.pendingKeyboardLane;
+    const queuedKeyboardLane = this.pendingKeyboardLanePulses[0] ?? 0;
+    const keyboardLane = heldKeyboardLane || queuedKeyboardLane;
     const keyboardPitch = this.keys.has(binding.pitchUp ?? "ArrowUp")
       ? 1
       : this.keys.has(binding.pitchDown ?? "ArrowDown")
@@ -137,13 +138,26 @@ export class InputManager {
       return { ...this.touch };
     }
 
+    if (
+      heldKeyboardLane === 0
+      && queuedKeyboardLane === 0
+      && this.pendingKeyboardLanePulses.length > 0
+    ) {
+      this.pendingKeyboardLanePulses.shift();
+      this.updateHeldInputCount();
+      this.device = "keyboard";
+      this.fallbackDevice = "keyboard";
+      return keyboardInput;
+    }
+
     const connectedPad = firstConnectedGamepad();
     if (!connectedPad && this.device === "gamepad") this.device = this.fallbackDevice;
     const gamepad = connectedPad ? this.sampleGamepad(connectedPad) : null;
     if (gamepad) return gamepad;
 
     if (keyboardActive) {
-      this.pendingKeyboardLane = 0;
+      if (this.pendingKeyboardLanePulses.length > 0) this.pendingKeyboardLanePulses.shift();
+      this.updateHeldInputCount();
       this.device = "keyboard";
       this.fallbackDevice = "keyboard";
       return keyboardInput;
@@ -184,7 +198,7 @@ export class InputManager {
     ];
     if (event.ctrlKey || event.metaKey || event.altKey) {
       this.keys.clear();
-      this.pendingKeyboardLane = 0;
+      this.clearPendingKeyboardLanePulses();
       this.updateHeldInputCount();
       return;
     }
@@ -196,9 +210,9 @@ export class InputManager {
     event.preventDefault();
     if (!event.repeat && !this.keys.has(event.code)) {
       if (event.code === (binding.laneLeft ?? "ArrowLeft")) {
-        this.pendingKeyboardLane = -1;
+        this.queueKeyboardLanePulse(-1);
       } else if (event.code === (binding.laneRight ?? "ArrowRight")) {
-        this.pendingKeyboardLane = 1;
+        this.queueKeyboardLanePulse(1);
       }
     }
     this.keys.add(event.code);
@@ -214,7 +228,7 @@ export class InputManager {
 
   private readonly clearInputState = (): void => {
     this.keys.clear();
-    this.pendingKeyboardLane = 0;
+    this.clearPendingKeyboardLanePulses();
     this.touch.throttle = false;
     this.touch.turbo = false;
     this.touch.laneChange = 0;
@@ -229,7 +243,17 @@ export class InputManager {
       + Number(this.touch.laneChange !== 0)
       + Number(this.touch.pitch !== 0)
       + Number(this.touch.recover);
-    setHeldInputCount(this.keys.size + touchInputs);
+    setHeldInputCount(this.keys.size + touchInputs + this.pendingKeyboardLanePulses.length);
+  }
+
+  private clearPendingKeyboardLanePulses(): void {
+    this.pendingKeyboardLanePulses.length = 0;
+  }
+
+  private queueKeyboardLanePulse(direction: Exclude<LaneChange, 0>): void {
+    const lastQueued = this.pendingKeyboardLanePulses.at(-1);
+    if (lastQueued === direction) this.pendingKeyboardLanePulses.push(0);
+    this.pendingKeyboardLanePulses.push(direction);
   }
 
   private sampleGamepad(pad: Gamepad): SimulationInput | null {
