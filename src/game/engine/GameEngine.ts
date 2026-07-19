@@ -594,6 +594,7 @@ interface DustParticle {
   mesh: THREE.Mesh;
   life: number;
   maxLife: number;
+  baseScale: number;
   driftX: number;
   driftY: number;
   driftZ: number;
@@ -3364,7 +3365,7 @@ export class GameEngine {
     );
     this.canvas.dataset.canyonKitAsset = this.usesAuthoredCanyonKit() ? "loading" : "not-applicable";
     this.clearCanyonKitMetrics();
-    this.canvas.dataset.groundedDustStyle = "trail-burst-contact";
+    this.canvas.dataset.groundedDustStyle = "speed-reactive-twin-wheel-trail";
     this.canvas.dataset.groundedDustBurstCount = "0";
     this.visualProfile = WORLD_VISUAL_PROFILES[this.track.id];
     this.mode = options.mode;
@@ -3555,6 +3556,7 @@ export class GameEngine {
     for (const particle of this.dustPool) {
       particle.life = 0;
       particle.maxLife = 0.58;
+      particle.baseScale = 0.7;
       particle.driftX = 0;
       particle.driftY = 0.42;
       particle.driftZ = 0;
@@ -5942,7 +5944,7 @@ export class GameEngine {
       mesh.castShadow = false;
       mesh.receiveShadow = false;
       this.scene.add(mesh);
-      this.dustPool.push({ mesh, life: 0, maxLife: 0.58, driftX: 0, driftY: 0.42, driftZ: 0 });
+      this.dustPool.push({ mesh, life: 0, maxLife: 0.58, baseScale: 0.7, driftX: 0, driftY: 0.42, driftZ: 0 });
     }
   }
 
@@ -5958,7 +5960,7 @@ export class GameEngine {
       particle.mesh.position.z += particle.driftZ * delta;
       particle.mesh.position.y += particle.driftY * delta;
       const elapsed = Math.max(0, particle.maxLife - particle.life);
-      const scale = 0.7 + elapsed * 2.1;
+      const scale = particle.baseScale + elapsed * 2.1;
       particle.mesh.scale.setScalar(scale);
     }
 
@@ -5969,30 +5971,41 @@ export class GameEngine {
       || state.bike.surface === "cooling"
     ) return;
     this.dustAccumulator += delta;
-    const interval = this.quality === "low" ? 0.16 : 0.09;
+    const speedFactor = clamp((state.bike.speed - 4) / 18, 0.35, 1.15);
+    const surfaceFactor = state.bike.surface === "mud" ? 1.22 : state.bike.surface === "grass" ? 0.68 : 1;
+    const interval = (this.quality === "low" ? 0.14 : this.quality === "medium" ? 0.08 : 0.06)
+      / clamp(speedFactor * surfaceFactor, 0.65, 1.35);
     if (this.dustAccumulator < interval) return;
     this.dustAccumulator %= interval;
-    const particle = this.dustPool[this.dustCursor % this.dustPool.length];
-    this.dustCursor += 1;
-    if (!particle) return;
-    const side = this.dustCursor % 2 === 0 ? -1 : 1;
-    particle.life = 0.58;
-    particle.maxLife = 0.58;
-    const drift = side * (0.25 + (this.dustCursor % 3) * 0.08);
-    particle.mesh.scale.setScalar(0.7);
-    const orientation = this.courseRoute.sample(
-      state.bike.forwardPosition - 0.85,
-      state.bike.lanePosition + side * 0.26,
-      0.18 + this.authoredRouteHeight(
-        state.bike.forwardPosition % this.track.courseLength,
-        state.bike.lanePosition,
-      ),
-      particle.mesh.position,
-    );
-    particle.driftX = orientation.rightX * drift;
-    particle.driftY = 0.42;
-    particle.driftZ = orientation.rightZ * drift;
-    particle.mesh.visible = true;
+    const emissions = this.quality === "low" ? 1 : 2;
+    const baseSide = this.dustCursor % 2 === 0 ? -1 : 1;
+    for (let index = 0; index < emissions; index += 1) {
+      const particle = this.dustPool[this.dustCursor % this.dustPool.length];
+      this.dustCursor += 1;
+      if (!particle) continue;
+      const side = emissions === 1 ? baseSide : index === 0 ? -1 : 1;
+      const rearOffset = 0.92 + speedFactor * 0.42 + index * 0.1;
+      const laneOffset = side * (0.28 + speedFactor * 0.1);
+      const orientation = this.courseRoute.sample(
+        state.bike.forwardPosition - rearOffset,
+        state.bike.lanePosition + laneOffset,
+        0.14 + this.authoredRouteHeight(
+          state.bike.forwardPosition % this.track.courseLength,
+          state.bike.lanePosition,
+        ),
+        particle.mesh.position,
+      );
+      const lateralDrift = side * (0.24 + speedFactor * 0.26);
+      const rearDrift = -(0.22 + speedFactor * 0.34);
+      particle.life = 0.56 + speedFactor * 0.14;
+      particle.maxLife = particle.life;
+      particle.baseScale = (0.52 + speedFactor * 0.28) * surfaceFactor;
+      particle.mesh.scale.setScalar(particle.baseScale);
+      particle.driftX = orientation.rightX * lateralDrift + orientation.forwardX * rearDrift;
+      particle.driftY = 0.34 + speedFactor * 0.18;
+      particle.driftZ = orientation.rightZ * lateralDrift + orientation.forwardZ * rearDrift;
+      particle.mesh.visible = true;
+    }
   }
 
   private emitContactDustBurst(
@@ -6030,10 +6043,11 @@ export class GameEngine {
       const rearDrift = -(0.35 + (index % 3) * 0.14) * speedFactor;
       particle.life = life;
       particle.maxLife = life;
+      particle.baseScale = baseScale + spreadStep * 0.04;
       particle.driftX = orientation.rightX * lateralDrift + orientation.forwardX * rearDrift;
       particle.driftY = kind === "crash" ? 0.58 + (index % 4) * 0.05 : 0.44 + (index % 3) * 0.04;
       particle.driftZ = orientation.rightZ * lateralDrift + orientation.forwardZ * rearDrift;
-      particle.mesh.scale.setScalar(baseScale + spreadStep * 0.04);
+      particle.mesh.scale.setScalar(particle.baseScale);
       particle.mesh.visible = true;
     }
     this.dustEventBurstCount += 1;
