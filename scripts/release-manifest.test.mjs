@@ -339,11 +339,18 @@ function runManifest(
   });
 }
 
-async function assertFailedClosed(directory, result, message) {
+async function assertFailedClosed(directory, result, message, { preserveRootOutputs = false } = {}) {
   assert.notEqual(result.status, 0);
   assert.match(`${result.stdout}\n${result.stderr}`, message);
-  await assert.rejects(access(path.join(directory, 'artifacts', 'release-manifest.json')));
-  await assert.rejects(access(path.join(directory, 'dist')));
+  if (preserveRootOutputs) {
+    assert.equal(
+      await readFile(path.join(directory, 'dist', 'FOREIGN.txt'), 'utf8'),
+      'stale foreign root artifact\n',
+    );
+  } else {
+    await assert.rejects(access(path.join(directory, 'artifacts', 'release-manifest.json')));
+    await assert.rejects(access(path.join(directory, 'dist')));
+  }
   const worktrees = git(directory, 'worktree', 'list', '--porcelain')
     .split('\n')
     .filter((line) => line.startsWith('worktree '));
@@ -518,6 +525,9 @@ test('rejects a symlinked release sidecar parent before touching outside files',
   await writeFile(outsideSidecar, 'must remain untouched\n');
   await rm(path.join(directory, 'artifacts'), { recursive: true, force: true });
   await symlink(outsideDirectory, path.join(directory, 'artifacts'));
+  git(directory, 'add', 'artifacts');
+  git(directory, 'commit', '-m', 'Track symlinked artifact parent fixture');
+  git(directory, 'tag', '-f', '-a', `v${FIXTURE_VERSION}`, '-m', `v${FIXTURE_VERSION}`);
 
   const result = runManifest(directory);
   assert.notEqual(result.status, 0);
@@ -569,7 +579,7 @@ test('fails closed for invalid provenance inputs', async (t) => {
       message: /npm_execpath must be an absolute path/,
     },
     {
-      name: 'sidecar directory is removed before a later failure',
+      name: 'sidecar directory is preserved before root output replacement starts',
       fixture: { sidecarDirectory: true },
       run: { npmExecPath: null },
       message: /npm_execpath must be an absolute path/,
@@ -597,7 +607,7 @@ test('fails closed for invalid provenance inputs', async (t) => {
       subtest.after(() => rm(path.dirname(directory), { recursive: true, force: true }));
       if (scenario.mutate) await scenario.mutate(directory);
       const result = runManifest(directory, scenario.run);
-      await assertFailedClosed(directory, result, scenario.message);
+      await assertFailedClosed(directory, result, scenario.message, { preserveRootOutputs: true });
     });
   }
 });
@@ -626,7 +636,7 @@ test('fails closed on unexpected ignored detached-checkout inputs at every build
       const directory = await createFixture(scenario.fixture);
       subtest.after(() => rm(path.dirname(directory), { recursive: true, force: true }));
       const result = runManifest(directory);
-      await assertFailedClosed(directory, result, scenario.message);
+      await assertFailedClosed(directory, result, scenario.message, { preserveRootOutputs: true });
     });
   }
 });
@@ -657,7 +667,7 @@ test('fails closed when exact tag or npm package provenance changes during build
       const directory = await createFixture({ buildMode: scenario.buildMode });
       subtest.after(() => rm(path.dirname(directory), { recursive: true, force: true }));
       const result = runManifest(directory);
-      await assertFailedClosed(directory, result, scenario.message);
+      await assertFailedClosed(directory, result, scenario.message, { preserveRootOutputs: true });
       if (scenario.excludedMessage) {
         assert.doesNotMatch(`${result.stdout}\n${result.stderr}`, scenario.excludedMessage);
       }
@@ -681,7 +691,11 @@ test('fails closed for invalid isolated build outputs', async (t) => {
     { buildMode: 'file-url', message: /absolute local file URL/ },
     { buildMode: 'private-key', message: /PEM private-key header/ },
     { buildMode: 'live-token', message: /GitHub token ghp_/ },
-    { buildMode: 'symlink', message: /non-regular dist entry: source-link/ },
+    {
+      buildMode: 'symlink',
+      message: /non-regular dist entry: source-link/,
+      preserveRootOutputs: true,
+    },
   ];
 
   for (const scenario of scenarios) {
@@ -689,7 +703,9 @@ test('fails closed for invalid isolated build outputs', async (t) => {
       const directory = await createFixture({ buildMode: scenario.buildMode });
       subtest.after(() => rm(path.dirname(directory), { recursive: true, force: true }));
       const result = runManifest(directory);
-      await assertFailedClosed(directory, result, scenario.message);
+      await assertFailedClosed(directory, result, scenario.message, {
+        preserveRootOutputs: scenario.preserveRootOutputs === true,
+      });
     });
   }
 });

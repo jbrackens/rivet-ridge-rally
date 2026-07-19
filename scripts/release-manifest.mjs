@@ -683,12 +683,17 @@ async function cleanupTemporaryWorktree(tempRoot, worktreePath, worktreeAdded) {
 let tempRoot = null;
 let worktreePath = null;
 let worktreeAdded = false;
+let rootOutputsTouched = false;
 let releaseComplete = false;
 let releaseFailure = null;
 let completeRelease = null;
 
-try {
+async function prepareRootOutputs() {
+  rootOutputsTouched = true;
   await removeRootOutputs();
+}
+
+try {
   const workingTreeStatus = await git(
     ['status', '--porcelain=v1', '--untracked-files=all'],
     'Git working tree could not be inspected',
@@ -847,6 +852,7 @@ try {
 
   const isolatedDist = path.join(worktreePath, 'dist');
   await walkRegularFiles(isolatedDist);
+  await prepareRootOutputs();
   if (visualQaProfile) {
     await mkdir(path.dirname(dist), { recursive: true });
     await assertNoSymlinkAncestors(root, path.dirname(dist), 'visual QA distribution parent');
@@ -1069,10 +1075,12 @@ if (!releaseFailure && completeRelease) {
 }
 
 if (!releaseComplete || releaseFailure) {
-  try {
-    await removeRootOutputs();
-  } catch (error) {
-    releaseFailure ??= error;
+  if (rootOutputsTouched) {
+    try {
+      await removeRootOutputs();
+    } catch (error) {
+      releaseFailure ??= error;
+    }
   }
   throw releaseFailure ?? new Error('Release guard failed: release manifest generation did not complete');
 }
