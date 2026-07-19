@@ -635,15 +635,15 @@ interface CameraPresentationProfile {
 
 const CAMERA_PRESENTATION_PROFILES = {
   desktop: {
-    fov: 53,
-    height: 4.7,
-    trailingDistance: 7.9,
-    lateralOffset: 1.65,
-    lookHeight: -1.9,
-    lookAhead: 17.2,
+    fov: 52,
+    height: 5.15,
+    trailingDistance: 8.85,
+    lateralOffset: 1.78,
+    lookHeight: -1.48,
+    lookAhead: 19.2,
     laneFollow: 0.76,
     lookAtLaneFollow: 0.72,
-    playerScale: 1.58,
+    playerScale: 1.46,
   },
   portrait: {
     fov: 58,

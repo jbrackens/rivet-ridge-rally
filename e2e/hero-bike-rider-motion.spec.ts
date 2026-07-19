@@ -241,7 +241,7 @@ test.describe("authored hero motion integration", () => {
       phase: "grounded",
       reducedMotion: false,
       actionState: "neutral",
-      playerScale: 1.58,
+      playerScale: 1.46,
       activeBikeName: "RRR_BikeVisual",
       activeRiderName: "player-rider",
       wheelNames: { front: "FrontTire", rear: "RearTire" },
@@ -628,7 +628,7 @@ test.describe("authored hero motion integration", () => {
       asset: "fallback",
       fallbackReason: "load-failed",
       phase: "grounded",
-      playerScale: 1.58,
+      playerScale: 1.46,
       activeBikeName: "procedural-bike-fallback",
       activeRiderName: "player-rider",
       wheelNames: {
