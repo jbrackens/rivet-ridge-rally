@@ -759,7 +759,7 @@ function soakEvidence(manifest) {
         lapTimes: ["01:19.55", "01:17.58"],
         crashes: 0,
         overheats: 0,
-        positionLabel: "Position 1 / 6",
+        positionLabel: "POSITION 1 / 6",
         classificationLabel: "Official 6-rider classification",
         classificationRows: 6,
       },

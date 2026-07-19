@@ -1566,7 +1566,7 @@ export function validateSoakEvidence(value, productRelease, version, manifest) {
       "soak completedRaceEvidence crash/overheat counts are invalid",
     );
     requireCondition(
-      /^Position [1-6] \/ 6$/u.test(completion.positionLabel)
+      /^(?:Position|POSITION) [1-6] \/ 6$/u.test(completion.positionLabel)
         && completion.classificationLabel === "Official 6-rider classification"
         && completion.classificationRows === 6,
       "soak completedRaceEvidence classification is incomplete",
