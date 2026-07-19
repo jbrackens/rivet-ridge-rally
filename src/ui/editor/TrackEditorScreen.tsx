@@ -139,6 +139,43 @@ function CategoryGlyph({ category }: { category: EditorModuleCategory }) {
   return <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 21V3M7 4h11l-2.5 4L18 12H7" {...common} /><path d="M8 5.5h3v3H8zm3 3h3v3h-3zm3-3h3v3h-3z" fill="currentColor" stroke="none" /></svg>;
 }
 
+function StepperIcon({ kind }: { kind: "left" | "right" | "up" | "down" | "rotate-left" | "rotate-right" }) {
+  const common = {
+    fill: "none",
+    stroke: "currentColor",
+    strokeLinecap: "round" as const,
+    strokeLinejoin: "round" as const,
+    strokeWidth: 2.25,
+  };
+  if (kind === "left" || kind === "right") {
+    const scale = kind === "left" ? -1 : 1;
+    return (
+      <svg className="stepper-icon" viewBox="0 0 24 24" aria-hidden="true" style={{ transform: `scaleX(${scale})` }}>
+        <path d="M7 12h9" {...common} />
+        <path d="m13 7 5 5-5 5" {...common} />
+      </svg>
+    );
+  }
+  if (kind === "up" || kind === "down") {
+    const scale = kind === "down" ? -1 : 1;
+    return (
+      <svg className="stepper-icon" viewBox="0 0 24 24" aria-hidden="true" style={{ transform: `scaleY(${scale})` }}>
+        <path d="M12 18V8" {...common} />
+        <path d="m7 11 5-5 5 5" {...common} />
+        <path d="M7 20h10" {...common} />
+      </svg>
+    );
+  }
+  const scale = kind === "rotate-left" ? -1 : 1;
+  return (
+    <svg className="stepper-icon" viewBox="0 0 24 24" aria-hidden="true" style={{ transform: `scaleX(${scale})` }}>
+      <path d="M7.5 9.2A6.1 6.1 0 1 1 6 13.2" {...common} />
+      <path d="M7.5 9.2H3.8V5.5" {...common} />
+      <path d="M12 9.2v4.1l3 1.8" {...common} />
+    </svg>
+  );
+}
+
 function ModuleThumbnail({ module }: { module: EditorModuleDefinition }) {
   const isCurve = module.id.includes("curve") || module.id.includes("bank");
   const isMud = module.id.includes("mud");
@@ -858,9 +895,9 @@ export function TrackEditorScreen() {
           {selectedPlacement ? <>
             <div className="inspector-stepper" role="group" aria-label="Lane stepper">
               <span>Lane</span>
-              <button type="button" aria-label="Move selected module left one lane" onClick={() => nudgeSelectedLane(-1)} disabled={selectedPlacement.lane <= 0}>‹</button>
+              <button type="button" aria-label="Move selected module left one lane" onClick={() => nudgeSelectedLane(-1)} disabled={selectedPlacement.lane <= 0}><StepperIcon kind="left" /></button>
               <output aria-label="Selected module lane">Lane {selectedPlacement.lane + 1}</output>
-              <button type="button" aria-label="Move selected module right one lane" onClick={() => nudgeSelectedLane(1)} disabled={selectedPlacement.lane >= 3}>›</button>
+              <button type="button" aria-label="Move selected module right one lane" onClick={() => nudgeSelectedLane(1)} disabled={selectedPlacement.lane >= 3}><StepperIcon kind="right" /></button>
             </div>
             <div className="inspector-lane-map" aria-hidden="true">
               {[0, 1, 2, 3].map((lane) => (
@@ -869,15 +906,15 @@ export function TrackEditorScreen() {
             </div>
             <div className="inspector-stepper" role="group" aria-label="Rotation stepper">
               <span>Rotation</span>
-              <button type="button" aria-label="Rotate selected module counterclockwise" onClick={() => rotateSelected(-90)}>↺</button>
+              <button type="button" aria-label="Rotate selected module counterclockwise" onClick={() => rotateSelected(-90)}><StepperIcon kind="rotate-left" /></button>
               <output aria-label="Selected module rotation">{selectedPlacement.rotation}°</output>
-              <button type="button" aria-label="Rotate selected module clockwise" onClick={() => rotateSelected(90)}>↻</button>
+              <button type="button" aria-label="Rotate selected module clockwise" onClick={() => rotateSelected(90)}><StepperIcon kind="rotate-right" /></button>
             </div>
             <div className="inspector-stepper" role="group" aria-label="Height stepper">
               <span>Height</span>
-              <button type="button" aria-label="Lower selected module height" onClick={() => nudgeSelectedHeight(-0.5)} disabled={selectedPlacement.height <= -4}>⌄</button>
+              <button type="button" aria-label="Lower selected module height" onClick={() => nudgeSelectedHeight(-0.5)} disabled={selectedPlacement.height <= -4}><StepperIcon kind="down" /></button>
               <output aria-label="Selected module height">{selectedPlacement.height} m</output>
-              <button type="button" aria-label="Raise selected module height" onClick={() => nudgeSelectedHeight(0.5)} disabled={selectedPlacement.height >= 40}>⌃</button>
+              <button type="button" aria-label="Raise selected module height" onClick={() => nudgeSelectedHeight(0.5)} disabled={selectedPlacement.height >= 40}><StepperIcon kind="up" /></button>
             </div>
             <label>Lane <input type="number" min="1" max="4" value={selectedPlacement.lane + 1} onChange={(event) => updateSelected({ lane: Math.max(0, Math.min(3, Number(event.target.value) - 1)) as 0 | 1 | 2 | 3 })} /></label>
             <label>Position <input type="number" min="0" max={CUSTOM_TRACK_ROUTE_LIMIT} step="2" value={selectedPlacement.gridPosition} onChange={(event) => updateSelected({ gridPosition: Math.max(0, Math.min(CUSTOM_TRACK_ROUTE_LIMIT, Number(event.target.value))) })} /></label>
@@ -918,9 +955,9 @@ export function TrackEditorScreen() {
           <section className="inspector-group">
           <div className="inspector-stepper" role="group" aria-label="Lap count stepper">
             <span>Laps</span>
-            <button type="button" aria-label="Decrease laps" onClick={() => nudgeLaps(-1)} disabled={track.laps <= 1}>‹</button>
+            <button type="button" aria-label="Decrease laps" onClick={() => nudgeLaps(-1)} disabled={track.laps <= 1}><StepperIcon kind="left" /></button>
             <output aria-label="Track lap count">{track.laps} {track.laps === 1 ? "lap" : "laps"}</output>
-            <button type="button" aria-label="Increase laps" onClick={() => nudgeLaps(1)} disabled={track.laps >= 9}>›</button>
+            <button type="button" aria-label="Increase laps" onClick={() => nudgeLaps(1)} disabled={track.laps >= 9}><StepperIcon kind="right" /></button>
           </div>
           <label>Laps <input type="number" min="1" max="9" value={track.laps} onChange={(event) => commit((current) => ({ ...current, laps: Math.max(1, Math.min(9, Number(event.target.value))) }))} /></label>
           <label>Difficulty <input type="range" min="1" max="5" value={track.difficultyEstimate} onChange={(event) => commit((current) => ({ ...current, difficultyEstimate: Number(event.target.value) }))} /><span>{track.difficultyEstimate} / 5</span></label>

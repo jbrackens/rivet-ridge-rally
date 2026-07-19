@@ -588,9 +588,10 @@ kbd {
 .editor-inspector .inspector-empty { min-height: 5rem; margin: 0; padding: .85rem .2rem; color: #b6c6cf; }
 .inspector-stepper { display: grid; grid-template-columns: 1fr 2.75rem minmax(5.7rem, auto) 2.75rem; align-items: center; gap: .22rem; min-height: 3.05rem; margin: .45rem 0; border: 1px solid #496980; background: linear-gradient(180deg, #0d304a, #071f35); box-shadow: inset 0 0 0 1px #071827, .18rem .2rem 0 #020b1377; }
 .inspector-stepper > span { padding-left: .7rem; color: #f5edda; font: 900 .7rem var(--display); letter-spacing: .06em; text-transform: uppercase; }
-.inspector-stepper button { display: grid; place-items: center; min-width: 2.75rem; min-height: 2.75rem; border: 0; border-left: 1px solid #496980; border-right: 1px solid #496980; background: linear-gradient(180deg, #143d57, #0a263e); color: #f5f7f2; font: 900 1.35rem/1 var(--display); text-shadow: 0 .12rem 0 #00101e; }
+.inspector-stepper button { display: grid; place-items: center; min-width: 2.75rem; min-height: 2.75rem; border: 0; border-left: 1px solid #496980; border-right: 1px solid #496980; background: linear-gradient(180deg, #143d57, #0a263e); color: #f5f7f2; text-shadow: 0 .12rem 0 #00101e; }
 .inspector-stepper button:hover:not(:disabled), .inspector-stepper button:focus-visible { background: #19506e; color: var(--teal); outline-offset: -3px; }
 .inspector-stepper button:disabled { color: #6f8796; background: #0a2237; }
+.inspector-stepper .stepper-icon { width: 1.32rem; height: 1.32rem; filter: drop-shadow(0 .13rem 0 #00101e); }
 .inspector-stepper output { justify-self: stretch; padding: .48rem .35rem; color: #ffffff; font: 900 1.02rem/1 var(--display); letter-spacing: .04em; text-align: center; text-transform: uppercase; text-shadow: 0 .14rem 0 #00101e; }
 .inspector-lane-map { display: grid; grid-template-columns: repeat(4, 1fr); gap: .28rem; margin: .35rem 0 .7rem; padding: .42rem .55rem; border: 1px solid #294960; background: #061c32; }
 .inspector-lane-map span { display: grid; min-height: 2.2rem; place-items: center; border-bottom: .16rem solid #425f73; color: #7f96a6; font: 900 1rem var(--display); transform: skewX(-10deg); }
