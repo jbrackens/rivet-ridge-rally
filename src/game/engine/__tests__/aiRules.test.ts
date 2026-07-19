@@ -1,6 +1,12 @@
 import { describe, expect, it } from "vitest";
 
-import type { TrackObstacle } from "../../content/tracks";
+import {
+  TRACKS,
+  type LaneIndex,
+  type TrackDefinition,
+  type TrackObstacle,
+} from "../../content/tracks";
+import type { Difficulty } from "../../../app/types";
 import {
   FIXED_DT,
   NEUTRAL_INPUT,
@@ -26,6 +32,247 @@ const throttle: SimulationInput = {
   ...NEUTRAL_INPUT,
   throttle: true,
 };
+
+const CALIBRATION_RIDERS = [
+  { name: "Copper Comet", behavior: "route", lane: 0, progress: 5, initialHeat: 0 },
+  { name: "Bluejay", behavior: "route", lane: 1, progress: 9.6, initialHeat: 7 },
+  { name: "Night Spur", behavior: "route", lane: 2, progress: 14.2, initialHeat: 14 },
+  { name: "Greenline", behavior: "route", lane: 3, progress: 18.8, initialHeat: 21 },
+  { name: "Ember Scout", behavior: "pursuer", lane: 0, progress: -11, initialHeat: 28 },
+] as const;
+
+interface CalibrationEntrant {
+  readonly name: string;
+  readonly simulation: RaceSimulation;
+  readonly behavior: "route" | "pursuer";
+  targetLane: LaneIndex;
+  previousLaneCommand: -1 | 0 | 1;
+  routeTimerSeconds: number;
+  recoveryDelaySeconds: number;
+  lastObstacleKey: string;
+  finishTimeMs?: number;
+}
+
+function positiveModulo(value: number, modulus: number): number {
+  return ((value % modulus) + modulus) % modulus;
+}
+
+function obstacleLength(obstacle: TrackObstacle): number {
+  if (obstacle.length !== undefined) return obstacle.length;
+  if (obstacle.kind === "barrier" || obstacle.kind === "bump") return 8;
+  return 12;
+}
+
+function activeObstacle(
+  track: TrackDefinition,
+  localDistance: number,
+  lane: LaneIndex,
+): TrackObstacle | undefined {
+  return track.obstacles.find((candidate) => (
+    candidate.lanes.includes(lane)
+    && localDistance >= candidate.distance
+    && localDistance <= candidate.distance + obstacleLength(candidate)
+  ));
+}
+
+function nextObstacle(
+  track: TrackDefinition,
+  localDistance: number,
+  lane: LaneIndex,
+  lookahead: number,
+  predicate: (obstacle: TrackObstacle) => boolean,
+): TrackObstacle | undefined {
+  return track.obstacles.find((candidate) => {
+    const gap = candidate.distance - localDistance;
+    return gap > 0
+      && gap < lookahead
+      && candidate.lanes.includes(lane)
+      && predicate(candidate);
+  });
+}
+
+function nextCooling(
+  track: TrackDefinition,
+  localDistance: number,
+  lookahead: number,
+): TrackObstacle | undefined {
+  return track.obstacles.find((candidate) => {
+    const gap = candidate.distance - localDistance;
+    return candidate.kind === "cooling-gate" && gap > 0 && gap < lookahead;
+  });
+}
+
+function createCalibrationField(): CalibrationEntrant[] {
+  return CALIBRATION_RIDERS.map((entrant, index) => ({
+    name: entrant.name,
+    behavior: entrant.behavior,
+    simulation: new RaceSimulation(createAiSimulationOptions(
+      entrant.lane,
+      entrant.progress,
+      entrant.initialHeat,
+    )),
+    targetLane: entrant.lane,
+    previousLaneCommand: 0,
+    routeTimerSeconds: index * 0.1,
+    recoveryDelaySeconds: 0,
+    lastObstacleKey: "",
+  }));
+}
+
+function stepCalibrationEntrant(
+  entrant: CalibrationEntrant,
+  index: number,
+  difficulty: Difficulty,
+  track: TrackDefinition,
+  playerProgress: number,
+): void {
+  const profile = AI_DIFFICULTY_PROFILES[difficulty];
+  const beforeState = entrant.simulation.snapshot;
+  const bike = beforeState.bike;
+  if (entrant.finishTimeMs !== undefined || beforeState.race.finished) {
+    entrant.finishTimeMs ??= Math.round(beforeState.race.elapsedSeconds * 1_000);
+    return;
+  }
+
+  const local = positiveModulo(bike.forwardPosition, track.courseLength);
+  const currentObstacle = activeObstacle(track, local, bike.lane);
+  const currentPolicy = getObstaclePolicy(currentObstacle?.kind);
+  const aheadObstacle = nextObstacle(
+    track,
+    local,
+    bike.lane,
+    profile.obstacleLookahead,
+    () => true,
+  );
+  const aheadCooling = nextCooling(track, local, profile.coolingLookahead);
+  const aheadPolicy = getObstaclePolicy(aheadObstacle?.kind);
+
+  if (bike.phase !== "crashed" && bike.phase !== "recovering") {
+    entrant.routeTimerSeconds -= FIXED_DT;
+    if (entrant.routeTimerSeconds <= 0) {
+      entrant.routeTimerSeconds = profile.planningIntervalSeconds + index * 0.035;
+      entrant.targetLane = chooseAiLane({
+        behavior: entrant.behavior,
+        currentLane: bike.lane,
+        riderIndex: index,
+        riderProgress: bike.forwardPosition,
+        playerLane: 1,
+        playerProgress,
+        heat: bike.heat,
+        profile,
+        aheadObstacle,
+        aheadObstacleAvoidable: aheadPolicy.avoidable,
+        aheadCooling,
+      });
+    }
+  }
+
+  const consistency = getAiConsistency(profile, index);
+  const laneChange = getAiLaneChange(bike.lane, entrant.targetLane, entrant.previousLaneCommand);
+  const drive = getAiDriveControl({
+    speed: bike.speed,
+    heat: bike.heat,
+    overheated: bike.overheated,
+    hasAheadObstacle: aheadObstacle !== undefined,
+    consistency,
+    profile,
+  });
+  const aheadGap = aheadObstacle ? aheadObstacle.distance - local : Number.POSITIVE_INFINITY;
+  const preparingRamp = currentPolicy.environment.surface === "ramp"
+    || (aheadPolicy.environment.surface === "ramp" && aheadGap < 8);
+  const rawErrorIndex = (index * 7 + Math.floor(bike.forwardPosition / track.courseLength)) % 3;
+  const errorSign = (((rawErrorIndex + 3) % 3) - 1) as -1 | 0 | 1;
+
+  if (bike.phase === "crashed") {
+    entrant.recoveryDelaySeconds = Math.max(0, entrant.recoveryDelaySeconds - FIXED_DT);
+  }
+
+  entrant.previousLaneCommand = laneChange;
+  entrant.simulation.advance(FIXED_DT, {
+    throttle: drive.throttle,
+    turbo: drive.turbo,
+    laneChange,
+    pitch: getAiPitchControl({
+      phase: bike.phase,
+      pitch: bike.pitch,
+      preparingRamp,
+      errorSign,
+      profile,
+    }),
+    recover: bike.phase === "crashed" && entrant.recoveryDelaySeconds <= 0,
+  }, currentPolicy.environment);
+
+  const afterState = entrant.simulation.snapshot;
+  const finishTimeMs = advanceAiRaceProgress(
+    entrant.simulation,
+    track.courseLength,
+    beforeState.bike.forwardPosition,
+    afterState.bike.forwardPosition,
+  );
+  if (finishTimeMs !== undefined) entrant.finishTimeMs = finishTimeMs;
+
+  const after = afterState.bike;
+  if (bike.phase !== "crashed" && after.phase === "crashed") {
+    entrant.recoveryDelaySeconds = profile.recoveryDelaySeconds;
+  } else if (after.phase === "grounded" && bike.phase === "recovering") {
+    entrant.recoveryDelaySeconds = 0;
+  }
+
+  const afterLocal = positiveModulo(after.forwardPosition, track.courseLength);
+  const afterObstacle = activeObstacle(track, afterLocal, after.lane);
+  if (afterObstacle && after.phase === "grounded") {
+    const obstacleKey = `${Math.floor(after.forwardPosition / track.courseLength)}:${afterObstacle.id}`;
+    if (obstacleKey !== entrant.lastObstacleKey) {
+      entrant.lastObstacleKey = obstacleKey;
+      const policy = getObstaclePolicy(afterObstacle.kind);
+      const frontWheelClear = after.wheelie || after.pitch >= 0.18;
+      const outcome = getObstacleContactOutcome(afterObstacle.kind, policy, frontWheelClear);
+      if (outcome === "crash") {
+        entrant.simulation.forceCrash();
+        entrant.recoveryDelaySeconds = profile.recoveryDelaySeconds;
+      } else if (outcome === "slowdown") {
+        entrant.simulation.applySpeedPenalty(policy.retainedSpeed);
+      }
+    }
+  }
+}
+
+function classifyCalibrationRace(track: TrackDefinition, difficulty: Difficulty): {
+  readonly aiTimes: readonly number[];
+  readonly classification: readonly { name: string; timeMs: number; isPlayer: boolean }[];
+} {
+  const field = createCalibrationField();
+  const representativePlayerMs = track.parTimeMs;
+  const representativePlayerSpeed = track.courseLength * 2 / (representativePlayerMs / 1_000);
+
+  for (let step = 0; step < 60 * 60 * 15; step += 1) {
+    const playerProgress = Math.min(
+      track.courseLength * 2,
+      representativePlayerSpeed * step * FIXED_DT,
+    );
+    for (const [index, entrant] of field.entries()) {
+      stepCalibrationEntrant(entrant, index, difficulty, track, playerProgress);
+    }
+    if (field.every((entrant) => entrant.finishTimeMs !== undefined)) break;
+  }
+
+  const aiTimes = field.map((entrant) => {
+    if (entrant.finishTimeMs === undefined) {
+      throw new Error(`${difficulty} ${track.name} did not classify ${entrant.name}`);
+    }
+    return entrant.finishTimeMs;
+  });
+  const classification = [
+    ...field.map((entrant, index) => ({
+      name: entrant.name,
+      timeMs: aiTimes[index]!,
+      isPlayer: false,
+    })),
+    { name: "You", timeMs: representativePlayerMs, isPlayer: true },
+  ].sort((left, right) => left.timeMs - right.timeMs);
+
+  return { aiTimes, classification };
+}
 
 function obstacle(
   kind: TrackObstacle["kind"],
@@ -355,5 +602,39 @@ describe("shared rider simulation contract", () => {
     chunked.advance(2, throttle, getObstaclePolicy("grass").environment);
 
     expect(chunked.snapshot).toEqual(fixed.snapshot);
+  });
+
+  it("classifies complete six-rider fields across all launch tracks and difficulty profiles", () => {
+    const averageAiMsByDifficulty = new Map<Difficulty, number>();
+
+    for (const difficulty of ["rookie", "rider", "ace"] as const) {
+      const allAiTimes: number[] = [];
+      for (const track of TRACKS) {
+        const { aiTimes, classification } = classifyCalibrationRace(track, difficulty);
+        allAiTimes.push(...aiTimes);
+
+        expect(classification, `${difficulty} ${track.name} field size`).toHaveLength(6);
+        expect(classification.filter((entry) => entry.isPlayer), `${difficulty} ${track.name} player row`).toHaveLength(1);
+        expect(
+          classification.map((entry) => entry.timeMs),
+          `${difficulty} ${track.name} classification order`,
+        ).toEqual([...classification.map((entry) => entry.timeMs)].sort((left, right) => left - right));
+        expect(
+          aiTimes.every((timeMs) => timeMs > 0 && timeMs <= 15 * 60_000),
+          `${difficulty} ${track.name} AI finish bounds`,
+        ).toBe(true);
+      }
+      averageAiMsByDifficulty.set(
+        difficulty,
+        allAiTimes.reduce((total, timeMs) => total + timeMs, 0) / allAiTimes.length,
+      );
+    }
+
+    expect(averageAiMsByDifficulty.get("rookie")).toBeGreaterThan(
+      averageAiMsByDifficulty.get("rider") ?? Number.POSITIVE_INFINITY,
+    );
+    expect(averageAiMsByDifficulty.get("rider")).toBeGreaterThan(
+      averageAiMsByDifficulty.get("ace") ?? Number.POSITIVE_INFINITY,
+    );
   });
 });
