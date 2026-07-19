@@ -165,7 +165,17 @@ npm run visual:promote:canyon -- \
   --capture-manifest artifacts/visual-review/<exact-run>/manifest.json
 ```
 
-Run it only after runtime qualification passes. Before mutation, the command requires a clean checkout at the exact approved capture commit, an absent target and approval record, a non-placeholder owner attribution/timestamp and explicit `ACCEPT`, a valid 1280×720 PNG, and matching hashes throughout this chain. Promotion must occur after capture and no later than 24 hours after `approvedAt`:
+Before asking the owner to review, an operator may create a non-acceptance external draft populated with the exact capture, candidate, and screenshot hashes:
+
+```sh
+npm run visual:approval:draft -- \
+  --capture-manifest artifacts/visual-review/<exact-run>/manifest.json \
+  --output /absolute/path/outside-the-repository/canyon-owner-approval.draft.json
+```
+
+The draft helper writes outside the repository, extracts the Canyon Practice 500 baseline-candidate screenshot, and intentionally sets `decision: "PENDING_OWNER_REVIEW"`, a placeholder timestamp, and a placeholder reviewer name. The promotion tool rejects that draft until the product owner manually reviews the exact PNG, changes `decision` to `ACCEPT`, sets a fresh UTC `approvedAt`, and replaces `reviewer.name` with a real non-placeholder product-owner attribution. Do not change candidate or screenshot hash fields while converting the draft into the owner-authored approval file.
+
+Run promotion only after runtime qualification passes. Before mutation, the command requires a clean checkout at the exact approved capture commit, an absent target and approval record, a non-placeholder owner attribution/timestamp and explicit `ACCEPT`, a valid 1280×720 PNG, and matching hashes throughout this chain. Promotion must occur after capture and no later than 24 hours after `approvedAt`:
 
 - the format-1 `visual-qa-candidate` manifest at the fixed `artifacts/candidate-evidence/visual/current/manifest.json` path for a clean `VITE_QA_MODE=1` build, reloaded through the shared candidate loader and matched exactly to a fresh inventory of the adjacent on-disk `dist/`;
 - a schema-v3 PASS `five-track-controlled-visual-review` manifest whose source identity, package/candidate version, local inventories, served inventories, loopback root, candidate-manifest SHA-256, runtime commit, and Chromium settings are independently revalidated rather than inferred from self-reported checks;
@@ -213,6 +223,8 @@ The external approval must be manually owner-authored; the promotion tool does n
 ```
 
 The placeholder strings and byte count above are documentation only and are intentionally rejected by the tool. `authentication: "external-manual-trust-boundary"` is a disclosure, not a signature: the tool can prove internal consistency among files, hashes, timestamps, source identity, and captured bytes, but it cannot authenticate a person or prove that the named product owner performed the review. Genuine owner authorship and concept review remain a manual **EXTERNAL BLOCKER**; do not invent a key, signature, or automated identity claim.
+
+Draft rehearsal evidence on 2026-07-19: `npm run visual:approval:draft -- --capture-manifest artifacts/visual-review/rc2-five-track-controlled-8882c33/manifest.json --output /tmp/rrr-canyon-owner-approval-draft-20260719T100133-final.json` wrote a non-acceptance external draft binding source `8882c332671a476ff3a14e9777aa367f8bb9a6ca`, candidate aggregate `5fadbb3d5b3108ca0c33759a7af3881db1c5767a584cd7cfc1a8c191eb1b32e0`, capture manifest SHA-256 `054f3b983dd242baf461c68f640489754616e3ae2a9d9746d5c0e7e2f1390c09`, and Canyon Practice 500 screenshot SHA-256 `5f31240535d0c38569e9680dcef9846cecddbf92f797dcbab89dae2c004da3c3`. A direct promotion attempt with that draft exited 1 with `Visual baseline promotion failed: owner approval decision must be ACCEPT`, proving the helper does not bypass owner review. The `/tmp` draft is not committed evidence and expires operationally with the owner-review window.
 
 After complete validation, promotion first writes `docs/design/RACE_CURVED_CANYON_BASELINE_APPROVAL.json`, embedding the complete validated capture manifest and complete re-inventoried candidate manifest so ignored evidence cannot disappear, and then copies the macOS Chromium PNG baseline. Ordinary failures roll both outputs back and successful completion verifies both. A hard process or machine interruption between those two exclusive writes can leave only the uncommitted approval record. If that happens, confirm that the baseline target is absent, manually delete only the orphaned `docs/design/RACE_CURVED_CANYON_BASELINE_APPROVAL.json`, return to the clean approved commit, and rerun the promotion command with the same still-fresh external approval. If an interruption leaves both outputs but no success message, treat completion as unknown: remove both uncommitted outputs, restore the clean approved commit, and rerun guarded promotion. If the 24-hour window has expired, obtain a new owner review and approval. Never copy or promote the baseline manually.
 

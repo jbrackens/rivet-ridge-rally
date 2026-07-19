@@ -29,6 +29,7 @@
     "test:release-attestation": "node --test scripts/release-attestation.test.mjs",
     "test:release-manifest": "node --test scripts/release-manifest.test.mjs",
     "visual:capture": "node scripts/capture-visual-review.mjs",
+    "visual:approval:draft": "node scripts/prepare-visual-approval-draft.mjs",
     "visual:promote:canyon": "node scripts/promote-visual-baseline.mjs",
     "build": "npm run typecheck && vite build && npm run notices:build",
     "preview": "vite preview",
