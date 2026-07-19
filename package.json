@@ -10,6 +10,7 @@
   "scripts": {
     "assets:build": "node scripts/build-hero-bike-rider-assets.mjs && node scripts/build-rival-pack-assets.mjs && node scripts/build-canyon-assets.mjs",
     "assets:verify": "node scripts/verify-hero-bike-rider-assets.mjs && node scripts/verify-rival-pack-assets.mjs && node scripts/verify-canyon-assets.mjs && node scripts/verify-production-art.mjs",
+    "audit:release-scope": "node scripts/release-scope-audit.mjs",
     "dev": "vite",
     "typecheck": "node node_modules/typescript-7/bin/tsc -b --pretty false",
     "lint": "eslint .",
@@ -24,7 +25,7 @@
     "test": "vitest run && npm run test:release-manifest && npm run test:release-attestation && npm run test:production-smoke-support",
     "test:coverage": "vitest run --coverage",
     "test:e2e": "playwright test",
-    "test:production-smoke-support": "node --test scripts/production-smoke-support.test.mjs scripts/production-smoke-flow.test.mjs scripts/service-worker-install.test.mjs",
+    "test:production-smoke-support": "node --test scripts/production-smoke-support.test.mjs scripts/production-smoke-flow.test.mjs scripts/service-worker-install.test.mjs scripts/release-scope-audit.test.mjs",
     "test:release-attestation": "node --test scripts/release-attestation.test.mjs",
     "test:release-manifest": "node --test scripts/release-manifest.test.mjs",
     "visual:capture": "node scripts/capture-visual-review.mjs",
