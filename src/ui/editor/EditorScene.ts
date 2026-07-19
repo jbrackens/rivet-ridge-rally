@@ -34,6 +34,10 @@ const EDITOR_EXTENSION_LOOK_BEHIND = 120;
 const EDITOR_EXTENSION_LOOK_AHEAD = 240;
 const EDITOR_EXTENSION_REBUILD_MARGIN = 54;
 const EDITOR_PICK_LAYER = 1;
+const EDITOR_ROUTE_CAMERA_RADIUS = 42;
+const EDITOR_ROUTE_CAMERA_HEIGHT = 31;
+const EDITOR_ROUTE_CAMERA_MIN_RADIUS = 22;
+const EDITOR_ROUTE_CAMERA_MAX_RADIUS = 62;
 
 type VisualState = "normal" | "selected" | "preview";
 
@@ -90,7 +94,7 @@ export class EditorScene {
   private readonly resizeObserver: ResizeObserver;
   private animationFrame = 0;
   private orbit = -0.36;
-  private routeRadius = 54;
+  private routeRadius = EDITOR_ROUTE_CAMERA_RADIUS;
   private overviewRadius = 90;
   private overviewFitRadius = 90;
   private cameraMode: "route" | "overview" = "route";
@@ -233,7 +237,7 @@ export class EditorScene {
     }
     this.modules.updateMatrixWorld(true);
     this.refreshRouteOverviewBounds();
-    if (routeChanged || (this.cameraMode === "overview" && moduleLayoutChanged)) {
+    if (this.cameraMode === "overview" && (routeChanged || moduleLayoutChanged)) {
       this.frameRoute();
     } else {
       if (this.cameraMode === "route") this.updateRouteExtension(this.cameraRoutePosition);
@@ -1792,10 +1796,13 @@ export class EditorScene {
       const orbitTrail = Math.cos(this.orbit) * this.routeRadius;
       this.camera.position.set(
         target.x + orientation.rightX * orbitSide - orientation.forwardX * orbitTrail,
-        target.y + 40,
+        target.y + EDITOR_ROUTE_CAMERA_HEIGHT,
         target.z + orientation.rightZ * orbitSide - orientation.forwardZ * orbitTrail,
       );
       this.camera.far = 500;
+      this.canvas.dataset.routeViewMode = "position";
+      this.canvas.dataset.editorCameraStyle = "closer-route-diorama-v1";
+      this.canvas.dataset.editorRouteCameraRadius = String(Math.round(this.routeRadius));
       if (this.scene.fog instanceof THREE.Fog) {
         this.scene.fog.near = 86;
         this.scene.fog.far = 164;
@@ -1880,10 +1887,10 @@ export class EditorScene {
     }
     const minimumRadius = this.cameraMode === "overview"
       ? this.overviewFitRadius * 0.52
-      : 26;
+      : EDITOR_ROUTE_CAMERA_MIN_RADIUS;
     const maximumRadius = this.cameraMode === "overview"
       ? this.overviewFitRadius * 2.4
-      : 72;
+      : EDITOR_ROUTE_CAMERA_MAX_RADIUS;
     if (this.cameraMode === "overview") {
       this.overviewRadius = THREE.MathUtils.clamp(
         this.overviewRadius + event.deltaY * 0.08,
