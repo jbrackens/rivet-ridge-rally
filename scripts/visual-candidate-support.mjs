@@ -6,6 +6,7 @@ import { isDeepStrictEqual } from "node:util";
 import { gzipSync } from "node:zlib";
 
 import { REPO_ROOT } from "./performance/common.mjs";
+import { assertGzipToolchainMatch } from "./lib/gzip-toolchain.mjs";
 
 export const VISUAL_CANDIDATE_MANIFEST = "artifacts/candidate-evidence/visual/current/manifest.json";
 const SHA256_PATTERN = /^[0-9a-f]{64}$/;
@@ -340,6 +341,7 @@ export async function startVisualCandidateServer(candidate, port = 4_373) {
   const host = "127.0.0.1";
   const baseURL = `http://${host}:${port}/`;
   const origin = new URL(baseURL).origin;
+  assertGzipToolchainMatch(candidate.manifest.toolchain.node, "Visual candidate server");
   const candidateFiles = new Map(candidate.manifest.files.map((record) => [record.path, record]));
   const server = createServer(async (request, response) => {
     try {

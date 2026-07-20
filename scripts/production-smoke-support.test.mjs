@@ -40,7 +40,7 @@ function fixtureManifest(contentsByPath) {
       tagObjectType: "tag",
     },
     toolchain: {
-      node: "26.4.0",
+      node: process.versions.node,
       nodeExecutableSha256: "e".repeat(64),
       npm: "11.17.0",
       npmCliSha256: "c".repeat(64),
@@ -224,6 +224,16 @@ test("rejects unsafe paths and internally inconsistent manifest aggregates", () 
   const mismatchedNpmTreeVersion = structuredClone(manifest);
   mismatchedNpmTreeVersion.toolchain.npmPackage.version = "11.16.0";
   assert.throws(() => validateFormat2ReleaseManifest(mismatchedNpmTreeVersion), /npm package version does not match npm/);
+});
+
+test("refuses gzip re-verification under a different Node than the manifest toolchain", async () => {
+  const manifest = fixtureManifest(fixtureContents());
+  const foreignToolchain = structuredClone(manifest);
+  foreignToolchain.toolchain.node = "1.0.0";
+  await assert.rejects(
+    verifyServedRelease(foreignToolchain, "http://127.0.0.1:9/", { fetchImpl: () => { throw new Error("must not fetch"); } }),
+    /gzip re-verification requires the manifest toolchain Node 1\.0\.0/,
+  );
 });
 
 test("bounds an unsettled production-smoke operation", async () => {

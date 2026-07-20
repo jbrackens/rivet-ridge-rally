@@ -4,6 +4,7 @@ import { resolve } from "node:path";
 import { gzipSync } from "node:zlib";
 
 import { REPO_ROOT } from "./performance/common.mjs";
+import { assertGzipToolchainMatch } from "./lib/gzip-toolchain.mjs";
 
 const SHA256_PATTERN = /^[0-9a-f]{64}$/;
 const GIT_OBJECT_PATTERN = /^(?:[0-9a-f]{40}|[0-9a-f]{64})$/;
@@ -209,6 +210,7 @@ export async function verifyServedRelease(
   { fetchImpl = globalThis.fetch, timeoutMs = 15_000 } = {},
 ) {
   validateFormat2ReleaseManifest(manifest);
+  assertGzipToolchainMatch(manifest.toolchain.node, "Production smoke");
   const normalizedBaseURL = normalizeProductionBaseURL(baseURL);
   const rootURL = new URL(normalizedBaseURL);
   if (typeof fetchImpl !== "function") throw new Error("Production smoke fetch implementation is unavailable.");
