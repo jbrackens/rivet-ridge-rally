@@ -68,6 +68,60 @@ test("passes a clean release scope without scanning docs or test fixtures", asyn
   assert.match(result.aggregateSha256, /^[0-9a-f]{64}$/u);
 });
 
+test("scans untracked files under public/ even when dist is absent", async () => {
+  const root = await fixtureRepository({
+    "src/main.ts": "export const ok = 1;\n",
+  });
+  await mkdir(path.join(root, "public"), { recursive: true });
+  await writeFile(path.join(root, "public/notes.txt"), `token ghp_${"A".repeat(36)}\n`);
+
+  const result = await auditReleaseScope({ root });
+
+  assert.equal(result.status, "FAIL");
+  assert.equal(result.findings.length, 1);
+  assert.equal(result.findings[0].label, "GitHub token ghp_");
+  assert.equal(result.findings[0].path, "public/notes.txt");
+});
+
+test("catches AWS, PEM, npm, Anthropic, legacy OpenAI, JWT, and Google shapes and redacts every match", async () => {
+  const root = await fixtureRepository({
+    "src/config.ts": [
+      "export const aws = 'AKIAIOSFODNN7EXAMPLE';",
+      "export const pem = '-----BEGIN OPENSSH PRIVATE KEY-----';",
+      `export const npmToken = 'npm_${"a".repeat(36)}';`,
+      `export const anthropic = 'sk-ant-${"a".repeat(24)}';`,
+      `export const legacyOpenAi = 'sk-${"b".repeat(44)}';`,
+      `export const jwt = 'eyJ${"a".repeat(10)}.eyJ${"b".repeat(10)}.${"c".repeat(12)}';`,
+      `export const google = 'AIza${"D".repeat(35)}';`,
+    ].join("\n"),
+  });
+
+  const result = await auditReleaseScope({ root });
+
+  assert.equal(result.status, "FAIL");
+  assert.deepEqual(
+    result.findings.map(({ label }) => label).toSorted(),
+    [
+      "AWS access key ID",
+      "PEM private key block",
+      "npm access token npm_",
+      "Anthropic API key sk-ant-",
+      "OpenAI legacy secret sk-",
+      "JWT-like bearer value",
+      "Google API key AIza",
+    ].toSorted(),
+  );
+  for (const finding of result.findings) {
+    assert.match(
+      finding.match,
+      /\[redacted \d+ chars, sha256:[0-9a-f]{12}\]$/u,
+      `${finding.label} match must be redacted, got: ${finding.match}`,
+    );
+    assert.ok(!finding.match.includes("a".repeat(20)), `${finding.label} must not echo the raw secret`);
+    assert.ok(!finding.match.includes("IOSFODNN7EXAMPLE"), `${finding.label} must not echo the raw AWS key`);
+  }
+});
+
 test("fails on prohibited product marks, local paths, trackers, and live secret shapes", async () => {
   const root = await fixtureRepository({
     "src/main.ts": [

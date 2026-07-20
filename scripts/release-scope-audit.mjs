@@ -23,6 +23,9 @@ const TRACKED_RELEASE_FILES = Object.freeze([
   "tsconfig.node.json",
 ]);
 const OPTIONAL_UNTRACKED_RELEASE_ROOTS = Object.freeze(["dist"]);
+// Vite copies all of publicDir into the build, so untracked files under public/
+// ship too — walk it unconditionally instead of trusting `git ls-files` alone.
+const ALWAYS_WALKED_SHIP_ROOTS = Object.freeze(["public"]);
 
 const PROHIBITED_PRODUCT_MARKS = Object.freeze([
   { label: "Excitebike", pattern: /excite\s*bike|excitebike/iu },
@@ -44,6 +47,13 @@ const SECRET_PATTERNS = Object.freeze([
   { label: "Stripe live secret sk_live_", pattern: /sk_live_[A-Za-z0-9]{20,}/u },
   { label: "Stripe restricted live key rk_live_", pattern: /rk_live_[A-Za-z0-9]{20,}/u },
   { label: "GitLab personal access token glpat-", pattern: /glpat-[A-Za-z0-9_-]{20,}/u },
+  { label: "AWS access key ID", pattern: /\b(?:AKIA|ASIA)[0-9A-Z]{16}\b/u },
+  { label: "PEM private key block", pattern: /-----BEGIN (?:RSA |EC |DSA |OPENSSH |PGP |ENCRYPTED )?PRIVATE KEY(?: BLOCK)?-----/u },
+  { label: "npm access token npm_", pattern: /\bnpm_[A-Za-z0-9]{36}\b/u },
+  { label: "Anthropic API key sk-ant-", pattern: /sk-ant-[A-Za-z0-9_-]{20,}/u },
+  { label: "OpenAI legacy secret sk-", pattern: /\bsk-[A-Za-z0-9]{40,}\b/u },
+  { label: "JWT-like bearer value", pattern: /\beyJ[A-Za-z0-9_-]{8,}\.eyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{10,}\b/u },
+  { label: "Google API key AIza", pattern: /\bAIza[0-9A-Za-z_-]{35}\b/u },
 ]);
 const TRACKER_PATTERNS = Object.freeze([
   { label: "Google Analytics", pattern: /google-analytics\.com|googletagmanager\.com|gtag\(/iu },
@@ -112,17 +122,25 @@ async function walkRegularFiles(root, relativeRoot) {
 
 export async function collectReleaseScopeFiles(root = REPO_ROOT) {
   const tracked = await gitTrackedFiles(root);
-  const optional = (await Promise.all(
-    OPTIONAL_UNTRACKED_RELEASE_ROOTS.map((relativeRoot) => walkRegularFiles(root, relativeRoot)),
+  const walked = (await Promise.all(
+    [...ALWAYS_WALKED_SHIP_ROOTS, ...OPTIONAL_UNTRACKED_RELEASE_ROOTS]
+      .map((relativeRoot) => walkRegularFiles(root, relativeRoot)),
   )).flat();
-  return [...new Set([...tracked, ...optional])].toSorted(comparePath);
+  return [...new Set([...tracked, ...walked])].toSorted(comparePath);
 }
 
 function sha256(bytes) {
   return createHash("sha256").update(bytes).digest("hex");
 }
 
-function findPatternMatches(text, patterns, relativePath, channel) {
+// A detected secret must never be reproduced verbatim in the report — audit
+// output lands in CI logs and retained evidence bundles on a public repo.
+function redactSecret(value) {
+  const digest = sha256(value).slice(0, 12);
+  return `${value.slice(0, 5)}… [redacted ${value.length} chars, sha256:${digest}]`;
+}
+
+function findPatternMatches(text, patterns, relativePath, channel, { redact = false } = {}) {
   const findings = [];
   for (const { label, pattern } of patterns) {
     const match = pattern.exec(text);
@@ -131,7 +149,7 @@ function findPatternMatches(text, patterns, relativePath, channel) {
         channel,
         path: relativePath,
         label,
-        match: match[0],
+        match: redact ? redactSecret(match[0]) : match[0],
       });
     }
   }
@@ -148,7 +166,7 @@ export async function auditReleaseScope({ root = REPO_ROOT } = {}) {
     findings.push(
       ...findPatternMatches(relativePath, PROHIBITED_PRODUCT_MARKS, relativePath, "path"),
       ...findPatternMatches(relativePath, FORBIDDEN_LOCAL_PATH_PATTERNS, relativePath, "path"),
-      ...findPatternMatches(relativePath, SECRET_PATTERNS, relativePath, "path"),
+      ...findPatternMatches(relativePath, SECRET_PATTERNS, relativePath, "path", { redact: true }),
     );
 
     const absolutePath = path.join(root, relativePath);
@@ -164,7 +182,7 @@ export async function auditReleaseScope({ root = REPO_ROOT } = {}) {
     findings.push(
       ...findPatternMatches(text, PROHIBITED_PRODUCT_MARKS, relativePath, "content"),
       ...findPatternMatches(text, FORBIDDEN_LOCAL_PATH_PATTERNS, relativePath, "content"),
-      ...findPatternMatches(text, SECRET_PATTERNS, relativePath, "content"),
+      ...findPatternMatches(text, SECRET_PATTERNS, relativePath, "content", { redact: true }),
       ...findPatternMatches(text, TRACKER_PATTERNS, relativePath, "content"),
     );
   }
@@ -176,6 +194,7 @@ export async function auditReleaseScope({ root = REPO_ROOT } = {}) {
     scope: {
       trackedPrefixes: [...TRACKED_RELEASE_PREFIXES],
       trackedFiles: [...TRACKED_RELEASE_FILES],
+      alwaysWalkedShipRoots: [...ALWAYS_WALKED_SHIP_ROOTS],
       optionalUntrackedRoots: [...OPTIONAL_UNTRACKED_RELEASE_ROOTS],
     },
     fileCount: files.length,
