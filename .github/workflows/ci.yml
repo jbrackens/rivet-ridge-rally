@@ -71,9 +71,15 @@ jobs:
           sleep 3
           # --headless=new + one retry: legacy headless intermittently dies with
           # "Runtime.evaluate: Promise was collected" under Lighthouse.
+          # Byte-efficiency audits are skipped: their gatherers stream full
+          # response bodies (incl. the 2MB title art) over CDP, which times out
+          # on 2-core runners — and payload budgets are already tracked by the
+          # repo's own release-manifest gzip evidence.
+          SKIP_AUDITS="unused-css-rules,unused-javascript,uses-optimized-images,modern-image-formats,uses-responsive-images,uses-text-compression,duplicated-javascript,legacy-javascript,efficient-animated-content,total-byte-weight"
           for attempt in 1 2; do
             if npx -y lighthouse http://127.0.0.1:4173 --preset=desktop \
               --output=json --output-path=./lighthouse.json \
+              --skip-audits="$SKIP_AUDITS" \
               --chrome-flags="--headless=new --no-sandbox" --quiet; then
               break
             fi
