@@ -48,6 +48,19 @@ function gamepad(overrides: Partial<Gamepad> = {}): Gamepad {
 }
 
 describe("InputManager", () => {
+  it("drops a queued keyboard lane tap when gamepad input wins the frame", () => {
+    const manager = new InputManager(settings);
+    window.dispatchEvent(new KeyboardEvent("keydown", { code: "ArrowLeft" }));
+    window.dispatchEvent(new KeyboardEvent("keyup", { code: "ArrowLeft" }));
+
+    const pad = gamepad({ buttons: Array.from({ length: 17 }, (_, index) => button(index === 0)) });
+    Object.defineProperty(navigator, "getGamepads", { configurable: true, value: () => [pad] });
+    expect(manager.sample().throttle).toBe(true);
+
+    Object.defineProperty(navigator, "getGamepads", { configurable: true, value: () => [] });
+    expect(manager.sample().laneChange).toBe(0);
+  });
+
   it("keeps an initial touch label until a real keyboard command takes over", () => {
     const manager = new InputManager(settings, "touch");
     expect(manager.activeDevice).toBe("touch");

@@ -134,6 +134,12 @@ export class InputManager {
       this.touch.pitch !== 0 ||
       this.touch.recover;
     if (touchActive) {
+      // A queued keyboard lane tap must not outlive a frame another device wins,
+      // or it fires an unwanted lane change whenever that device next goes idle.
+      if (this.pendingKeyboardLanePulses.length > 0) {
+        this.clearPendingKeyboardLanePulses();
+        this.updateHeldInputCount();
+      }
       this.device = "touch";
       return { ...this.touch };
     }
@@ -153,7 +159,13 @@ export class InputManager {
     const connectedPad = firstConnectedGamepad();
     if (!connectedPad && this.device === "gamepad") this.device = this.fallbackDevice;
     const gamepad = connectedPad ? this.sampleGamepad(connectedPad) : null;
-    if (gamepad) return gamepad;
+    if (gamepad) {
+      if (this.pendingKeyboardLanePulses.length > 0) {
+        this.clearPendingKeyboardLanePulses();
+        this.updateHeldInputCount();
+      }
+      return gamepad;
+    }
 
     if (keyboardActive) {
       if (this.pendingKeyboardLanePulses.length > 0) this.pendingKeyboardLanePulses.shift();
