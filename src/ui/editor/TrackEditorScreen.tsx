@@ -802,6 +802,15 @@ export function TrackEditorScreen() {
           </div>
           <div className="editor-help"><kbd>Click</kbd> Select / place <kbd>Drag ↔</kbd> Orbit <kbd>Drag ↕</kbd> Travel <kbd>Wheel</kbd> Zoom <kbd>Fit route</kbd> Overview</div>
           {showLibrary ? (
+            /* aria-modal promises the background is unavailable — make that true for
+               pointer users too: the backdrop blocks clicks and closes the drawer. */
+            <div
+              className="library-drawer-backdrop"
+              aria-hidden="true"
+              onClick={() => { if (!saveInFlight) setShowLibrary(false); }}
+            />
+          ) : null}
+          {showLibrary ? (
             <aside
               ref={libraryDrawerRef}
               id="local-track-library"

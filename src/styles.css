@@ -630,6 +630,7 @@ kbd {
 .editor-status output { justify-self: end; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .status-valid { color: var(--green); }
 .status-invalid { color: var(--danger); }
+.library-drawer-backdrop { position: fixed; z-index: 3; inset: 0; background: #020b1359; }
 .library-drawer { position: absolute; z-index: 4; top: 1rem; right: 1rem; bottom: 1rem; width: min(31rem, calc(100% - 2rem)); padding: 1rem; border: 1px solid #5b7182; background: #061c32f2; box-shadow: .8rem .8rem 0 #0006; overflow-y: auto; }
 .library-drawer header { display: flex; align-items: center; justify-content: space-between; }
 .library-drawer h2 { margin: 0 0 1rem; font: 900 1.5rem var(--display); text-transform: uppercase; }
@@ -768,8 +769,10 @@ html[data-reduced-motion="true"] .race-settings-overlay > .settings-screen {
   .main-actions { width: min(28rem, 100%); }
   .menu-sky { opacity: .7; background-position: 60% center; }
   .rider-summary { top: 1rem; right: 1rem; transform: scale(.78); transform-origin: top right; }
-  .campaign-rail { --campaign-rail-track-width: 37.8rem; position: relative; right: auto; bottom: auto; left: auto; grid-template-columns: repeat(5, minmax(7rem, 10rem)); width: 100%; max-width: 100%; margin-top: 4rem; overflow-x: auto; overflow-y: hidden; overscroll-behavior-x: contain; padding: 2rem 1rem 7rem; scroll-padding-inline: 1rem; scroll-snap-type: x proximity; -webkit-overflow-scrolling: touch; }
-  .rail-line { right: auto; bottom: 12.7rem; left: 2rem; width: calc(var(--campaign-rail-track-width) - 4rem); }
+  /* Track-width bounds mirror the grid: 5 × minmax(7rem, 10rem) columns + 4 × .7rem gaps.
+     The rail line must follow the actual (viewport-dependent) column growth, not a constant. */
+  .campaign-rail { --campaign-rail-track-min: 37.8rem; --campaign-rail-track-max: 52.8rem; position: relative; right: auto; bottom: auto; left: auto; grid-template-columns: repeat(5, minmax(7rem, 10rem)); width: 100%; max-width: 100%; margin-top: 4rem; overflow-x: auto; overflow-y: hidden; overscroll-behavior-x: contain; padding: 2rem 1rem 7rem; scroll-padding-inline: 1rem; scroll-snap-type: x proximity; -webkit-overflow-scrolling: touch; }
+  .rail-line { right: auto; bottom: 12.7rem; left: 2rem; width: calc(clamp(var(--campaign-rail-track-min), 100% - 2rem, var(--campaign-rail-track-max)) - 4rem); }
   .campaign-stop { scroll-snap-align: center; }
   .menu-footer { position: fixed; min-height: 3.5rem; padding: 0 1rem; }
   .menu-footer span:nth-child(-n+2) { display: none; }
@@ -792,7 +795,7 @@ html[data-reduced-motion="true"] .race-settings-overlay > .settings-screen {
   .persistence-notice { right: .5rem; bottom: .5rem; width: calc(100vw - 1rem); max-height: calc(100svh - 1rem); }
   .rider-summary { display: none; }
   .title-panel { padding-top: .5rem; }
-  .campaign-rail { --campaign-rail-track-width: 38.8rem; grid-template-columns: repeat(5, 7.2rem); }
+  .campaign-rail { --campaign-rail-track-min: 38.8rem; --campaign-rail-track-max: 38.8rem; grid-template-columns: repeat(5, 7.2rem); }
   .menu-footer span:last-child { display: none; }
   .menu-support-link { margin: 0 auto; }
   .screen-header { min-height: 5rem; padding: .7rem; }
