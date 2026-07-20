@@ -8,8 +8,8 @@ import { inspectPngIntegrity } from "./lib/png-integrity.mjs";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const PANORAMA_PATH = path.join(ROOT, "public/assets/art/canyon-festival-panorama.png");
-const EXPECTED_BYTES = 1_801_764;
-const EXPECTED_SHA256 = "43b39c9075428e9bc081b3d8f216fae0027e889f89caa59586aa6097080b26a5";
+const EXPECTED_BYTES = 1_683_944;
+const EXPECTED_SHA256 = "17c222c931e91b1dca3ceae29543acab351df93b01ced27aa8ddb9c8a0588c01";
 const MODELING_REFERENCES = [
   {
     path: path.join(ROOT, "docs/design/concepts/canyon-production-asset-reference.png"),
@@ -37,13 +37,13 @@ const MODELING_REFERENCES = [
 const TITLE_ART_ASSETS = [
   {
     path: path.join(ROOT, "public/assets/art/title-background.png"),
-    bytes: 2_129_759,
-    sha256: "292ffdf20edcb4c483b30a5a4f6882f3ecbaf8ff1f28815d8fe28a9aeb6e3e78",
+    bytes: 2_049_503,
+    sha256: "bf5b8e9101b31f0d67a4ac3f48f1ccf4172f8bb92dfb0e8ba219f3126acfaaf8",
   },
   {
     path: path.join(ROOT, "docs/design/concepts/title-background-production.png"),
-    bytes: 2_129_759,
-    sha256: "292ffdf20edcb4c483b30a5a4f6882f3ecbaf8ff1f28815d8fe28a9aeb6e3e78",
+    bytes: 2_049_503,
+    sha256: "bf5b8e9101b31f0d67a4ac3f48f1ccf4172f8bb92dfb0e8ba219f3126acfaaf8",
   },
 ];
 const APP_ICON = {
@@ -59,32 +59,32 @@ const MASKABLE_APP_ICON_SOURCE = {
 const APP_ICON_RASTERS = [
   {
     path: path.join(ROOT, "public/assets/icons/app-icon-192.png"),
-    bytes: 8_560,
-    sha256: "b45e0ac35c9a1eb45a06d2487a75c5ae977854a95bb48f669d668ce0219b5a7e",
+    bytes: 5_485,
+    sha256: "2e257fd4d8aa9a502e30fde6ed51323d670525b2dacf3e941b5bfc10c8c89340",
     width: 192,
     height: 192,
     usage: "PWA any-purpose icon",
   },
   {
     path: path.join(ROOT, "public/assets/icons/app-icon-512.png"),
-    bytes: 27_595,
-    sha256: "9a1666c7fe34cc2c79270f6498dcbf948a4febda0ef04576dd5f38dd3875ad4e",
+    bytes: 16_501,
+    sha256: "4295f901592cb704c0f2d5e8081832dec3f3aa0450c61ebac3938e67f122a488",
     width: 512,
     height: 512,
     usage: "PWA any-purpose icon",
   },
   {
     path: path.join(ROOT, "public/assets/icons/app-icon-maskable-512.png"),
-    bytes: 19_855,
-    sha256: "214cafc22adfcb95d013b4ed7b0843db64cd32e21756096d44cd010e6fcccff8",
+    bytes: 11_287,
+    sha256: "51830f92be1d8fc29467da1c69bf3c2e2a27def5390b4b1c7a6dc83cf4a6afd4",
     width: 512,
     height: 512,
     usage: "PWA maskable safe-zone icon",
   },
   {
     path: path.join(ROOT, "public/assets/icons/apple-touch-icon-180.png"),
-    bytes: 5_426,
-    sha256: "b82b791567ecc66dec30f9e3c6d5b7d8d146e9476198e8a8cebf2ae9ec7b9bd0",
+    bytes: 3_434,
+    sha256: "09b9c09f20ef36a9b80d9004a4f4f4ee73e3a4affc25cb416f0b2560f5edbd78",
     width: 180,
     height: 180,
     usage: "Apple touch icon",

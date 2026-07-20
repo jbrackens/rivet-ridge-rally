@@ -878,6 +878,11 @@ test("primary menus fit 16:9, ultrawide, tablet, and narrow viewports", async ({
         weight: rule.style.getPropertyValue("font-weight"),
         display: rule.style.getPropertyValue("font-display"),
       }));
+    const fontPreloads = Array.from(document.querySelectorAll<HTMLLinkElement>(
+      'link[rel="preload"][as="font"]',
+    )).map((link) => ({ href: link.href, fetchPriority: link.fetchPriority }));
+    const preloadOrder = Array.from(document.querySelectorAll<HTMLLinkElement>('link[rel="preload"]'))
+      .map((link) => link.as);
     const menuSkyStyle = getComputedStyle(document.querySelector<HTMLElement>(".menu-sky")!);
     return {
       titlePreload: titlePreload
@@ -887,16 +892,28 @@ test("primary menus fit 16:9, ultrawide, tablet, and narrow viewports", async ({
             fetchPriority: titlePreload.fetchPriority,
           }
         : null,
+      fontPreloads,
+      preloadOrder,
       fontDisplays,
       menuSkyBackgroundImage: menuSkyStyle.backgroundImage,
       menuSkyBackgroundSize: menuSkyStyle.backgroundSize,
     };
   });
+  // Fonts must outrank the 2MB backdrop: with font-display: optional, losing
+  // the fetch race pins fallback type for the whole session, so the fonts
+  // preload first at high priority and the image demotes to auto.
   expect(titleFirstPaintContract.titlePreload).toEqual({
     as: "image",
     type: "image/png",
-    fetchPriority: "high",
+    fetchPriority: "auto",
   });
+  expect(titleFirstPaintContract.fontPreloads).toHaveLength(2);
+  for (const fontPreload of titleFirstPaintContract.fontPreloads) {
+    expect(fontPreload.fetchPriority, `${fontPreload.href} preloads at high priority`).toBe("high");
+  }
+  expect(titleFirstPaintContract.preloadOrder.indexOf("font")).toBeLessThan(
+    titleFirstPaintContract.preloadOrder.indexOf("image"),
+  );
   expect(titleFirstPaintContract.fontDisplays).toEqual(expect.arrayContaining([
     expect.objectContaining({ weight: "700", display: "optional" }),
     expect.objectContaining({ weight: "900", display: "optional" }),

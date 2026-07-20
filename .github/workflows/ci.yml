@@ -43,3 +43,41 @@ jobs:
 
       - name: Unit tests
         run: npx vitest run
+
+  # Non-blocking Lighthouse report (polish-plan wave 4.4): logs category scores
+  # per PR so payload/perf regressions are visible; promote to a blocking budget
+  # once targets are agreed.
+  lighthouse-report:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install
+        run: npm ci
+
+      - name: Build
+        run: npx vite build
+
+      - name: Lighthouse
+        run: |
+          npm run preview -- --host 127.0.0.1 --port 4173 &
+          sleep 3
+          npx -y lighthouse http://127.0.0.1:4173 --preset=desktop \
+            --output=json --output-path=./lighthouse.json \
+            --chrome-flags="--headless --no-sandbox" --quiet
+          node -e '
+            const r = JSON.parse(require("fs").readFileSync("./lighthouse.json", "utf8"));
+            for (const [key, cat] of Object.entries(r.categories)) {
+              console.log(`${key}: ${Math.round(cat.score * 100)}`);
+            }
+            const lcp = r.audits["largest-contentful-paint"];
+            const cls = r.audits["cumulative-layout-shift"];
+            console.log(`LCP: ${lcp.displayValue}  CLS: ${cls.displayValue}`);
+          '
