@@ -618,7 +618,7 @@ describe("shared rider simulation contract", () => {
         expect(
           classification.map((entry) => entry.timeMs),
           `${difficulty} ${track.name} classification order`,
-        ).toEqual([...classification.map((entry) => entry.timeMs)].sort((left, right) => left - right));
+        ).toEqual([...aiTimes, track.parTimeMs].sort((left, right) => left - right));
         expect(
           aiTimes.every((timeMs) => timeMs > 0 && timeMs <= 15 * 60_000),
           `${difficulty} ${track.name} AI finish bounds`,

@@ -263,7 +263,27 @@ async function expectReachableResultsAtViewport(
   await page.locator(".results-screen").evaluate((element) => {
     element.scrollTo({ top: element.scrollHeight, left: 0 });
   });
-  await expect(page.getByRole("button", { name: "Retry now" }), `${viewport.name} retry action reachable`).toBeVisible();
+  // toBeVisible() cannot catch an element clipped outside the scrollport (it only
+  // checks a non-empty box), so assert the button's rect actually sits inside the
+  // results scroll container after scrolling to the bottom.
+  const retryWithinScrollport = await page.evaluate(() => {
+    const results = document.querySelector<HTMLElement>(".results-screen");
+    const retry = Array.from(document.querySelectorAll("button"))
+      .find((candidate) => candidate.textContent?.trim() === "Retry now");
+    if (!results || !retry || !results.contains(retry)) return null;
+    const resultsRect = results.getBoundingClientRect();
+    const retryRect = retry.getBoundingClientRect();
+    return {
+      topInside: retryRect.top >= resultsRect.top - 1,
+      bottomInside: retryRect.bottom <= resultsRect.bottom + 1,
+      hasSize: retryRect.width > 0 && retryRect.height > 0,
+    };
+  });
+  expect(retryWithinScrollport, `${viewport.name} retry action reachable`).toEqual({
+    topInside: true,
+    bottomInside: true,
+    hasSize: true,
+  });
 }
 
 test("slow race prep shows an animated loading gate before countdown", async ({ page }, testInfo) => {
@@ -287,6 +307,41 @@ test("slow race prep shows an animated loading gate before countdown", async ({ 
   await expect(gate).toHaveAttribute("data-gate-mode", "countdown", { timeout: 10_000 });
   await expect(gate.locator(".race-loading-track")).toHaveCount(0);
   await expect(page.locator(".game-shell")).toHaveAttribute("data-race-gate-phase", "racing", { timeout: 10_000 });
+});
+
+test("shipped display font renders tabular timing digits", async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== "chromium", "Font metric gate runs once in Chromium");
+  // The wave-1.1 tabular-nums declaration only delivers a stable race clock if
+  // the shipped woff2 actually carries a working tnum feature — a subsetting
+  // step could silently strip it. Loading the shipped file as a fresh FontFace
+  // sidesteps font-display: optional's swap-race (whose first-visit fallback
+  // residual is tracked as polish-plan item U4) so this measurement is
+  // deterministic; the element-level declaration itself is asserted by the
+  // computed-style polls in the keyboard-race journey.
+  await page.goto("/");
+  const timerDigitWidths = await page.evaluate(async () => {
+    const face = new FontFace(
+      "Ridge Display Probe",
+      'url(/assets/fonts/barlow-condensed-900-latin.woff2)',
+      { weight: "900" },
+    );
+    await face.load();
+    document.fonts.add(face);
+    const probe = document.createElement("span");
+    probe.style.cssText = 'position:absolute;visibility:hidden;white-space:pre;font:900 40px "Ridge Display Probe";font-variant-numeric:tabular-nums;';
+    document.body.append(probe);
+    const measure = (text: string) => {
+      probe.textContent = text;
+      return probe.getBoundingClientRect().width;
+    };
+    const widths = ["0000", "1111", "8888", "9999"].map(measure);
+    probe.remove();
+    return widths;
+  });
+  expect(
+    Math.max(...timerDigitWidths) - Math.min(...timerDigitWidths),
+    `tabular digits render at equal widths (${timerDigitWidths.map((width) => width.toFixed(2)).join(", ")})`,
+  ).toBeLessThan(0.5);
 });
 
 test("fresh load completes a keyboard race, saves onboarding, and retries", async ({ page }, testInfo) => {
@@ -348,6 +403,10 @@ test("fresh load completes a keyboard race, saves onboarding, and retries", asyn
   await expect.poll(() => page.locator(".timing-block > strong").evaluate((element) => getComputedStyle(element).fontVariantNumeric)).toContain("tabular-nums");
   await expect.poll(() => page.locator(".timing-block span b").evaluate((element) => getComputedStyle(element).fontVariantNumeric)).toContain("tabular-nums");
   await expect.poll(() => page.locator(".target-hud > strong").evaluate((element) => getComputedStyle(element).fontVariantNumeric)).toContain("tabular-nums");
+  // Digit-box width equality is asserted in the dedicated "timing digits render
+  // tabular" test below: this fresh-load journey can lose the font-display:
+  // optional swap race in a cold profile, which would make the measurement
+  // assert the fallback font instead of the shipped face.
 
   await finishFastKeyboardRace(page);
   await expect(page.getByText("Lap 1", { exact: true })).toBeVisible();
