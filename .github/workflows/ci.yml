@@ -69,9 +69,18 @@ jobs:
         run: |
           npm run preview -- --host 127.0.0.1 --port 4173 &
           sleep 3
-          npx -y lighthouse http://127.0.0.1:4173 --preset=desktop \
-            --output=json --output-path=./lighthouse.json \
-            --chrome-flags="--headless --no-sandbox" --quiet
+          # --headless=new + one retry: legacy headless intermittently dies with
+          # "Runtime.evaluate: Promise was collected" under Lighthouse.
+          for attempt in 1 2; do
+            if npx -y lighthouse http://127.0.0.1:4173 --preset=desktop \
+              --output=json --output-path=./lighthouse.json \
+              --chrome-flags="--headless=new --no-sandbox" --quiet; then
+              break
+            fi
+            if [ "$attempt" = "2" ]; then exit 1; fi
+            echo "Lighthouse attempt $attempt failed — retrying"
+            sleep 3
+          done
           node -e '
             const r = JSON.parse(require("fs").readFileSync("./lighthouse.json", "utf8"));
             for (const [key, cat] of Object.entries(r.categories)) {
