@@ -545,7 +545,7 @@ test("quota write failure stays visible and retry flushes session settings", asy
 test("newer-version open failure preserves seeded data and shows upgrade recovery guidance", async ({ page }, testInfo) => {
   test.skip(testInfo.project.name !== "chromium", "IndexedDB failure gate runs once in Chromium");
   const assertCleanRuntime = observeUnexpectedFailures(page);
-  await page.route("http://127.0.0.1:4173/", (route) => route.fulfill({
+  await page.route(`http://127.0.0.1:${process.env.RRR_PLAYWRIGHT_PORT ?? "4173"}/`, (route) => route.fulfill({
     contentType: "text/html",
     body: "<!doctype html><html><body>Persistence preservation fixture</body></html>",
   }), { times: 1 });

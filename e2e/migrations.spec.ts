@@ -1,6 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
 
-const BASE_URL = "http://127.0.0.1:4173";
+const BASE_URL = `http://127.0.0.1:${process.env.RRR_PLAYWRIGHT_PORT ?? "4173"}`;
 const DATABASE_NAME = "rivet-ridge-rally";
 const PROFILE_ID = "rider-01";
 

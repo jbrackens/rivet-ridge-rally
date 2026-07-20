@@ -1,6 +1,6 @@
 import { chromium, expect, test, type BrowserContext, type Page } from "@playwright/test";
 
-const BASE_URL = "http://127.0.0.1:4173";
+const BASE_URL = `http://127.0.0.1:${process.env.RRR_PLAYWRIGHT_PORT ?? "4173"}`;
 
 async function openPersistentProfile(userDataDir: string): Promise<BrowserContext> {
   return chromium.launchPersistentContext(userDataDir, {
