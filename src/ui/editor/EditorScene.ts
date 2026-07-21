@@ -34,6 +34,10 @@ const EDITOR_EXTENSION_LOOK_BEHIND = 120;
 const EDITOR_EXTENSION_LOOK_AHEAD = 240;
 const EDITOR_EXTENSION_REBUILD_MARGIN = 54;
 const EDITOR_PICK_LAYER = 1;
+const EDITOR_ROUTE_CAMERA_RADIUS = 42;
+const EDITOR_ROUTE_CAMERA_HEIGHT = 31;
+const EDITOR_ROUTE_CAMERA_MIN_RADIUS = 22;
+const EDITOR_ROUTE_CAMERA_MAX_RADIUS = 62;
 
 type VisualState = "normal" | "selected" | "preview";
 
@@ -90,7 +94,7 @@ export class EditorScene {
   private readonly resizeObserver: ResizeObserver;
   private animationFrame = 0;
   private orbit = -0.36;
-  private routeRadius = 54;
+  private routeRadius = EDITOR_ROUTE_CAMERA_RADIUS;
   private overviewRadius = 90;
   private overviewFitRadius = 90;
   private cameraMode: "route" | "overview" = "route";
@@ -114,6 +118,7 @@ export class EditorScene {
   private routeExtensionEnd = Number.NaN;
   private previewModuleId = "ramp-medium";
   private previewSignature = "none";
+  private builderWorksitePropCount = 0;
   private onPlace: (lane: 0 | 1 | 2 | 3, gridPosition: number) => void = () => undefined;
   private onSelect: (placementId: string) => void = () => undefined;
   private onPreview: (preview: EditorPlacementPreview | null) => void = () => undefined;
@@ -232,7 +237,7 @@ export class EditorScene {
     }
     this.modules.updateMatrixWorld(true);
     this.refreshRouteOverviewBounds();
-    if (routeChanged || (this.cameraMode === "overview" && moduleLayoutChanged)) {
+    if (this.cameraMode === "overview" && (routeChanged || moduleLayoutChanged)) {
       this.frameRoute();
     } else {
       if (this.cameraMode === "route") this.updateRouteExtension(this.cameraRoutePosition);
@@ -918,6 +923,7 @@ export class EditorScene {
   }
 
   private buildDioramaScenery(): void {
+    this.builderWorksitePropCount = 0;
     const treeCount = Math.min(44, Math.max(10, Math.ceil(this.courseRouteLength / 30)));
     for (let index = 0; index < treeCount; index += 1) {
       const side = index % 2 === 0 ? -1 : 1;
@@ -976,6 +982,91 @@ export class EditorScene {
 
     this.addFestivalBanner(0.14, 0xec5549);
     this.addFestivalBanner(0.72, 0x27bfd0);
+    this.addBuilderWorksiteScenery();
+    this.canvas.dataset.builderWorksiteStyle = "route-following-prop-clusters-v1";
+    this.canvas.dataset.builderWorksitePropCount = String(this.builderWorksitePropCount);
+  }
+
+  private addBuilderWorksiteScenery(): void {
+    this.addMarshalPlatform(0.18, -15.5, 0.78);
+    this.addMarshalPlatform(0.58, 16.2, 0.72);
+    this.addTireStackCluster(0.24, 18.5, 5);
+    this.addTireStackCluster(0.47, -18.8, 4);
+    this.addConeLine(0.36, -12.6, 6, 0xec5549);
+    this.addConeLine(0.68, 12.8, 5, 0xf3c545);
+    this.addCrateAndToolCluster(0.31, -19.6, 0.9);
+    this.addCrateAndToolCluster(0.76, 19.8, 1.05);
+  }
+
+  private addMarshalPlatform(routeRatio: number, lateral: number, scale: number): void {
+    const group = new THREE.Group();
+    group.scale.setScalar(scale);
+    const timber = new THREE.MeshStandardMaterial({ color: 0x6f4630, roughness: 0.94, flatShading: true });
+    const cream = new THREE.MeshStandardMaterial({ color: 0xf4e4ba, roughness: 0.82, flatShading: true });
+    const teal = new THREE.MeshStandardMaterial({ color: 0x22c7d2, roughness: 0.72, flatShading: true });
+    const vest = new THREE.MeshStandardMaterial({ color: 0xf4b53f, roughness: 0.78, flatShading: true });
+    for (const x of [-1.65, 1.65]) {
+      for (const z of [-1.25, 1.25]) {
+        this.addMesh(group, new THREE.CylinderGeometry(0.12, 0.16, 2.65, 6), timber, [x, 1.32, z], [0, 0, 0], true, true);
+        this.builderWorksitePropCount += 1;
+      }
+    }
+    this.addMesh(group, new THREE.BoxGeometry(4.25, 0.28, 3.1), timber, [0, 2.75, 0], [0, 0, 0], true, true);
+    this.addMesh(group, new THREE.BoxGeometry(4.45, 0.16, 0.16), cream, [0, 3.28, -1.55], [0, 0, 0], true, true);
+    this.addMesh(group, new THREE.BoxGeometry(0.16, 0.16, 3.15), cream, [-2.18, 3.28, 0], [0, 0, 0], true, true);
+    this.addMesh(group, new THREE.CylinderGeometry(0.28, 0.36, 0.62, 8), vest, [-0.62, 3.22, 0.1], [0, 0, 0], true, true);
+    this.addMesh(group, new THREE.SphereGeometry(0.22, 8, 6), cream, [-0.62, 3.66, 0.1], [0, 0, 0], false, true);
+    this.addMesh(group, new THREE.BoxGeometry(1.6, 0.9, 0.08), teal, [1.0, 3.55, -1.62], [0, 0, 0.05], true, true);
+    this.builderWorksitePropCount += 6;
+    this.placeSceneryOnRoute(group, routeRatio, lateral, 0, lateral < 0 ? -8 : 8);
+  }
+
+  private addTireStackCluster(routeRatio: number, lateral: number, tireCount: number): void {
+    const group = new THREE.Group();
+    const tireMaterial = new THREE.MeshStandardMaterial({ color: 0x151d20, roughness: 0.96, flatShading: true });
+    const hubMaterial = new THREE.MeshStandardMaterial({ color: 0x6b7f85, roughness: 0.62, metalness: 0.16, flatShading: true });
+    for (let index = 0; index < tireCount; index += 1) {
+      const x = (index % 3) * 0.92 - 0.92;
+      const z = Math.floor(index / 3) * 0.82 - 0.42;
+      const y = 0.32 + (index % 2) * 0.32;
+      this.addMesh(group, new THREE.TorusGeometry(0.38, 0.12, 7, 14), tireMaterial, [x, y, z], [Math.PI / 2, 0, index * 0.2], true, true);
+      this.addMesh(group, new THREE.CylinderGeometry(0.16, 0.16, 0.06, 8), hubMaterial, [x, y, z], [Math.PI / 2, 0, 0], false, true);
+      this.builderWorksitePropCount += 1;
+    }
+    this.placeSceneryOnRoute(group, routeRatio, lateral, 0.05, lateral < 0 ? -16 : 16);
+  }
+
+  private addConeLine(routeRatio: number, lateral: number, coneCount: number, color: number): void {
+    const group = new THREE.Group();
+    const coneMaterial = new THREE.MeshStandardMaterial({ color, roughness: 0.82, flatShading: true });
+    const stripeMaterial = new THREE.MeshStandardMaterial({ color: 0xf8f1dd, roughness: 0.78, flatShading: true });
+    for (let index = 0; index < coneCount; index += 1) {
+      const z = (index - (coneCount - 1) / 2) * 1.35;
+      this.addMesh(group, new THREE.ConeGeometry(0.32, 0.9, 6), coneMaterial, [0, 0.45, z], [0, index * 0.4, 0], true, true);
+      this.addMesh(group, new THREE.BoxGeometry(0.46, 0.08, 0.46), stripeMaterial, [0, 0.6, z], [0, index * 0.4, 0], false, true);
+      this.builderWorksitePropCount += 1;
+    }
+    this.placeSceneryOnRoute(group, routeRatio, lateral, 0, lateral < 0 ? 10 : -10);
+  }
+
+  private addCrateAndToolCluster(routeRatio: number, lateral: number, scale: number): void {
+    const group = new THREE.Group();
+    group.scale.setScalar(scale);
+    const crate = new THREE.MeshStandardMaterial({ color: 0xb36a35, roughness: 0.9, flatShading: true });
+    const dark = new THREE.MeshStandardMaterial({ color: 0x1e2c32, roughness: 0.78, flatShading: true });
+    const metal = new THREE.MeshStandardMaterial({ color: 0x8fa2a5, roughness: 0.56, metalness: 0.24, flatShading: true });
+    const coral = new THREE.MeshStandardMaterial({ color: 0xec5549, roughness: 0.78, flatShading: true });
+    const cratePositions: readonly VectorTuple[] = [[-0.75, 0.36, -0.2], [0.24, 0.34, 0.34], [0.84, 0.72, -0.44]];
+    for (const position of cratePositions) {
+      this.addMesh(group, new THREE.BoxGeometry(0.86, 0.72, 0.78), crate, position, [0, 0.24, 0], true, true);
+      this.builderWorksitePropCount += 1;
+    }
+    this.addMesh(group, new THREE.BoxGeometry(2.35, 0.2, 0.7), dark, [0.2, 1.28, 0.95], [0, 0.12, 0], true, true);
+    this.addMesh(group, new THREE.CylinderGeometry(0.12, 0.12, 1.2, 7), metal, [-0.72, 1.84, 0.95], [0, 0, Math.PI / 2], true, true);
+    this.addMesh(group, new THREE.CylinderGeometry(0.12, 0.12, 1.2, 7), metal, [0.78, 1.84, 0.95], [0, 0, Math.PI / 2], true, true);
+    this.addMesh(group, new THREE.BoxGeometry(1.4, 0.12, 0.12), coral, [0.18, 1.98, 0.95], [0, 0.4, 0], true, true);
+    this.builderWorksitePropCount += 4;
+    this.placeSceneryOnRoute(group, routeRatio, lateral, 0.02, lateral < 0 ? -14 : 14);
   }
 
   private addCanyonMesa(lateral: number, routeRatio: number, scale: number, rotation: number): void {
@@ -1705,10 +1796,13 @@ export class EditorScene {
       const orbitTrail = Math.cos(this.orbit) * this.routeRadius;
       this.camera.position.set(
         target.x + orientation.rightX * orbitSide - orientation.forwardX * orbitTrail,
-        target.y + 40,
+        target.y + EDITOR_ROUTE_CAMERA_HEIGHT,
         target.z + orientation.rightZ * orbitSide - orientation.forwardZ * orbitTrail,
       );
       this.camera.far = 500;
+      this.canvas.dataset.routeViewMode = "position";
+      this.canvas.dataset.editorCameraStyle = "closer-route-diorama-v1";
+      this.canvas.dataset.editorRouteCameraRadius = String(Math.round(this.routeRadius));
       if (this.scene.fog instanceof THREE.Fog) {
         this.scene.fog.near = 86;
         this.scene.fog.far = 164;
@@ -1793,10 +1887,10 @@ export class EditorScene {
     }
     const minimumRadius = this.cameraMode === "overview"
       ? this.overviewFitRadius * 0.52
-      : 26;
+      : EDITOR_ROUTE_CAMERA_MIN_RADIUS;
     const maximumRadius = this.cameraMode === "overview"
       ? this.overviewFitRadius * 2.4
-      : 72;
+      : EDITOR_ROUTE_CAMERA_MAX_RADIUS;
     if (this.cameraMode === "overview") {
       this.overviewRadius = THREE.MathUtils.clamp(
         this.overviewRadius + event.deltaY * 0.08,
@@ -1917,6 +2011,10 @@ export class EditorScene {
     const candidate = this.placementCandidateAtPointer(event);
     if (!candidate) return;
     if (this.currentTrack && this.currentTrack.modules.length >= CUSTOM_TRACK_MODULE_LIMIT) {
+      this.updatePreview(candidate);
+      return;
+    }
+    if (this.currentTrack && !validateCustomTrackPlacement(this.currentTrack, candidate).valid) {
       this.updatePreview(candidate);
       return;
     }

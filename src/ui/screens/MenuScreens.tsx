@@ -11,6 +11,7 @@ import {
 import { TRACKS, getTrack } from "../../game/content/tracks";
 import { formatKeyCode, getKeyBindingRejectionReason } from "../../game/input/keyLabels";
 import { formatTime } from "../format";
+import { RallyIcon } from "../icons/RallyIcon";
 
 const CONTROL_ACTION_LABELS: Readonly<Record<string, string>> = {
   throttle: "Ride",
@@ -69,12 +70,17 @@ function BrandMark() {
   );
 }
 
-export function BootScreen() {
-  const message = useAppStore((state) => state.bootMessage);
+interface BootScreenProps {
+  message?: string;
+}
+
+export function BootScreen({ message }: BootScreenProps) {
+  const bootMessage = useAppStore((state) => state.bootMessage);
+  const statusMessage = message ?? bootMessage;
   return (
     <main className="boot-screen" aria-live="polite">
       <div className="boot-mark" aria-hidden="true"><span>R</span></div>
-      <p>{message}</p>
+      <p>{statusMessage}</p>
       <div className="loading-track"><span /></div>
     </main>
   );
@@ -131,7 +137,7 @@ export function TitleScreen() {
           return (
             <button
               key={track.id}
-              className={`campaign-stop ${active ? "active" : ""}`}
+              className={`campaign-stop ${active ? "active" : ""} ${unlocked ? "" : "locked"}`}
               disabled={!unlocked}
               aria-pressed={active}
               aria-label={`${track.name}${unlocked ? "" : ", locked"}`}
@@ -148,7 +154,12 @@ export function TitleScreen() {
       </section>
 
       {recoveredSave ? <p className="save-recovery" role="status">A damaged local save was recovered safely.</p> : null}
-      <footer className="menu-footer"><span><kbd>Tab</kbd> Navigate</span><span><kbd>Enter</kbd> Select</span><span>v{__APP_VERSION__} · Local play · No account · No tracking</span></footer>
+      <footer className="menu-footer">
+        <span><kbd>Tab</kbd> Navigate</span>
+        <span><kbd>Enter</kbd> Select</span>
+        <button className="menu-support-link" onClick={() => navigate("support")}>Support · Privacy · Accessibility</button>
+        <span>v{__APP_VERSION__} · Local play · No account · No in-game tracking</span>
+      </footer>
     </main>
   );
 }
@@ -193,7 +204,7 @@ export function ModeScreen() {
   return (
     <main className="panel-screen mode-screen">
       <header className="screen-header">
-        <button className="back-button" onClick={() => navigate("title")} aria-label="Back to main menu">←</button>
+        <button className="back-button" onClick={() => navigate("title")} aria-label="Back to main menu"><RallyIcon kind="back" /></button>
         <div><p>Selected track</p><h1>{track.name}</h1></div>
         <div className="target-block">
           <span>Third-place target</span>
@@ -222,7 +233,12 @@ export function ModeScreen() {
                 : "Beat the Solo Challenge target to unlock."
               : mode.description;
             return (
-              <button key={mode.id} className="mode-row" disabled={locked} onClick={() => startRace(mode.id)}>
+              <button
+                key={mode.id}
+                className={`mode-row ${locked ? "locked" : ""}`}
+                disabled={locked}
+                onClick={() => startRace(mode.id)}
+              >
                 <span className="mode-index">{String(index + 1).padStart(2, "0")}</span>
                 <span className="mode-copy"><strong>{mode.name}</strong><small>{description}</small></span>
                 <span className="mode-stat">{locked ? <LockIcon /> : mode.stat}</span>
@@ -233,6 +249,104 @@ export function ModeScreen() {
         </div>
       </section>
       <footer className="panel-footer"><button onClick={() => navigate("title")}>Back</button><span>Immediate retry is available after every run.</span></footer>
+    </main>
+  );
+}
+
+export function SupportScreen() {
+  const navigate = useAppStore((state) => state.navigate);
+  const resetLocalProgress = useAppStore((state) => state.resetLocalProgress);
+  const [resetPending, setResetPending] = useState(false);
+  const [resetNotice, setResetNotice] = useState("");
+  const buildLabel = `${__RRR_BUILD_IDENTITY__.commit.slice(0, 12)}${__RRR_BUILD_IDENTITY__.dirty ? " · working tree" : ""}`;
+
+  return (
+    <main className="panel-screen support-screen">
+      <header className="screen-header">
+        <button className="back-button" onClick={() => navigate("title")} aria-label="Back to main menu"><RallyIcon kind="back" /></button>
+        <div><p>Local-first release information</p><h1>Support &amp; privacy</h1></div>
+      </header>
+
+      <section className="support-layout" aria-label="Product support, privacy, accessibility, and release information">
+        <div className="support-lede">
+          <div>
+            <span>Rider service board</span>
+            <h2>Your game data stays on this device</h2>
+            <p>Rivet Ridge Rally runs without an account, ads, payments, analytics SDKs, or behavioral tracking in the game. The commercial operator, public support channel, hosting policy, and retention commitments still require owner decisions before launch.</p>
+          </div>
+          <dl className="support-build" aria-label="Installed build identity">
+            <div><dt>Version</dt><dd>{__APP_VERSION__}</dd></div>
+            <div><dt>Source build</dt><dd>{buildLabel}</dd></div>
+            <div><dt>Release state</dt><dd>Candidate · acceptance pending</dd></div>
+          </dl>
+        </div>
+
+        <div className="support-grid">
+          <article className="support-card" aria-labelledby="support-heading">
+            <span>01 · Help</span>
+            <h2 id="support-heading">Support</h2>
+            <p><strong>Public support contact: not published.</strong> The release owner must add a verified support address or URL before commercial launch. There is currently no authorized inbox for support, safety, privacy, or accessibility requests.</p>
+            <p>When a verified channel is published, include the version and source build shown above, browser and operating system, input method, and exact reproduction steps. Do not send passwords, identifying information, or private track files to an unverified contact.</p>
+          </article>
+
+          <article className="support-card" aria-labelledby="privacy-heading">
+            <span>02 · On-device data</span>
+            <h2 id="privacy-heading">Privacy</h2>
+            <p>Progress, settings, personal race replays, custom tracks, and recoverable damaged-track records are stored in this browser on this device. A service worker caches game files for offline play. The game does not intentionally upload those saved records.</p>
+            <p>The eventual hosting provider may process ordinary web-request information such as an IP address and user agent. The operator identity, host, request-log policy, retention period, and deletion-response commitment have not been selected or published.</p>
+            <p><strong>Clearing browser site data permanently removes local progress and tracks.</strong> Export any custom tracks you need from Track Builder before clearing it.</p>
+          </article>
+
+          <article className="support-card" aria-labelledby="accessibility-heading">
+            <span>03 · Rider access</span>
+            <h2 id="accessibility-heading">Accessibility</h2>
+            <p>Settings include reduced motion, reduced screen shake, high contrast, gameplay captions, colorblind-safe indicators, UI scaling, remappable keyboard controls, separate audio levels, mirrored touch controls, and optional vibration.</p>
+            <p>Formal assistive-technology, cross-browser, and physical-device acceptance is still pending for this candidate. <strong>Accessibility contact: not published.</strong> The release owner must provide the verified reporting channel before launch.</p>
+          </article>
+
+          <article className="support-card" aria-labelledby="about-heading">
+            <span>04 · Product</span>
+            <h2 id="about-heading">About</h2>
+            <p>Rivet Ridge Rally is an original local-first 3D arcade motocross game. It includes five campaign tracks, Rider School, solo and rival racing, Practice, and an on-device Track Builder.</p>
+            <p>This screen identifies a working release candidate, not final commercial approval. The product operator identity and top-level product license remain owner decisions and must be published before release.</p>
+          </article>
+
+          <article className="support-card device-data-controls" aria-labelledby="device-data-heading">
+            <span>05 · Device controls</span>
+            <h2 id="device-data-heading">Reset race progress</h2>
+            <p>This resets Rider School completion, campaign unlocks, best times, and mastery progress. Settings, custom tracks, recoverable damaged-track records, and cached game files stay on this device.</p>
+            {resetPending ? (
+              <div className="support-reset-confirmation" role="group" aria-labelledby="reset-confirmation-heading">
+                <strong id="reset-confirmation-heading">Reset all race progress now?</strong>
+                <p>This cannot be undone. Exporting custom tracks is not required because this action does not delete them.</p>
+                <div className="support-reset-actions">
+                  <button type="button" onClick={() => {
+                    resetLocalProgress();
+                    setResetPending(false);
+                    setResetNotice("Race progress was reset. Device persistence will save the reset when available.");
+                  }}>Reset progress now</button>
+                  <button type="button" onClick={() => setResetPending(false)}>Cancel</button>
+                </div>
+              </div>
+            ) : (
+              <button type="button" onClick={() => { setResetNotice(""); setResetPending(true); }}>Reset race progress…</button>
+            )}
+            <p className="support-reset-notice" role="status" aria-live="polite">{resetNotice}</p>
+          </article>
+        </div>
+
+        <aside className="support-owner-actions" aria-labelledby="owner-actions-heading">
+          <div><span>Launch blockers</span><h2 id="owner-actions-heading">Owner-supplied public information required</h2></div>
+          <dl>
+            <div><dt>Support and accessibility contact</dt><dd>Blocked · verified public address or URL not supplied</dd></div>
+            <div><dt>Operator / data-controller identity</dt><dd>Blocked · legal public identity not supplied</dd></div>
+            <div><dt>Host and request-log policy</dt><dd>Blocked · provider and public policy not selected</dd></div>
+            <div><dt>Retention and deletion-response periods</dt><dd>Blocked · owner commitments not defined</dd></div>
+          </dl>
+        </aside>
+      </section>
+
+      <footer className="panel-footer"><button onClick={() => navigate("title")}>Back to menu</button><span>Do not replace owner decisions with invented contact or retention details.</span></footer>
     </main>
   );
 }
@@ -286,10 +400,19 @@ export function SettingsScreen() {
 
   return (
     <main className="panel-screen settings-screen">
-      <header className="screen-header"><button ref={closeButtonRef} className="back-button" aria-label="Close settings" onClick={closeOverlay}>←</button><div><p>Rider setup</p><h1>Settings</h1></div></header>
+      <header className="screen-header"><button ref={closeButtonRef} className="back-button" aria-label="Close settings" onClick={closeOverlay}><RallyIcon kind="back" /></button><div><p>Rider setup</p><h1>Settings</h1></div></header>
       <div className="settings-layout">
         <nav className="settings-tabs" aria-label="Settings sections">
-          {(["accessibility", "audio", "play"] as const).map((tab) => <button key={tab} className={activeTab === tab ? "active" : ""} onClick={() => setActiveTab(tab)}>{tab}</button>)}
+          {(["accessibility", "audio", "play"] as const).map((tab) => (
+            <button
+              key={tab}
+              className={activeTab === tab ? "active" : ""}
+              aria-pressed={activeTab === tab}
+              onClick={() => setActiveTab(tab)}
+            >
+              {tab}
+            </button>
+          ))}
         </nav>
         <section className="settings-content">
           {activeTab === "accessibility" ? (
@@ -363,6 +486,7 @@ export function SettingsScreen() {
 
 export function ResultsScreen() {
   const result = useAppStore((state) => state.latestResult);
+  const replayFailureReason = useAppStore((state) => state.latestReplayFailureReason);
   const retryRace = useAppStore((state) => state.retryRace);
   const navigate = useAppStore((state) => state.navigate);
   if (!result) return <TitleScreen />;
@@ -394,6 +518,11 @@ export function ResultsScreen() {
       : `Finish top three by ${formatTime(masteryGoal.targetMs)} from ${masteryGoal.startingHeat}% starting heat.`
     : result.coachingHint;
   const winnerTimeMs = result.classification[0]?.finishTimeMs;
+  const replayFailureDetail = replayFailureReason === "capacity"
+    ? "the recorder reached its byte capacity"
+    : replayFailureReason === "cadence"
+      ? "the fixed-step recording cadence was interrupted"
+      : "the recorder did not reach a complete terminal sample";
 
   return (
     <main className="results-screen">
@@ -463,6 +592,12 @@ export function ResultsScreen() {
             })}
           </ol>
         </section>
+      ) : null}
+      {replayFailureReason ? (
+        <p className="replay-unavailable-notice" role="status">
+          <span>Replay unavailable</span>
+          Your official result and progress were kept, but no replay was saved because {replayFailureDetail}.
+        </p>
       ) : null}
       <p className="coach-note"><span>{coachLabel}</span>{coachCopy}</p>
       <nav className="result-actions"><button className="button-primary" onClick={retryRace}>Retry now</button>{result.mode === "custom" ? <button onClick={() => navigate("editor")}>Return to Track Builder</button> : <button onClick={() => navigate("mode-select")}>Change mode</button>}<button onClick={() => navigate("title")}>Festival menu</button></nav>

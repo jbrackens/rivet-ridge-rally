@@ -1,0 +1,14 @@
+$ npx vitest run src/game/persistence
+startedAt=2026-07-19T13:02:20.183Z
+completedAt=2026-07-19T13:02:21.320Z
+exitCode=0
+
+
+ RUN  v4.1.10 /Users/john/Sandbox/Rivet Ridge Rally
+
+
+ Test Files  3 passed (3)
+      Tests  62 passed (62)
+   Start at  15:02:20
+   Duration  675ms (transform 195ms, setup 0ms, import 389ms, tests 152ms, environment 1.09s)
+

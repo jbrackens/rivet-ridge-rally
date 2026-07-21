@@ -257,27 +257,39 @@ describe("campaign progression", () => {
 
 describe("Summit mastery", () => {
   it("escalates its target and hot-start modifier through seven tiers", () => {
+    expect(Array.from({ length: MASTERY_TIER_COUNT }, (_, masteryLevel) => {
+      const goal = getMasteryGoal(masteryLevel);
+      return { targetMs: goal.targetMs, startingHeat: goal.startingHeat };
+    })).toEqual([
+      { targetMs: 257_000, startingHeat: 35 },
+      { targetMs: 255_000, startingHeat: 40 },
+      { targetMs: 253_000, startingHeat: 45 },
+      { targetMs: 251_000, startingHeat: 50 },
+      { targetMs: 249_000, startingHeat: 55 },
+      { targetMs: 248_000, startingHeat: 60 },
+      { targetMs: 247_000, startingHeat: 65 },
+    ]);
     expect(getMasteryGoal(0)).toMatchObject({
       tier: 1,
       tierCount: 7,
-      targetMs: 163_560,
+      targetMs: 257_000,
       startingHeat: 35,
       isMaxTierReplay: false,
     });
     expect(getMasteryGoal(1)).toMatchObject({
       tier: 2,
-      targetMs: 159_210,
+      targetMs: 255_000,
       startingHeat: 40,
     });
     expect(getMasteryGoal(6)).toMatchObject({
       tier: 7,
-      targetMs: 139_200,
+      targetMs: 247_000,
       startingHeat: 65,
       isMaxTierReplay: false,
     });
     expect(getMasteryGoal(MASTERY_TIER_COUNT)).toMatchObject({
       tier: 7,
-      targetMs: 139_200,
+      targetMs: 247_000,
       startingHeat: 65,
       isMaxTierReplay: true,
     });
@@ -312,6 +324,41 @@ describe("Summit mastery", () => {
     expect(missedTime.tracks[MASTERY_TRACK_ID].masteryLevel).toBe(0);
     expect(missedPodium.tracks[MASTERY_TRACK_ID].masteryLevel).toBe(0);
     expect(cleared.tracks[MASTERY_TRACK_ID].masteryLevel).toBe(1);
+  });
+
+  it("clears every Summit tier sequentially and keeps the final tier replayable", () => {
+    let current = unlockSummitMastery();
+
+    for (let masteryLevel = 0; masteryLevel < MASTERY_TIER_COUNT; masteryLevel += 1) {
+      const goal = getMasteryGoal(masteryLevel);
+      expect(goal).toMatchObject({
+        tier: masteryLevel + 1,
+        isMaxTierReplay: false,
+      });
+
+      current = applyRaceResult(
+        current,
+        raceResult("mastery", MASTERY_TRACK_ID, {
+          finishTimeMs: goal.targetMs,
+          position: 3,
+        }),
+      );
+      expect(current.tracks[MASTERY_TRACK_ID].masteryLevel).toBe(masteryLevel + 1);
+    }
+
+    const replayGoal = getMasteryGoal(current.tracks[MASTERY_TRACK_ID].masteryLevel);
+    expect(replayGoal).toMatchObject({
+      tier: MASTERY_TIER_COUNT,
+      isMaxTierReplay: true,
+    });
+    current = applyRaceResult(
+      current,
+      raceResult("mastery", MASTERY_TRACK_ID, {
+        finishTimeMs: replayGoal.targetMs,
+        position: 1,
+      }),
+    );
+    expect(current.tracks[MASTERY_TRACK_ID].masteryLevel).toBe(MASTERY_TIER_COUNT);
   });
 
   it("caps progression at the final tier while keeping its goal replayable", () => {

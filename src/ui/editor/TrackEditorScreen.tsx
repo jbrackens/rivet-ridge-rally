@@ -1,4 +1,12 @@
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+  type KeyboardEvent as ReactKeyboardEvent,
+} from "react";
 
 import { useAppStore, type EditorSessionState } from "../../app/store";
 import { EDITOR_MODULE_BY_ID, EDITOR_MODULES, type EditorModuleCategory, type EditorModuleDefinition } from "../../game/editor/modules";
@@ -8,6 +16,7 @@ import {
   CUSTOM_TRACK_NAME_MAX_CHARS,
   CUSTOM_TRACK_ROUTE_LIMIT,
   validateCustomTrack,
+  validateCustomTrackPlacement,
 } from "../../game/editor/validation";
 import {
   CUSTOM_TRACK_ROUTE_ANCHOR_ELEVATION_LIMIT,
@@ -25,6 +34,7 @@ import {
   type CustomTrackRecovery,
 } from "../../game/persistence/database";
 import { EditorScene, type EditorPlacementPreview } from "./EditorScene";
+import { RallyIcon } from "../icons/RallyIcon";
 
 const HISTORY_LIMIT = 50;
 const INITIAL_ROUTE_VIEW_POSITION = 62;
@@ -34,9 +44,31 @@ const ROUTE_RISE_MIN = 0;
 const ROUTE_RISE_MAX = CUSTOM_TRACK_ROUTE_ANCHOR_ELEVATION_LIMIT;
 const NOW = () => Date.now();
 
+function containDialogFocus(event: ReactKeyboardEvent<HTMLElement>): void {
+  if (event.key !== "Tab") return;
+  const controls = Array.from(event.currentTarget.querySelectorAll<HTMLElement>(
+    "button:not(:disabled), a[href], input:not(:disabled), select:not(:disabled), textarea:not(:disabled), [tabindex]:not([tabindex='-1'])",
+  )).filter((control) => !control.hidden && control.getAttribute("aria-hidden") !== "true");
+  const first = controls[0];
+  const last = controls.at(-1);
+  if (!first || !last) return;
+
+  if (event.shiftKey && document.activeElement === first) {
+    event.preventDefault();
+    last.focus();
+  } else if (!event.shiftKey && document.activeElement === last) {
+    event.preventDefault();
+    first.focus();
+  }
+}
+
 function boundedNumber(value: string, minimum: number, maximum: number): number {
   const parsed = Number(value);
   return Number.isFinite(parsed) ? Math.max(minimum, Math.min(maximum, parsed)) : 0;
+}
+
+function clampNumber(value: number, minimum: number, maximum: number): number {
+  return Math.max(minimum, Math.min(maximum, value));
 }
 
 function authoredRouteRange(track: CustomTrackData): readonly [number, number] {
@@ -83,6 +115,13 @@ function createDraft(): CustomTrackData {
 
 const CATEGORIES: readonly EditorModuleCategory[] = ["track", "jumps", "terrain", "hazards", "race"];
 
+interface EditorConfirmation {
+  title: string;
+  message: string;
+  confirmLabel: string;
+  onConfirm: () => void | Promise<void>;
+}
+
 function CategoryGlyph({ category }: { category: EditorModuleCategory }) {
   const common = { fill: "none", stroke: "currentColor", strokeWidth: 2.2, strokeLinecap: "round" as const, strokeLinejoin: "round" as const };
   if (category === "track") {
@@ -98,6 +137,43 @@ function CategoryGlyph({ category }: { category: EditorModuleCategory }) {
     return <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16v10H4zM6.5 17v3M17.5 17v3M7 7l4 10M13 7l4 10" {...common} /></svg>;
   }
   return <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 21V3M7 4h11l-2.5 4L18 12H7" {...common} /><path d="M8 5.5h3v3H8zm3 3h3v3h-3zm3-3h3v3h-3z" fill="currentColor" stroke="none" /></svg>;
+}
+
+function StepperIcon({ kind }: { kind: "left" | "right" | "up" | "down" | "rotate-left" | "rotate-right" }) {
+  const common = {
+    fill: "none",
+    stroke: "currentColor",
+    strokeLinecap: "round" as const,
+    strokeLinejoin: "round" as const,
+    strokeWidth: 2.25,
+  };
+  if (kind === "left" || kind === "right") {
+    const scale = kind === "left" ? -1 : 1;
+    return (
+      <svg className="stepper-icon" viewBox="0 0 24 24" aria-hidden="true" style={{ transform: `scaleX(${scale})` }}>
+        <path d="M7 12h9" {...common} />
+        <path d="m13 7 5 5-5 5" {...common} />
+      </svg>
+    );
+  }
+  if (kind === "up" || kind === "down") {
+    const scale = kind === "down" ? -1 : 1;
+    return (
+      <svg className="stepper-icon" viewBox="0 0 24 24" aria-hidden="true" style={{ transform: `scaleY(${scale})` }}>
+        <path d="M12 18V8" {...common} />
+        <path d="m7 11 5-5 5 5" {...common} />
+        <path d="M7 20h10" {...common} />
+      </svg>
+    );
+  }
+  const scale = kind === "rotate-left" ? -1 : 1;
+  return (
+    <svg className="stepper-icon" viewBox="0 0 24 24" aria-hidden="true" style={{ transform: `scaleX(${scale})` }}>
+      <path d="M7.5 9.2A6.1 6.1 0 1 1 6 13.2" {...common} />
+      <path d="M7.5 9.2H3.8V5.5" {...common} />
+      <path d="M12 9.2v4.1l3 1.8" {...common} />
+    </svg>
+  );
 }
 
 function ModuleThumbnail({ module }: { module: EditorModuleDefinition }) {
@@ -148,56 +224,123 @@ export function TrackEditorScreen() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const sceneRef = useRef<EditorScene | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
-  const initialSessionRef = useRef(useAppStore.getState().editorSession);
+  const libraryDrawerRef = useRef<HTMLElement>(null);
+  const libraryTriggerRef = useRef<HTMLButtonElement>(null);
+  const libraryReturnFocusRef = useRef<HTMLElement | null>(null);
+  const confirmationConfirmRef = useRef<HTMLButtonElement>(null);
+  const confirmationReturnFocusRef = useRef<HTMLElement | null>(null);
+  const wasLibraryOpenRef = useRef(false);
+  const [initialSession] = useState(() => useAppStore.getState().editorSession);
   const navigate = useAppStore((state) => state.navigate);
   const startCustomRace = useAppStore((state) => state.startCustomRace);
   const setEditorSession = useAppStore((state) => state.setEditorSession);
   const saveTestRideTrack = useAppStore((state) => state.saveTestRideTrack);
   const clearPendingTestRideSave = useAppStore((state) => state.clearPendingTestRideSave);
-  const [track, setTrack] = useState<CustomTrackData>(() => structuredClone(initialSessionRef.current?.track ?? createDraft()));
-  const [past, setPast] = useState<CustomTrackData[]>(() => structuredClone(initialSessionRef.current?.past ?? []));
-  const [future, setFuture] = useState<CustomTrackData[]>(() => structuredClone(initialSessionRef.current?.future ?? []));
-  const [category, setCategory] = useState<EditorModuleCategory>(() => initialSessionRef.current?.category ?? "jumps");
+  const [track, setTrack] = useState<CustomTrackData>(() => structuredClone(initialSession?.track ?? createDraft()));
+  const [persistedBase, setPersistedBase] = useState<CustomTrackData | null>(() => (
+    structuredClone(initialSession?.persistedBase ?? null)
+  ));
+  const [past, setPast] = useState<CustomTrackData[]>(() => structuredClone(initialSession?.past ?? []));
+  const [future, setFuture] = useState<CustomTrackData[]>(() => structuredClone(initialSession?.future ?? []));
+  const [category, setCategory] = useState<EditorModuleCategory>(() => initialSession?.category ?? "jumps");
   const [selectedModuleId, setSelectedModuleId] = useState(() => {
-    const restored = initialSessionRef.current?.selectedModuleId;
+    const restored = initialSession?.selectedModuleId;
     return restored && EDITOR_MODULES.some((module) => module.id === restored) ? restored : "ramp-medium";
   });
   const [selectedPlacementId, setSelectedPlacementId] = useState<string | null>(() => {
-    const restored = initialSessionRef.current?.selectedPlacementId;
-    return restored && initialSessionRef.current?.track.modules.some((module) => module.id === restored)
+    const restored = initialSession?.selectedPlacementId;
+    return restored && initialSession?.track.modules.some((module) => module.id === restored)
       ? restored
       : null;
   });
   const [library, setLibrary] = useState<CustomTrackData[]>([]);
   const [recoveries, setRecoveries] = useState<CustomTrackRecovery[]>([]);
   const [placementPreview, setPlacementPreview] = useState<EditorPlacementPreview | null>(null);
+  const [placementLane, setPlacementLane] = useState<0 | 1 | 2 | 3>(0);
   const [viewPosition, setViewPosition] = useState(() => (
     track.modules.find((module) => module.id === selectedPlacementId)?.gridPosition
       ?? INITIAL_ROUTE_VIEW_POSITION
   ));
   const [notice, setNotice] = useState("Autosave waits for a valid route.");
   const [showLibrary, setShowLibrary] = useState(false);
+  const [saveInFlight, setSaveInFlight] = useState(false);
+  const [confirmation, setConfirmation] = useState<EditorConfirmation | null>(null);
+  const saveInFlightRef = useRef(false);
   const trackRef = useRef(track);
+  const persistedBaseRef = useRef(persistedBase);
   const selectedModuleIdRef = useRef(selectedModuleId);
   const viewPositionRef = useRef(viewPosition);
-  trackRef.current = track;
-  selectedModuleIdRef.current = selectedModuleId;
-  viewPositionRef.current = viewPosition;
   const validation = useMemo(() => validateCustomTrack(track), [track]);
   const routeRange = useMemo(() => authoredRouteRange(track), [track]);
   const selectedPlacement = track.modules.find((module) => module.id === selectedPlacementId) ?? null;
+  const resolvedSelectedPlacementId = selectedPlacement?.id ?? null;
   const placedModules = useMemo(
     () => [...track.modules].sort((left, right) => left.gridPosition - right.gridPosition || left.lane - right.lane),
     [track.modules],
   );
+  const editorControlsLocked = saveInFlight || confirmation !== null;
+  const restoreConfirmationFocus = () => {
+    window.requestAnimationFrame(() => {
+      const target = confirmationReturnFocusRef.current;
+      if (target?.isConnected) target.focus({ preventScroll: true });
+      confirmationReturnFocusRef.current = null;
+    });
+  };
+  const requestConfirmation = (nextConfirmation: EditorConfirmation) => {
+    const activeElement = document.activeElement;
+    confirmationReturnFocusRef.current = activeElement instanceof HTMLElement
+      ? activeElement
+      : null;
+    setConfirmation(nextConfirmation);
+  };
+  const cancelConfirmation = () => {
+    setConfirmation(null);
+    restoreConfirmationFocus();
+  };
+  const confirmPendingAction = () => {
+    const pending = confirmation;
+    if (!pending || saveInFlightRef.current) return;
+    setConfirmation(null);
+    restoreConfirmationFocus();
+    void Promise.resolve(pending.onConfirm());
+  };
 
   useLayoutEffect(() => {
-    setEditorSession({ track, past, future, category, selectedModuleId, selectedPlacementId });
-  }, [category, future, past, selectedModuleId, selectedPlacementId, setEditorSession, track]);
+    trackRef.current = track;
+    persistedBaseRef.current = persistedBase;
+    selectedModuleIdRef.current = selectedModuleId;
+    viewPositionRef.current = viewPosition;
+  }, [persistedBase, selectedModuleId, track, viewPosition]);
 
   useLayoutEffect(() => {
-    if (selectedPlacementId && !selectedPlacement) setSelectedPlacementId(null);
-  }, [selectedPlacement, selectedPlacementId]);
+    setEditorSession({
+      track,
+      persistedBase,
+      past,
+      future,
+      category,
+      selectedModuleId,
+      selectedPlacementId: resolvedSelectedPlacementId,
+    });
+  }, [category, future, past, persistedBase, resolvedSelectedPlacementId, selectedModuleId, setEditorSession, track]);
+
+  useLayoutEffect(() => {
+    const wasOpen = wasLibraryOpenRef.current;
+    if (showLibrary && !wasOpen) {
+      libraryDrawerRef.current?.querySelector<HTMLButtonElement>("button:not(:disabled)")?.focus({ preventScroll: true });
+    } else if (!showLibrary && wasOpen) {
+      const returnTarget = libraryReturnFocusRef.current;
+      if (returnTarget?.isConnected) returnTarget.focus({ preventScroll: true });
+      else libraryTriggerRef.current?.focus({ preventScroll: true });
+      libraryReturnFocusRef.current = null;
+    }
+    wasLibraryOpenRef.current = showLibrary;
+  }, [showLibrary]);
+
+  useLayoutEffect(() => {
+    if (!confirmation) return;
+    confirmationConfirmRef.current?.focus({ preventScroll: true });
+  }, [confirmation]);
 
   const refreshLibrary = useCallback(async () => {
     try {
@@ -223,6 +366,7 @@ export function TrackEditorScreen() {
   }, []);
 
   const commit = useCallback((update: (current: CustomTrackData) => CustomTrackData) => {
+    if (saveInFlightRef.current) return;
     setTrack((current) => {
       setPast((history) => [...history.slice(-(HISTORY_LIMIT - 1)), structuredClone(current)]);
       setFuture([]);
@@ -241,6 +385,7 @@ export function TrackEditorScreen() {
     const scene = new EditorScene(canvas);
     sceneRef.current = scene;
     scene.setPlacementHandler((lane, gridPosition) => {
+      if (saveInFlightRef.current) return;
       const placement: CustomTrackModule = { id: crypto.randomUUID(), moduleId: selectedModuleIdRef.current, lane, gridPosition, rotation: 0, height: 0 };
       commit((current) => ({ ...current, modules: [...current.modules, placement] }));
       setSelectedPlacementId(placement.id);
@@ -253,14 +398,15 @@ export function TrackEditorScreen() {
   }, [commit]);
 
   useEffect(() => {
-    sceneRef.current?.update(trackRef.current, selectedPlacementId, selectedModuleId);
-  }, [selectedModuleId, selectedPlacementId, track.modules]);
+    sceneRef.current?.update(trackRef.current, resolvedSelectedPlacementId, selectedModuleId);
+  }, [resolvedSelectedPlacementId, selectedModuleId, track.modules]);
 
   useEffect(() => {
     if (selectedPlacement) sceneRef.current?.focusRoutePosition(selectedPlacement.gridPosition);
   }, [selectedPlacement]);
 
   const undo = () => {
+    if (saveInFlightRef.current) return;
     const previous = past.at(-1);
     if (!previous) return;
     setFuture((items) => [structuredClone(track), ...items].slice(0, HISTORY_LIMIT));
@@ -269,6 +415,7 @@ export function TrackEditorScreen() {
   };
 
   const redo = () => {
+    if (saveInFlightRef.current) return;
     const next = future[0];
     if (!next) return;
     setPast((items) => [...items, structuredClone(track)].slice(-HISTORY_LIMIT));
@@ -285,22 +432,67 @@ export function TrackEditorScreen() {
   };
 
   const save = async () => {
+    if (saveInFlightRef.current) return false;
     if (!validation.valid) { setNotice(validation.errors[0] ?? "Fix validation errors before saving."); return false; }
+    saveInFlightRef.current = true;
+    setSaveInFlight(true);
+    setNotice("Saving this draft to the device…");
     try {
       const saved = createTrackSnapshot();
-      await saveCustomTrack(saved);
+      const result = await saveCustomTrack(saved, persistedBase);
       clearPendingTestRideSave(saved.id);
-      setTrack(saved);
+      setTrack(result.track);
+      setPersistedBase(structuredClone(result.track));
+      if (result.conflictCopy) {
+        setPast([]);
+        setFuture([]);
+      }
       await refreshLibrary();
-      setNotice("Track saved locally.");
+      setNotice(result.conflictCopy
+        ? `A newer saved version was preserved. Your draft was saved as “${result.track.name}”.`
+        : "Track saved locally.");
       return true;
     } catch (error) {
       setNotice(error instanceof Error ? error.message : "The track could not be saved. Check local storage and retry.");
       return false;
+    } finally {
+      saveInFlightRef.current = false;
+      setSaveInFlight(false);
+    }
+  };
+
+  const startTestRide = async () => {
+    if (saveInFlightRef.current) return;
+    if (!validation.valid) {
+      setNotice(validation.errors[0] ?? "Fix validation errors before test riding.");
+      return;
+    }
+    saveInFlightRef.current = true;
+    setSaveInFlight(true);
+    setNotice("Saving the exact Test Ride draft…");
+    const snapshot = createTrackSnapshot();
+    const session: EditorSessionState = structuredClone({
+      track: snapshot,
+      persistedBase,
+      past,
+      future,
+      category,
+      selectedModuleId,
+      selectedPlacementId: resolvedSelectedPlacementId,
+    });
+    setEditorSession(session);
+    try {
+      startCustomRace(await saveTestRideTrack(snapshot, persistedBase));
+    } catch {
+      startCustomRace(snapshot);
+    } finally {
+      saveInFlightRef.current = false;
+      setSaveInFlight(false);
     }
   };
 
   const downloadExport = () => {
+    if (saveInFlightRef.current) return;
     if (!validation.valid) { setNotice(validation.errors[0] ?? "Fix validation errors before export."); return; }
     try {
       const blob = new Blob([exportCustomTrack(track)], { type: "application/json" });
@@ -334,15 +526,66 @@ export function TrackEditorScreen() {
   };
 
   const removeRecovery = async (recovery: CustomTrackRecovery) => {
+    if (saveInFlightRef.current) return;
     if (recovery.key === null) return;
-    if (!window.confirm("Remove this preserved recovery record? Download its package first if you may need it.")) return;
-    try {
-      await deleteCustomTrackRecovery(recovery.key);
-      await refreshLibrary();
-      setNotice("Recovery record removed from this device.");
-    } catch (error) {
-      setNotice(error instanceof Error ? error.message : "The recovery record could not be removed.");
-    }
+    requestConfirmation({
+      title: "Remove recovery record?",
+      message: "Download its package first if you may need it. Removing this preserved local record cannot be undone.",
+      confirmLabel: "Remove record",
+      onConfirm: async () => {
+        if (saveInFlightRef.current || recovery.key === null) return;
+        saveInFlightRef.current = true;
+        setSaveInFlight(true);
+        setNotice("Removing the selected recovery record…");
+        try {
+          await deleteCustomTrackRecovery(recovery.key);
+          await refreshLibrary();
+          setNotice("Recovery record removed from this device.");
+        } catch (error) {
+          setNotice(error instanceof Error ? error.message : "The recovery record could not be removed.");
+        } finally {
+          saveInFlightRef.current = false;
+          setSaveInFlight(false);
+        }
+      },
+    });
+  };
+
+  const removeSavedTrack = async (savedTrack: CustomTrackData) => {
+    if (saveInFlightRef.current) return;
+    requestConfirmation({
+      title: `Delete “${savedTrack.name}”?`,
+      message: "Delete this custom track from this device? Export it first if you may need it. This cannot be undone.",
+      confirmLabel: "Delete track",
+      onConfirm: async () => {
+        if (saveInFlightRef.current) return;
+        saveInFlightRef.current = true;
+        setSaveInFlight(true);
+        setNotice(`Removing “${savedTrack.name}” from this device…`);
+        try {
+          const result = await deleteCustomTrack(savedTrack.id, savedTrack);
+          await refreshLibrary();
+          if (result.conflict) {
+            setNotice(`“${savedTrack.name}” changed in another tab and was not deleted. Review the refreshed copy first.`);
+            return;
+          }
+          if (!result.deleted) {
+            setNotice(`“${savedTrack.name}” was already removed in another tab.`);
+            return;
+          }
+          if (
+            trackRef.current.id === savedTrack.id
+            && persistedBaseRef.current?.id === savedTrack.id
+          ) setPersistedBase(null);
+          setNotice(`“${savedTrack.name}” was removed from this device. Any open editor draft was not changed.`);
+        } catch (error) {
+          setNotice(error instanceof Error ? error.message : "The local track could not be deleted.");
+        } finally {
+          saveInFlightRef.current = false;
+          setSaveInFlight(false);
+        }
+      },
+    });
   };
 
   const focusRouteStart = () => {
@@ -351,37 +594,70 @@ export function TrackEditorScreen() {
   };
 
   const importFile = async (file: File) => {
+    if (saveInFlightRef.current) return;
     if (file.size > MAX_CUSTOM_TRACK_FILE_BYTES) {
       setNotice("Track file exceeds the 1 MB safety limit.");
       return;
     }
+    saveInFlightRef.current = true;
+    setSaveInFlight(true);
+    setNotice("Reading and validating the selected track…");
     try {
       const imported = importCustomTrack(await file.text());
       const suffix = " Copy";
       const copyName = `${imported.name.slice(0, CUSTOM_TRACK_NAME_MAX_CHARS - suffix.length).trimEnd()}${suffix}`;
-      setPast((items) => [...items, structuredClone(track)].slice(-HISTORY_LIMIT));
+      setPast([]);
       setFuture([]);
       setTrack({ ...imported, id: crypto.randomUUID(), name: copyName, createdAt: NOW(), updatedAt: NOW() });
+      setPersistedBase(null);
       setSelectedPlacementId(null);
       focusRouteStart();
       setNotice("Track imported as a safe local copy.");
     } catch (error) {
       setNotice(error instanceof Error ? error.message : "Track import failed.");
+    } finally {
+      saveInFlightRef.current = false;
+      setSaveInFlight(false);
     }
   };
 
   const updateSelected = (patch: Partial<CustomTrackModule>) => {
+    if (saveInFlightRef.current) return;
     if (!selectedPlacement) return;
     commit((current) => ({ ...current, modules: current.modules.map((module) => module.id === selectedPlacement.id ? { ...module, ...patch } : module) }));
   };
 
+  const nudgeSelectedLane = (delta: -1 | 1) => {
+    if (!selectedPlacement) return;
+    updateSelected({ lane: clampNumber(selectedPlacement.lane + delta, 0, 3) as 0 | 1 | 2 | 3 });
+  };
+
+  const rotateSelected = (delta: -90 | 90) => {
+    if (!selectedPlacement) return;
+    const rotations = [0, 90, 180, 270] as const;
+    const currentIndex = Math.max(0, rotations.indexOf(selectedPlacement.rotation));
+    const nextIndex = (currentIndex + (delta > 0 ? 1 : -1) + rotations.length) % rotations.length;
+    updateSelected({ rotation: rotations[nextIndex] ?? 0 });
+  };
+
+  const nudgeSelectedHeight = (delta: -0.5 | 0.5) => {
+    if (!selectedPlacement) return;
+    updateSelected({ height: clampNumber(Number((selectedPlacement.height + delta).toFixed(1)), -4, 40) });
+  };
+
+  const nudgeLaps = (delta: -1 | 1) => {
+    commit((current) => ({ ...current, laps: clampNumber(current.laps + delta, 1, 9) }));
+  };
+
   const deleteSelected = () => {
-    if (!selectedPlacementId) return;
-    commit((current) => ({ ...current, modules: current.modules.filter((module) => module.id !== selectedPlacementId) }));
+    if (saveInFlightRef.current) return;
+    if (!resolvedSelectedPlacementId) return;
+    commit((current) => ({ ...current, modules: current.modules.filter((module) => module.id !== resolvedSelectedPlacementId) }));
     setSelectedPlacementId(null);
   };
 
   const duplicateSelected = () => {
+    if (saveInFlightRef.current) return;
     if (!selectedPlacement) return;
     if (track.modules.length >= CUSTOM_TRACK_MODULE_LIMIT) {
       setNotice(`The track has reached the ${CUSTOM_TRACK_MODULE_LIMIT}-module safety limit.`);
@@ -396,50 +672,105 @@ export function TrackEditorScreen() {
     setSelectedPlacementId(duplicate.id);
   };
 
+  const placeSelectedAtRouteView = () => {
+    if (saveInFlightRef.current) return;
+    const gridPosition = Math.max(0, Math.min(
+      CUSTOM_TRACK_ROUTE_LIMIT,
+      Math.round(viewPosition / 2) * 2,
+    ));
+    const placement: CustomTrackModule = {
+      id: crypto.randomUUID(),
+      moduleId: selectedModuleId,
+      lane: placementLane,
+      gridPosition,
+      rotation: 0,
+      height: 0,
+    };
+    const placementValidation = validateCustomTrackPlacement(track, placement);
+    if (!placementValidation.valid) {
+      setNotice(placementValidation.errors[0] ?? "This module cannot be placed at the selected route view.");
+      return;
+    }
+    commit((current) => ({ ...current, modules: [...current.modules, placement] }));
+    setSelectedPlacementId(placement.id);
+    setNotice(`${EDITOR_MODULE_BY_ID.get(selectedModuleId)?.name ?? selectedModuleId} placed in lane ${placementLane + 1} at ${gridPosition} m.`);
+  };
+
+  const requestClearTrack = () => {
+    if (saveInFlightRef.current) return;
+    requestConfirmation({
+      title: "Clear every placed module?",
+      message: "This removes every module from the current editor draft. It can be undone with the editor undo stack.",
+      confirmLabel: "Clear all",
+      onConfirm: () => {
+        commit((current) => ({ ...current, modules: [] }));
+        setSelectedPlacementId(null);
+        setNotice("All placed modules were cleared. Use Undo to restore them.");
+      },
+    });
+  };
+
   return (
-    <main className="editor-screen">
+    <main className={`editor-screen${saveInFlight ? " saving" : ""}`} aria-busy={saveInFlight}>
       <h1 className="sr-only">Track Builder — {track.name}</h1>
-      <header className="editor-toolbar">
-        <button className="editor-home" onClick={() => navigate("title")} aria-label="Back to festival menu">← <span>Track Builder</span></button>
-        <input aria-label="Track name" value={track.name} maxLength={CUSTOM_TRACK_NAME_MAX_CHARS} onChange={(event) => commit((current) => ({ ...current, name: event.target.value }))} />
-        <button onClick={undo} disabled={past.length === 0} aria-label="Undo">↶</button>
-        <button onClick={redo} disabled={future.length === 0} aria-label="Redo">↷</button>
+      <header className="editor-toolbar" inert={confirmation !== null} aria-hidden={confirmation !== null ? true : undefined}>
+        <button className="editor-home" onClick={() => navigate("title")} aria-label="Back to festival menu" disabled={saveInFlight}><RallyIcon kind="back" /> <span>Track Builder</span></button>
+        <input aria-label="Track name" value={track.name} maxLength={CUSTOM_TRACK_NAME_MAX_CHARS} disabled={saveInFlight} onChange={(event) => commit((current) => ({ ...current, name: event.target.value }))} />
+        <button onClick={undo} disabled={saveInFlight || past.length === 0} aria-label="Undo"><RallyIcon kind="undo" /></button>
+        <button onClick={redo} disabled={saveInFlight || future.length === 0} aria-label="Redo"><RallyIcon kind="redo" /></button>
         <span className="toolbar-spacer" />
-        <button onClick={() => setShowLibrary((value) => !value)}>Library</button>
-        <button onClick={() => void save()}>Save</button>
-        <button className="test-ride" onClick={() => {
-          if (!validation.valid) {
-            setNotice(validation.errors[0] ?? "Fix validation errors before test riding.");
-            return;
-          }
-          const snapshot = createTrackSnapshot();
-          const session: EditorSessionState = structuredClone({
-            track: snapshot,
-            past,
-            future,
-            category,
-            selectedModuleId,
-            selectedPlacementId,
-          });
-          setEditorSession(session);
-          void saveTestRideTrack(snapshot).catch(() => undefined);
-          startCustomRace(snapshot);
-        }}>Test Ride</button>
-        <button onClick={downloadExport}>Export</button>
-        <button onClick={() => fileRef.current?.click()}>Import</button>
+        <button
+          ref={libraryTriggerRef}
+          disabled={saveInFlight}
+          aria-haspopup="dialog"
+          aria-expanded={showLibrary}
+          aria-controls="local-track-library"
+          onClick={() => {
+            if (!showLibrary) {
+              const activeElement = document.activeElement;
+              libraryReturnFocusRef.current = activeElement instanceof HTMLElement
+                ? activeElement
+                : libraryTriggerRef.current;
+            }
+            setShowLibrary((value) => !value);
+          }}
+        >Library</button>
+        <button disabled={saveInFlight} onClick={() => void save()}>{saveInFlight ? "Working…" : "Save"}</button>
+        <button className="test-ride" disabled={saveInFlight} onClick={() => { void startTestRide(); }}>Test Ride</button>
+        <button disabled={saveInFlight} onClick={downloadExport}>Export</button>
+        <button disabled={saveInFlight} onClick={() => fileRef.current?.click()}>Import</button>
         <input ref={fileRef} hidden type="file" accept="application/json,.json" onChange={(event) => { const file = event.target.files?.[0]; if (file) void importFile(file); }} />
       </header>
-      <div className="editor-workspace">
+      <div className="editor-workspace" inert={editorControlsLocked} aria-hidden={confirmation !== null ? true : undefined}>
         <nav className="module-categories" aria-label="Module categories">
-          {CATEGORIES.map((item) => <button key={item} className={category === item ? "active" : ""} onClick={() => setCategory(item)}><CategoryGlyph category={item} /><span>{item}</span></button>)}
+          {CATEGORIES.map((item) => (
+            <button
+              key={item}
+              className={category === item ? "active" : ""}
+              aria-pressed={category === item}
+              onClick={() => setCategory(item)}
+            >
+              <CategoryGlyph category={item} /><span>{item}</span>
+            </button>
+          ))}
         </nav>
         <aside className="module-rail" aria-label={`${category} modules`}>
-          {EDITOR_MODULES.filter((module) => module.category === category).map((module) => <button key={module.id} className={selectedModuleId === module.id ? "active" : ""} onClick={() => setSelectedModuleId(module.id)}><ModuleThumbnail module={module} /><strong>{module.name}</strong><small>{module.description}</small></button>)}
+          {EDITOR_MODULES.filter((module) => module.category === category).map((module) => (
+            <button
+              key={module.id}
+              className={selectedModuleId === module.id ? "active" : ""}
+              aria-pressed={selectedModuleId === module.id}
+              onClick={() => setSelectedModuleId(module.id)}
+            >
+              <ModuleThumbnail module={module} /><strong>{module.name}</strong><small>{module.description}</small>
+            </button>
+          ))}
         </aside>
         <section className="editor-canvas-wrap">
           <canvas
             ref={canvasRef}
-            aria-label="Interactive 3D track build camera. Click an existing module to select it, click an empty lane to place the chosen module, drag left or right to orbit, drag up or down to travel the route, use the wheel to zoom, Shift plus wheel to travel, or use Fit route to frame the complete authored course."
+            aria-label="Interactive 3D track build camera. Click an existing module to select it, click an empty lane to place the chosen module, drag left or right to orbit, drag up or down to travel the route, use the wheel to zoom, Shift plus wheel to travel, or use Fit route to frame the complete authored course. Keyboard placement controls are available in the Placement inspector."
+            aria-describedby="editor-keyboard-placement-help"
           />
           {placementPreview ? (
             <div
@@ -471,8 +802,33 @@ export function TrackEditorScreen() {
           </div>
           <div className="editor-help"><kbd>Click</kbd> Select / place <kbd>Drag ↔</kbd> Orbit <kbd>Drag ↕</kbd> Travel <kbd>Wheel</kbd> Zoom <kbd>Fit route</kbd> Overview</div>
           {showLibrary ? (
-            <aside className="library-drawer">
-              <header><h2>Local tracks</h2><button aria-label="Close local track library" onClick={() => setShowLibrary(false)}>×</button></header>
+            /* aria-modal promises the background is unavailable — make that true for
+               pointer users too: the backdrop blocks clicks and closes the drawer. */
+            <div
+              className="library-drawer-backdrop"
+              aria-hidden="true"
+              onClick={() => { if (!saveInFlight) setShowLibrary(false); }}
+            />
+          ) : null}
+          {showLibrary ? (
+            <aside
+              ref={libraryDrawerRef}
+              id="local-track-library"
+              className="library-drawer"
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="local-track-library-heading"
+              onKeyDown={(event) => {
+                if (event.key === "Escape") {
+                  event.preventDefault();
+                  event.stopPropagation();
+                  if (!saveInFlight) setShowLibrary(false);
+                  return;
+                }
+                containDialogFocus(event);
+              }}
+            >
+              <header><h2 id="local-track-library-heading">Local tracks</h2><button aria-label="Close local track library" disabled={saveInFlight} onClick={() => setShowLibrary(false)}><RallyIcon kind="close" /></button></header>
               {recoveries.length > 0 ? (
                 <section className="recovery-list" aria-label="Recovered track data">
                   <h3>! Recovered track data</h3>
@@ -484,9 +840,9 @@ export function TrackEditorScreen() {
                         <small>{recovery.quarantined ? "Preserved in local quarantine" : "Not preserved in storage — download now"}</small>
                         <p>{recovery.reason}</p>
                       </div>
-                      <button onClick={() => { void downloadRecovery(recovery); }}>Download recovery package</button>
+                      <button disabled={saveInFlight} onClick={() => { void downloadRecovery(recovery); }}>Download recovery package</button>
                       {recovery.key === null ? null : (
-                        <button onClick={() => { void removeRecovery(recovery); }}>Remove recovery record…</button>
+                        <button disabled={saveInFlight} onClick={() => { void removeRecovery(recovery); }}>Remove recovery record…</button>
                       )}
                     </div>
                   ))}
@@ -496,15 +852,16 @@ export function TrackEditorScreen() {
                 <article key={item.id}>
                   {item.thumbnail ? <img src={item.thumbnail} alt="" /> : <span className="library-placeholder" />}
                   <div><strong>{item.name}</strong><small>{item.laps} laps · difficulty {item.difficultyEstimate}</small></div>
-                  <button onClick={() => {
-                    setPast((items) => [...items, structuredClone(track)].slice(-HISTORY_LIMIT));
+                  <button disabled={saveInFlight} onClick={() => {
+                    setPast([]);
                     setFuture([]);
                     setTrack(structuredClone(item));
+                    setPersistedBase(structuredClone(item));
                     setSelectedPlacementId(null);
                     focusRouteStart();
                     setShowLibrary(false);
                   }}>Open</button>
-                  <button aria-label={`Delete ${item.name}`} onClick={() => { void deleteCustomTrack(item.id).then(refreshLibrary).catch(() => setNotice("The local track could not be deleted.")); }}>×</button>
+                  <button disabled={saveInFlight} aria-label={`Delete ${item.name}…`} onClick={() => { void removeSavedTrack(item); }}>Delete…</button>
                 </article>
               ))}
             </aside>
@@ -513,10 +870,27 @@ export function TrackEditorScreen() {
         <aside className="editor-inspector">
           <h2>Placement</h2>
           <section className="inspector-group">
+          <div className="keyboard-placement" role="group" aria-labelledby="editor-keyboard-placement-title">
+            <strong id="editor-keyboard-placement-title">Keyboard placement</strong>
+            <p id="editor-keyboard-placement-help">Choose a module, set Route view with its slider, choose a lane, then place it without using the 3D canvas.</p>
+            <label>New module lane
+              <select
+                aria-label="New module lane"
+                value={placementLane}
+                onChange={(event) => setPlacementLane(Number(event.target.value) as 0 | 1 | 2 | 3)}
+              >
+                <option value={0}>Lane 1</option>
+                <option value={1}>Lane 2</option>
+                <option value={2}>Lane 3</option>
+                <option value={3}>Lane 4</option>
+              </select>
+            </label>
+            <button type="button" onClick={placeSelectedAtRouteView}>Place selected module at route view</button>
+          </div>
           <label className="placement-picker">Placed module
             <select
               aria-label="Placed module"
-              value={selectedPlacementId ?? ""}
+              value={resolvedSelectedPlacementId ?? ""}
               onChange={(event) => setSelectedPlacementId(event.target.value || null)}
             >
               <option value="">Select a module…</option>
@@ -528,6 +902,29 @@ export function TrackEditorScreen() {
             </select>
           </label>
           {selectedPlacement ? <>
+            <div className="inspector-stepper" role="group" aria-label="Lane stepper">
+              <span>Lane</span>
+              <button type="button" aria-label="Move selected module left one lane" onClick={() => nudgeSelectedLane(-1)} disabled={selectedPlacement.lane <= 0}><StepperIcon kind="left" /></button>
+              <output aria-label="Selected module lane">Lane {selectedPlacement.lane + 1}</output>
+              <button type="button" aria-label="Move selected module right one lane" onClick={() => nudgeSelectedLane(1)} disabled={selectedPlacement.lane >= 3}><StepperIcon kind="right" /></button>
+            </div>
+            <div className="inspector-lane-map" aria-hidden="true">
+              {[0, 1, 2, 3].map((lane) => (
+                <span key={lane} className={selectedPlacement.lane === lane ? "active" : undefined}>{lane + 1}</span>
+              ))}
+            </div>
+            <div className="inspector-stepper" role="group" aria-label="Rotation stepper">
+              <span>Rotation</span>
+              <button type="button" aria-label="Rotate selected module counterclockwise" onClick={() => rotateSelected(-90)}><StepperIcon kind="rotate-left" /></button>
+              <output aria-label="Selected module rotation">{selectedPlacement.rotation}°</output>
+              <button type="button" aria-label="Rotate selected module clockwise" onClick={() => rotateSelected(90)}><StepperIcon kind="rotate-right" /></button>
+            </div>
+            <div className="inspector-stepper" role="group" aria-label="Height stepper">
+              <span>Height</span>
+              <button type="button" aria-label="Lower selected module height" onClick={() => nudgeSelectedHeight(-0.5)} disabled={selectedPlacement.height <= -4}><StepperIcon kind="down" /></button>
+              <output aria-label="Selected module height">{selectedPlacement.height} m</output>
+              <button type="button" aria-label="Raise selected module height" onClick={() => nudgeSelectedHeight(0.5)} disabled={selectedPlacement.height >= 40}><StepperIcon kind="up" /></button>
+            </div>
             <label>Lane <input type="number" min="1" max="4" value={selectedPlacement.lane + 1} onChange={(event) => updateSelected({ lane: Math.max(0, Math.min(3, Number(event.target.value) - 1)) as 0 | 1 | 2 | 3 })} /></label>
             <label>Position <input type="number" min="0" max={CUSTOM_TRACK_ROUTE_LIMIT} step="2" value={selectedPlacement.gridPosition} onChange={(event) => updateSelected({ gridPosition: Math.max(0, Math.min(CUSTOM_TRACK_ROUTE_LIMIT, Number(event.target.value))) })} /></label>
             <label>Rotation <select value={selectedPlacement.rotation} onChange={(event) => updateSelected({ rotation: Number(event.target.value) as 0 | 90 | 180 | 270 })}><option>0</option><option>90</option><option>180</option><option>270</option></select></label>
@@ -561,18 +958,59 @@ export function TrackEditorScreen() {
               /></label>
             </> : null}
             <div className="inspector-actions"><button onClick={duplicateSelected}>Duplicate</button><button onClick={deleteSelected}>Delete</button></div>
-          </> : <p className="inspector-empty">Click a placed module to inspect it, or click the canvas to place the selected module.</p>}
+          </> : <p className="inspector-empty">Choose a lane and use the Place button above, or click the canvas to place the selected module.</p>}
           </section>
           <h2>Race</h2>
           <section className="inspector-group">
+          <div className="inspector-stepper" role="group" aria-label="Lap count stepper">
+            <span>Laps</span>
+            <button type="button" aria-label="Decrease laps" onClick={() => nudgeLaps(-1)} disabled={track.laps <= 1}><StepperIcon kind="left" /></button>
+            <output aria-label="Track lap count">{track.laps} {track.laps === 1 ? "lap" : "laps"}</output>
+            <button type="button" aria-label="Increase laps" onClick={() => nudgeLaps(1)} disabled={track.laps >= 9}><StepperIcon kind="right" /></button>
+          </div>
           <label>Laps <input type="number" min="1" max="9" value={track.laps} onChange={(event) => commit((current) => ({ ...current, laps: Math.max(1, Math.min(9, Number(event.target.value))) }))} /></label>
           <label>Difficulty <input type="range" min="1" max="5" value={track.difficultyEstimate} onChange={(event) => commit((current) => ({ ...current, difficultyEstimate: Number(event.target.value) }))} /><span>{track.difficultyEstimate} / 5</span></label>
-          <button className="clear-track" onClick={() => { if (window.confirm("Clear every placed module? This can be undone.")) { commit((current) => ({ ...current, modules: [] })); setSelectedPlacementId(null); } }}>Clear all…</button>
+          <button className="clear-track" onClick={requestClearTrack}>Clear all…</button>
           </section>
           <section className={`validation-panel ${validation.valid ? "valid" : "invalid"}`}><h3>{validation.valid ? "✓ Route complete" : "! Route needs work"}</h3>{validation.errors.map((error) => <p key={error}>{error}</p>)}{validation.warnings.map((warning) => <p key={warning} className="warning">{warning}</p>)}</section>
         </aside>
       </div>
-      <footer className="editor-status"><strong className={validation.valid ? "status-valid" : "status-invalid"}>{validation.valid ? "✓ Route complete" : `! ${validation.errors.length} validation issue${validation.errors.length === 1 ? "" : "s"}`}</strong><span>{past.length} / 50 actions</span><span>{track.modules.length} modules</span><output aria-live="polite">{notice}</output></footer>
+      <footer className="editor-status" inert={confirmation !== null} aria-hidden={confirmation !== null ? true : undefined}><strong className={validation.valid ? "status-valid" : "status-invalid"}>{validation.valid ? "✓ Route complete" : `! ${validation.errors.length} validation issue${validation.errors.length === 1 ? "" : "s"}`}</strong><span>{past.length} / 50 actions</span><span>{track.modules.length} modules</span><output aria-live="polite">{notice}</output></footer>
+      {confirmation ? (
+        <div className="editor-confirm-backdrop">
+          <section
+            className="editor-confirm-dialog"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="editor-confirm-title"
+            aria-describedby="editor-confirm-message"
+            onKeyDown={(event) => {
+              if (event.key === "Escape") {
+                event.preventDefault();
+                event.stopPropagation();
+                cancelConfirmation();
+                return;
+              }
+              containDialogFocus(event);
+            }}
+          >
+            <span>Track Builder confirmation</span>
+            <h2 id="editor-confirm-title">{confirmation.title}</h2>
+            <p id="editor-confirm-message">{confirmation.message}</p>
+            <div className="editor-confirm-actions">
+              <button type="button" onClick={cancelConfirmation}>Cancel</button>
+              <button
+                ref={confirmationConfirmRef}
+                type="button"
+                className="danger"
+                onClick={confirmPendingAction}
+              >
+                {confirmation.confirmLabel}
+              </button>
+            </div>
+          </section>
+        </div>
+      ) : null}
     </main>
   );
 }

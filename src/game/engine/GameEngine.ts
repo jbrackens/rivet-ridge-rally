@@ -1,13 +1,17 @@
 import * as THREE from "three";
+import { RoomEnvironment } from "three/examples/jsm/environments/RoomEnvironment.js";
+import type { GLTF } from "three/examples/jsm/loaders/GLTFLoader.js";
 import { mergeGeometries } from "three/examples/jsm/utils/BufferGeometryUtils.js";
 
 import type {
   GameSettings,
   RaceClassificationEntry,
   RaceMode,
+  RaceReplayHandoff,
   RaceResult,
 } from "../../app/types";
 import {
+  getMasteryTargetMs,
   getTrack,
   type AuthoredPlacementTransform,
   type AuthoredRaceGate,
@@ -20,12 +24,15 @@ import { customTrackToDefinition } from "../editor/toTrackDefinition";
 import type { CustomTrackData } from "../persistence/database";
 import { AudioManager } from "../audio/AudioManager";
 import {
-  FESTIVAL_TRAIL_BIKE_URL,
+  CANYON_KIT_URL,
+  HERO_BIKE_RIDER_URL,
+  RIVAL_PACK_URL,
   createCompressedAssetLoader,
   type CompressedAssetLoader,
 } from "../assets/compressedAssetLoader";
 import { InputManager, type InputDevice } from "../input/InputManager";
 import { formatKeyCode } from "../input/keyLabels";
+import { ReplayRecorder } from "../replay/replayCodec";
 import {
   observeWebglContext,
   releaseWebglContext,
@@ -36,6 +43,7 @@ import {
   FIXED_DT,
   LANE_POSITIONS,
   RaceSimulation,
+  type BikeState,
   type BikePhase,
   type LaneChange,
   type LandingQuality,
@@ -52,6 +60,7 @@ import {
   getAiDriveControl,
   getAiLaneChange,
   getAiPitchControl,
+  getObstacleContactOutcome,
   getObstaclePolicy,
   isRampObstacle,
   resolveRiderCollision,
@@ -70,8 +79,14 @@ import {
 } from "./obstacleContacts";
 import { parseQaVisualDistance } from "./qaVisualCapture";
 import {
-  resolveRiderSpeedTuck,
-  resolveRiderSteeringRoll,
+  createResolvedRiderPose,
+  resolveBikePresentationPitch,
+  resolveHeldLaneChangePresentationRoll,
+  RIDER_LANE_CHANGE_LEAN_HOLD_SECONDS,
+  resolvePresentationRecoveryProgress,
+  resolveRiderPose,
+  resolveRiderPresentationRoll,
+  type ResolvedRiderPose,
   usesPortraitRacePresentation,
 } from "./racePresentation";
 import {
@@ -87,6 +102,20 @@ const YELLOW = 0xf7cc3d;
 const COOLING = 0x1ddfe6;
 const START_GRID_NUMBER_PROGRESS = 7;
 const START_GRID_LINE_PROGRESS = 10.4;
+export const CRITICAL_HEAT_WARNING = 78;
+const FRONT_WHEEL_CLEAR_PITCH = 0.18;
+export const TUTORIAL_USABLE_SPEED = 5;
+export const TUTORIAL_OBSTACLES = [
+  // Keep the gate downstream of the Ride/coast/lane lead-in plus a cold
+  // Turbo run to 78%, with dirt before the bump for the lesson handoff.
+  { id: "qa-cooling", kind: "cooling-gate", distance: 250, lanes: [0, 1, 2, 3], length: 18 },
+  { id: "qa-bump", kind: "bump", distance: 300, lanes: [0, 1, 2, 3], length: 10 },
+  { id: "qa-ramp", kind: "medium-ramp", distance: 340, lanes: [0, 1, 2, 3], length: 18, rampImpulse: 12 },
+  { id: "qa-choice-barrier", kind: "barrier", distance: 440, lanes: [1, 2], length: 6 },
+  { id: "qa-mud", kind: "mud", distance: 500, lanes: [0, 3], length: 30 },
+  { id: "qa-grass", kind: "grass", distance: 560, lanes: [0, 3], length: 22 },
+  { id: "qa-recovery-barrier", kind: "barrier", distance: 620, lanes: [0, 1, 2, 3], length: 6 },
+] as const satisfies readonly TrackObstacle[];
 const START_GRID_SEGMENTS = {
   a: { x: 0, forward: 0.78, width: 0.78, depth: 0.14 },
   b: { x: 0.43, forward: 0.39, width: 0.14, depth: 0.72 },
@@ -112,10 +141,179 @@ const SHADOW_ORIENTATION = new THREE.Quaternion().setFromEuler(
 );
 const MAX_DELTA_SECONDS = 0.1;
 const FIXED_STEP_EPSILON = FIXED_DT * 1e-9;
-const PLAYER_ASSET_READINESS_TIMEOUT_MS = 5_000;
-const CANYON_PANORAMA_READINESS_TIMEOUT_MS = 5_000;
+const PLAYER_ASSET_READINESS_TIMEOUT_MS = 12_000;
+const HERO_ASSET_VERTICAL_OFFSET = -0.63;
+const HERO_ASSET_SCENE_NAME = "RRR_HeroBikeRiderScene";
+const HERO_ASSET_ROOT_NAME = "RRR_HeroBikeRider";
+const HERO_ASSET_PARENT_BY_NAME = {
+  RRR_HeroBikeRider: null,
+  RRR_BikeVisual: HERO_ASSET_ROOT_NAME,
+  Bike_ChassisShell: "RRR_BikeVisual",
+  Bike_TankAndRadiator: "RRR_BikeVisual",
+  Bike_Seat: "RRR_BikeVisual",
+  Bike_RearFender: "RRR_BikeVisual",
+  Bike_LeftSidePanel: "RRR_BikeVisual",
+  Bike_RightSidePanel: "RRR_BikeVisual",
+  Bike_Engine: "RRR_BikeVisual",
+  Bike_Exhaust: "RRR_BikeVisual",
+  Bike_ChainDrive: "RRR_BikeVisual",
+  "bike-steering-pivot": "RRR_BikeVisual",
+  Bike_Handlebar: "bike-steering-pivot",
+  Bike_FrontFork: "bike-steering-pivot",
+  Bike_FrontFender: "bike-steering-pivot",
+  NumberPlate: "bike-steering-pivot",
+  "bike-front-suspension-pivot": "bike-steering-pivot",
+  FrontTire: "bike-front-suspension-pivot",
+  FrontTireRing: "FrontTire",
+  FrontTreadRing: "FrontTire",
+  FrontHub: "FrontTire",
+  FrontSpokes: "FrontTire",
+  FrontBrakeDisc: "FrontTire",
+  "bike-rear-suspension-pivot": "RRR_BikeVisual",
+  Bike_Swingarm: "bike-rear-suspension-pivot",
+  RearTire: "bike-rear-suspension-pivot",
+  RearTireRing: "RearTire",
+  RearTreadRing: "RearTire",
+  RearHub: "RearTire",
+  RearSpokes: "RearTire",
+  RearBrakeDisc: "RearTire",
+  RearNumberPanel: "RRR_BikeVisual",
+  RearNumber22: "RearNumberPanel",
+  "bike-seat-anchor": "RRR_BikeVisual",
+  "bike-left-hand-anchor": "RRR_BikeVisual",
+  "bike-right-hand-anchor": "RRR_BikeVisual",
+  "bike-left-boot-anchor": "RRR_BikeVisual",
+  "bike-right-boot-anchor": "RRR_BikeVisual",
+  "player-rider": HERO_ASSET_ROOT_NAME,
+  "rider-torso-pivot": "player-rider",
+  Rider_Torso: "rider-torso-pivot",
+  Rider_ChestArmor: "rider-torso-pivot",
+  Rider_BackPlate: "rider-torso-pivot",
+  JerseyNumber22: "Rider_BackPlate",
+  "rider-head-pivot": "rider-torso-pivot",
+  Rider_Head: "rider-head-pivot",
+  Rider_Helmet: "rider-head-pivot",
+  Rider_Visor: "rider-head-pivot",
+  Rider_HelmetPeak: "rider-head-pivot",
+  "rider-left-arm-pivot": "rider-torso-pivot",
+  Rider_LeftArm: "rider-left-arm-pivot",
+  "rider-right-arm-pivot": "rider-torso-pivot",
+  Rider_RightArm: "rider-right-arm-pivot",
+  Rider_Hips: "player-rider",
+  "rider-left-leg-pivot": "player-rider",
+  Rider_LeftLeg: "rider-left-leg-pivot",
+  "rider-right-leg-pivot": "player-rider",
+  Rider_RightLeg: "rider-right-leg-pivot",
+} as const satisfies Record<string, string | null>;
+const HERO_ASSET_REQUIRED_NODE_NAMES = Object.freeze(
+  Object.keys(HERO_ASSET_PARENT_BY_NAME),
+);
+const HERO_ASSET_REQUIRED_NODE_NAME_SET = new Set(HERO_ASSET_REQUIRED_NODE_NAMES);
+const HERO_ASSET_POSE_PIVOT_NAMES = [
+  "rider-torso-pivot",
+  "rider-head-pivot",
+  "rider-left-arm-pivot",
+  "rider-right-arm-pivot",
+  "rider-left-leg-pivot",
+  "rider-right-leg-pivot",
+] as const;
+const HERO_ASSET_NEUTRAL_HOOK_NAMES = [
+  "bike-steering-pivot",
+  "bike-front-suspension-pivot",
+  "bike-rear-suspension-pivot",
+  "FrontTire",
+  "RearTire",
+  ...HERO_ASSET_POSE_PIVOT_NAMES,
+  "bike-seat-anchor",
+  "bike-left-hand-anchor",
+  "bike-right-hand-anchor",
+  "bike-left-boot-anchor",
+  "bike-right-boot-anchor",
+] as const;
+const HERO_ASSET_MATERIAL_SPECS = new Map<string, {
+  roughness: readonly [number, number];
+  metalness: readonly [number, number];
+}>([
+  ["RRR_PlasticTeal", { roughness: [0.48, 0.62], metalness: [0, 0] }],
+  ["RRR_PlasticCoral", { roughness: [0.48, 0.62], metalness: [0, 0] }],
+  ["RRR_PlateCream", { roughness: [0.58, 0.72], metalness: [0, 0] }],
+  ["RRR_Rubber", { roughness: [0.86, 0.96], metalness: [0, 0] }],
+  ["RRR_MetalDark", { roughness: [0.38, 0.62], metalness: [0.45, 0.85] }],
+  ["RRR_MetalBright", { roughness: [0.25, 0.48], metalness: [0.65, 0.95] }],
+  ["RRR_RiderFabric", { roughness: [0.76, 0.9], metalness: [0, 0] }],
+  ["RRR_RiderArmor", { roughness: [0.5, 0.72], metalness: [0, 0] }],
+  ["RRR_Visor", { roughness: [0.18, 0.32], metalness: [0.05, 0.18] }],
+  ["RRR_NumberCream", { roughness: [0.62, 0.78], metalness: [0, 0] }],
+]);
+const HERO_ASSET_ALLOWED_MATERIAL_NAMES = new Set(HERO_ASSET_MATERIAL_SPECS.keys());
+const HERO_ASSET_NUMBER_BUCKETS = [
+  { name: "BikeStatic_NumberCream", parent: "RRR_BikeVisual" },
+  { name: "RiderTorso_NumberCream", parent: "rider-torso-pivot" },
+] as const;
+const HERO_ASSET_MAX_NODES = 96;
+const HERO_ASSET_MAX_MESH_BEARING_NODES = 28;
+const HERO_ASSET_MAX_RENDER_PRIMITIVES = 28;
+const HERO_ASSET_MAX_MATERIALS = 10;
+const HERO_ASSET_MAX_TEXTURES = 3;
+const HERO_ASSET_MAX_TRIANGLES = 70_000;
+const HERO_ASSET_MAX_BIKE_TRIANGLES = 40_000;
+const HERO_ASSET_MAX_RIDER_TRIANGLES = 30_000;
+const HERO_ASSET_MAX_WHEEL_TRIANGLES = 18_000;
+const HERO_ASSET_TRANSFORM_EPSILON = 1e-4;
+const RIVAL_PACK_READINESS_TIMEOUT_MS = 5_000;
+const RIVAL_PACK_VERTICAL_OFFSET = -0.62;
+const RIVAL_PACK_SCENE_NAME = "RRR_RivalPackScene";
+const RIVAL_PACK_ROOT_NAME = "RRR_RivalPackBase";
+const RIVAL_PACK_PARENT_BY_NAME = {
+  RRR_RivalPackBase: null,
+  RRR_RivalBikeVisual: RIVAL_PACK_ROOT_NAME,
+  BikeStatic_Primary: "RRR_RivalBikeVisual",
+  BikeStatic_Accent: "RRR_RivalBikeVisual",
+  BikeStatic_Hardware: "RRR_RivalBikeVisual",
+  BikeStatic_NumberField: "RRR_RivalBikeVisual",
+  "bike-steering-pivot": "RRR_RivalBikeVisual",
+  "bike-front-suspension-pivot": "bike-steering-pivot",
+  FrontTire: "bike-front-suspension-pivot",
+  FrontWheel_Wheel: "FrontTire",
+  "bike-rear-suspension-pivot": "RRR_RivalBikeVisual",
+  RearTire: "bike-rear-suspension-pivot",
+  RearWheel_Wheel: "RearTire",
+  "rival-rider": RIVAL_PACK_ROOT_NAME,
+  "rider-torso-pivot": "rival-rider",
+  RivalTorso_Primary: "rider-torso-pivot",
+  "rider-head-pivot": "rider-torso-pivot",
+  RivalHead_Accent: "rider-head-pivot",
+  "rider-left-arm-pivot": "rider-torso-pivot",
+  RivalLeftArm_Accent: "rider-left-arm-pivot",
+  "rider-right-arm-pivot": "rider-torso-pivot",
+  RivalRightArm_Accent: "rider-right-arm-pivot",
+  "rider-left-leg-pivot": "rival-rider",
+  RivalLeftLeg_Primary: "rider-left-leg-pivot",
+  "rider-right-leg-pivot": "rival-rider",
+  RivalRightLeg_Primary: "rider-right-leg-pivot",
+} as const satisfies Record<string, string | null>;
+const RIVAL_PACK_REQUIRED_NODE_NAMES = Object.freeze(
+  Object.keys(RIVAL_PACK_PARENT_BY_NAME),
+);
+const RIVAL_PACK_REQUIRED_NODE_NAME_SET = new Set(RIVAL_PACK_REQUIRED_NODE_NAMES);
+const RIVAL_PACK_MATERIAL_NAMES = new Set([
+  "RRR_RivalPrimary",
+  "RRR_RivalAccent",
+  "RRR_RivalHardware",
+  "RRR_RivalWheel",
+  "RRR_RivalNumberField",
+]);
+const RIVAL_PACK_MAX_NODES = 26;
+const RIVAL_PACK_MAX_MESHES = 12;
+const RIVAL_PACK_MAX_PRIMITIVES = 12;
+const RIVAL_PACK_MIN_TRIANGLES = 15_000;
+const RIVAL_PACK_MAX_TRIANGLES = 20_000;
+const RIVAL_PACK_VARIANT_NUMBERS = ["17", "31", "46", "58", "73"] as const;
+const CANYON_KIT_READINESS_TIMEOUT_MS = 30_000;
+const CANYON_PANORAMA_READINESS_TIMEOUT_MS = 12_000;
 const CANYON_FESTIVAL_PANORAMA_URL = "/assets/art/canyon-festival-panorama.png";
 const MAX_AI_CLASSIFICATION_STEPS = 60 * 60 * 15;
+const AI_CLASSIFICATION_STEPS_PER_FRAME = 30;
 const MAX_REPLAY_BYTES = 512_000;
 const AI_FIELD = [
   {
@@ -220,8 +418,17 @@ export interface GameEngineOptions {
   masteryLevel?: number | undefined;
   customTrack?: CustomTrackData | undefined;
   onHud: (state: EngineHudState) => void;
-  onFinish: (result: RaceResult, replaySamples: Uint8Array) => void;
+  onFinishStart?: (() => void) | undefined;
+  onFinish: (result: RaceResult, replay: RaceReplayHandoff) => void;
   onFatal: (message: string) => void;
+}
+
+type FinishClassificationStatus = "pending" | "complete" | "exhausted";
+
+interface FinishClassificationWork {
+  readonly playerState: SimulationState;
+  readonly profile: AiDifficultyProfile;
+  ticks: number;
 }
 
 interface AiRider {
@@ -239,12 +446,140 @@ interface AiRider {
 }
 
 interface RiderPoseRig {
-  torso: THREE.Group;
-  head: THREE.Group;
-  leftArm: THREE.Group;
-  rightArm: THREE.Group;
-  leftLeg: THREE.Group;
-  rightLeg: THREE.Group;
+  torso: THREE.Object3D;
+  head: THREE.Object3D;
+  leftArm: THREE.Object3D;
+  rightArm: THREE.Object3D;
+  leftLeg: THREE.Object3D;
+  rightLeg: THREE.Object3D;
+}
+
+interface RiderPoseMemory {
+  previousPhase: BikePhase;
+  previousLanding: LandingQuality;
+  landingAgeSeconds: number;
+  presentationRecoveryProgress: number;
+  pose: ResolvedRiderPose;
+}
+
+interface WheelPoseMemory {
+  frontWheel: THREE.Object3D;
+  rearWheel: THREE.Object3D;
+  frontRestPosition: THREE.Vector3;
+  rearRestPosition: THREE.Vector3;
+}
+
+interface HeroBikeRiderNodes {
+  root: THREE.Object3D;
+  bike: THREE.Object3D;
+  rider: THREE.Object3D;
+  frontWheel: THREE.Object3D;
+  rearWheel: THREE.Object3D;
+  rig: RiderPoseRig;
+  nodeCount: number;
+  meshCount: number;
+  primitiveCount: number;
+  materialCount: number;
+  textureCount: number;
+  triangleCount: number;
+  bikeTriangleCount: number;
+  riderTriangleCount: number;
+  wheelTriangleCount: number;
+}
+
+interface RivalPackNodes {
+  root: THREE.Object3D;
+  bike: THREE.Object3D;
+  rider: THREE.Object3D;
+  frontWheel: THREE.Object3D;
+  rearWheel: THREE.Object3D;
+  rig: RiderPoseRig;
+  nodeCount: number;
+  meshCount: number;
+  primitiveCount: number;
+  materialCount: number;
+  textureCount: number;
+  triangleCount: number;
+  geometries: ReadonlySet<THREE.BufferGeometry>;
+}
+
+interface PreparedRivalVariant {
+  root: THREE.Object3D;
+  nodes: RivalPackNodes;
+  numberTexture: THREE.CanvasTexture;
+}
+
+interface SerializedHeroScene {
+  name?: unknown;
+  nodes?: unknown;
+}
+
+interface SerializedHeroNode {
+  name?: unknown;
+}
+
+interface SerializedHeroBuffer {
+  uri?: unknown;
+}
+
+interface SerializedHeroImage {
+  uri?: unknown;
+  bufferView?: unknown;
+  mimeType?: unknown;
+}
+
+interface SerializedHeroTexture {
+  source?: unknown;
+  extensions?: {
+    KHR_texture_basisu?: {
+      source?: unknown;
+    } | undefined;
+  } | undefined;
+}
+
+interface SerializedHeroMaterial {
+  name?: unknown;
+}
+
+interface SerializedHeroAccessor {
+  bufferView?: unknown;
+  componentType?: unknown;
+  normalized?: unknown;
+  type?: unknown;
+}
+
+interface SerializedHeroBufferView {
+  extensions?: {
+    EXT_meshopt_compression?: unknown;
+  } | undefined;
+}
+
+interface SerializedHeroPrimitive {
+  attributes?: Record<string, unknown>;
+  indices?: unknown;
+  mode?: unknown;
+  targets?: unknown[];
+}
+
+interface SerializedHeroMesh {
+  primitives?: SerializedHeroPrimitive[];
+}
+
+interface SerializedHeroGltf {
+  scenes?: SerializedHeroScene[];
+  nodes?: SerializedHeroNode[];
+  buffers?: SerializedHeroBuffer[];
+  bufferViews?: SerializedHeroBufferView[];
+  accessors?: SerializedHeroAccessor[];
+  meshes?: SerializedHeroMesh[];
+  images?: SerializedHeroImage[];
+  textures?: SerializedHeroTexture[];
+  materials?: SerializedHeroMaterial[];
+  cameras?: unknown[];
+  skins?: unknown[];
+  animations?: unknown[];
+  extensionsUsed?: unknown[];
+  extensionsRequired?: unknown[];
 }
 
 interface PerformanceWindow {
@@ -258,7 +593,11 @@ interface PerformanceWindow {
 interface DustParticle {
   mesh: THREE.Mesh;
   life: number;
+  maxLife: number;
+  baseScale: number;
+  baseOpacity: number;
   driftX: number;
+  driftY: number;
   driftZ: number;
 }
 
@@ -288,6 +627,7 @@ interface CameraPresentationProfile {
   fov: number;
   height: number;
   trailingDistance: number;
+  lateralOffset: number;
   lookHeight: number;
   lookAhead: number;
   laneFollow: number;
@@ -297,24 +637,26 @@ interface CameraPresentationProfile {
 
 const CAMERA_PRESENTATION_PROFILES = {
   desktop: {
-    fov: 58,
-    height: 7.2,
-    trailingDistance: 9.2,
-    lookHeight: -0.2,
-    lookAhead: 21.5,
+    fov: 52,
+    height: 5.15,
+    trailingDistance: 8.85,
+    lateralOffset: 1.78,
+    lookHeight: -1.48,
+    lookAhead: 19.2,
     laneFollow: 0.76,
     lookAtLaneFollow: 0.72,
-    playerScale: 1.62,
+    playerScale: 1.46,
   },
   portrait: {
-    fov: 64,
-    height: 8,
-    trailingDistance: 9.5,
-    lookHeight: -0.2,
-    lookAhead: 19.5,
+    fov: 58,
+    height: 5.7,
+    trailingDistance: 8.3,
+    lateralOffset: 0.9,
+    lookHeight: -1.55,
+    lookAhead: 16.4,
     laneFollow: 0.92,
     lookAtLaneFollow: 0.9,
-    playerScale: 1.65,
+    playerScale: 1.58,
   },
 } as const satisfies Record<"desktop" | "portrait", CameraPresentationProfile>;
 
@@ -326,13 +668,13 @@ const WORLD_VISUAL_PROFILES = {
     fogFar: 340,
     hemisphereSky: 0xe1f7ff,
     hemisphereGround: 0x6c3525,
-    hemisphereIntensity: 1.65,
+    hemisphereIntensity: 1.12,
     sun: 0xffd6a0,
-    sunIntensity: 3.45,
-    exposure: 1.15,
+    sunIntensity: 3.7,
+    exposure: 1.08,
     treeDensity: 1,
     mesaDensity: 2.05,
-    terraceHeight: 1.55,
+    terraceHeight: 0.95,
   },
   "pine-run": {
     background: 0x77c9de,
@@ -411,6 +753,7 @@ function resolveQuality(setting: GameSettings["quality"]): Exclude<GameSettings[
 }
 
 const rendererByCanvas = new WeakMap<HTMLCanvasElement, THREE.WebGLRenderer>();
+let gameEngineInstanceCounter = 0;
 
 function acquireRenderer(
   canvas: HTMLCanvasElement,
@@ -462,15 +805,33 @@ function disposeObjectResources(
   textures.forEach((texture) => texture.dispose());
 }
 
+function disposeObjectMaterialResources(root: THREE.Object3D): void {
+  const materials = new Set<THREE.Material>();
+  const textures = new Set<THREE.Texture>();
+  root.traverse((object) => {
+    if (!(object instanceof THREE.Mesh)) return;
+    const objectMaterials = Array.isArray(object.material) ? object.material : [object.material];
+    objectMaterials.forEach((material) => materials.add(material));
+  });
+  for (const material of materials) {
+    for (const value of Object.values(material)) {
+      if (value instanceof THREE.Texture) textures.add(value);
+    }
+    material.dispose();
+  }
+  textures.forEach((texture) => texture.dispose());
+}
+
+function clearCanvasDatasetAttribute(canvas: HTMLCanvasElement, key: string): void {
+  delete canvas.dataset[key];
+  canvas.removeAttribute(`data-${key.replace(/[A-Z]/g, (letter) => `-${letter.toLowerCase()}`)}`);
+}
+
 function disposeShadowRenderTargets(light: THREE.DirectionalLight | null): void {
   if (!light) return;
   light.shadow.dispose();
   light.shadow.map = null;
   light.shadow.mapPass = null;
-}
-
-function masteryTarget(baseTargetMs: number, masteryLevel: number): number {
-  return Math.round(baseTargetMs * Math.max(0.8, 0.94 - masteryLevel * 0.025));
 }
 
 function makeMaterial(color: number, roughness = 0.78): THREE.MeshStandardMaterial {
@@ -488,6 +849,31 @@ function createCanyonCactusGeometry(): THREE.BufferGeometry {
   const geometry = mergeGeometries(parts, false);
   parts.forEach((part) => part.dispose());
   geometry.name = "branched-saguaro-cactus";
+  return geometry;
+}
+
+function createCanyonAgaveGeometry(): THREE.BufferGeometry {
+  const parts: THREE.BufferGeometry[] = [
+    new THREE.CylinderGeometry(0.12, 0.18, 0.26, 6).translate(0, 0.13, 0),
+  ];
+  const leafRotations = [
+    { yaw: 0, roll: -0.58, length: 1.15 },
+    { yaw: Math.PI * 0.5, roll: -0.62, length: 0.96 },
+    { yaw: Math.PI, roll: -0.54, length: 1.08 },
+    { yaw: Math.PI * 1.5, roll: -0.66, length: 0.9 },
+    { yaw: Math.PI * 0.25, roll: -0.82, length: 0.74 },
+    { yaw: Math.PI * 1.25, roll: -0.76, length: 0.7 },
+  ];
+  for (const leaf of leafRotations) {
+    const geometry = new THREE.ConeGeometry(0.16, leaf.length, 4)
+      .rotateZ(leaf.roll)
+      .rotateY(leaf.yaw)
+      .translate(Math.sin(leaf.yaw) * 0.18, 0.25, Math.cos(leaf.yaw) * 0.18);
+    parts.push(geometry);
+  }
+  const geometry = mergeGeometries(parts, false);
+  parts.forEach((part) => part.dispose());
+  geometry.name = "canyon-agave-cluster";
   return geometry;
 }
 
@@ -559,11 +945,96 @@ function seededRandom(seed: number): () => number {
   };
 }
 
+const FESTIVAL_SHOWCASE_CLEARANCE = 5.6;
+const FESTIVAL_SHOWCASE_CLEARANCE_BUFFER = 0.4;
+
+export interface FestivalPocketPlacement {
+  readonly side: -1 | 1;
+  readonly x: number;
+  readonly z: number;
+  readonly rotationY: number;
+  readonly elevatedWatchtower: boolean;
+}
+
+export function resolveFestivalPocketPlacements(options: {
+  readonly handcraftedCanyon: boolean;
+  readonly quality: Exclude<GameSettings["quality"], "auto">;
+  readonly totalLength: number;
+  readonly trackOrder: number;
+  readonly coolingGateDistances: readonly number[];
+}): {
+  readonly routePockets: readonly FestivalPocketPlacement[];
+  readonly coolingGatePockets: readonly FestivalPocketPlacement[];
+  readonly pocketPlacements: readonly FestivalPocketPlacement[];
+} {
+  const {
+    handcraftedCanyon,
+    quality,
+    totalLength,
+    trackOrder,
+    coolingGateDistances,
+  } = options;
+    const spacing = handcraftedCanyon
+    ? quality === "low" ? 230 : quality === "medium" ? 150 : 110
+    : quality === "low" ? 250 : quality === "medium" ? 180 : 135;
+  const routePocketCount = Math.max(4, Math.floor((totalLength - 150) / spacing));
+  const random = seededRandom(trackOrder * 377_911);
+  const routePockets: FestivalPocketPlacement[] = Array.from(
+    { length: routePocketCount },
+    (_, pocket) => {
+      const side: -1 | 1 = (pocket + trackOrder) % 2 === 0 ? -1 : 1;
+      return {
+        side,
+        x: side * (handcraftedCanyon ? 10.75 + random() * 0.35 : 11.85 + random() * 0.45),
+        z: -125 - pocket * spacing - (random() - 0.5) * 34,
+        rotationY: side * (0.04 + random() * 0.035),
+        elevatedWatchtower: false,
+      };
+    },
+  );
+  const coolingGatePockets: FestivalPocketPlacement[] = handcraftedCanyon
+    ? coolingGateDistances.slice(0, 2).flatMap((distance, gateIndex) => (
+      ([-1, 1] as const).map((side) => ({
+        side,
+        x: side * (11.15 + gateIndex * 0.2),
+        z: -(distance + 12),
+        rotationY: side * 0.06,
+        elevatedWatchtower: true,
+      }))
+    ))
+    : [];
+  const separatedRoutePockets = handcraftedCanyon
+    ? routePockets.map((routePocket) => coolingGatePockets.reduce((adjustedPocket, gatePocket) => {
+      const xGap = adjustedPocket.x - gatePocket.x;
+      const zGap = adjustedPocket.z - gatePocket.z;
+      if (Math.hypot(xGap, zGap) >= FESTIVAL_SHOWCASE_CLEARANCE) return adjustedPocket;
+
+      // Preserve the planned crowd density while preventing a route stand
+      // from intersecting the authored cooling-gate watchtower showcase.
+      const requiredZGap = Math.sqrt(Math.max(
+        0,
+        FESTIVAL_SHOWCASE_CLEARANCE ** 2 - xGap ** 2,
+      )) + FESTIVAL_SHOWCASE_CLEARANCE_BUFFER;
+      return {
+        ...adjustedPocket,
+        z: gatePocket.z + (zGap >= 0 ? requiredZGap : -requiredZGap),
+      };
+    }, routePocket))
+    : routePockets;
+
+  return {
+    routePockets: separatedRoutePockets,
+    coolingGatePockets,
+    pocketPlacements: [...separatedRoutePockets, ...coolingGatePockets],
+  };
+}
+
 const TERRAIN_MARK_BATCH_SIZE = 128;
 // Five launch palettes, each with one grass and one dirt canvas.
 const MAX_TERRAIN_CANVAS_CACHE_ENTRIES = 10;
 const terrainCanvasCache = new Map<string, HTMLCanvasElement>();
 const DIRT_HEIGHT_TEXTURE_SIZE = 512;
+const DIRT_TEXTURE_DETAIL_STYLE = "layered-rut-pebble-v3";
 const DIRT_LANE_EDGE_RATIOS = [0.028, 0.2744, 0.5, 0.7256, 0.972] as const;
 const DIRT_LANE_CENTER_RATIOS = [0.1617, 0.3872, 0.6128, 0.8383] as const;
 let dirtHeightCanvasCache: HTMLCanvasElement | null = null;
@@ -613,6 +1084,42 @@ function paintDirtMarks(
   }
 }
 
+function paintDirtPebbleFlecks(
+  context: CanvasRenderingContext2D,
+  width: number,
+  height: number,
+  base: THREE.Color,
+  mark: THREE.Color,
+  random: () => number,
+): void {
+  const lightPebble = base.clone().lerp(new THREE.Color(0xf7d09a), 0.42);
+  const darkPebble = mark.clone().multiplyScalar(0.72);
+  const redPebble = base.clone().lerp(new THREE.Color(0xb7442f), 0.35);
+  for (let index = 0; index < 860; index += 1) {
+    const color = index % 7 === 0
+      ? lightPebble
+      : index % 5 === 0
+        ? redPebble
+        : darkPebble;
+    const x = random() * width;
+    const y = random() * height;
+    const radius = 0.45 + random() * (index % 7 === 0 ? 1.15 : 0.75);
+    context.fillStyle = `#${color.getHexString()}`;
+    context.globalAlpha = index % 7 === 0 ? 0.4 : 0.28;
+    context.beginPath();
+    context.ellipse(
+      x,
+      y,
+      radius * (1.15 + random() * 1.4),
+      radius * (0.55 + random() * 0.75),
+      random() * Math.PI,
+      0,
+      Math.PI * 2,
+    );
+    context.fill();
+  }
+}
+
 function dirtRutWobble(y: number, height: number, center: number): number {
   const phase = center * Math.PI * 7;
   const cycle = (y / height) * Math.PI * 8;
@@ -653,9 +1160,9 @@ function paintDirtLanes(
     context.stroke();
   }
 
-  context.strokeStyle = `#${mark.clone().multiplyScalar(0.68).getHexString()}`;
-  context.globalAlpha = 0.46;
-  context.lineWidth = 6.5;
+  context.strokeStyle = `#${mark.clone().multiplyScalar(0.56).getHexString()}`;
+  context.globalAlpha = 0.56;
+  context.lineWidth = 8.2;
   for (const center of DIRT_LANE_CENTER_RATIOS) {
     for (const offset of [-0.025, 0.025]) {
       context.beginPath();
@@ -668,8 +1175,8 @@ function paintDirtLanes(
       context.stroke();
     }
 
-    context.globalAlpha = 0.3;
-    context.lineWidth = 1.5;
+    context.globalAlpha = 0.36;
+    context.lineWidth = 1.8;
     for (let y = 0; y < height; y += 16) {
       const wobble = dirtRutWobble(y, height, center);
       context.beginPath();
@@ -677,9 +1184,27 @@ function paintDirtLanes(
       context.lineTo(width * center + 7 + wobble, y + 3);
       context.stroke();
     }
-    context.globalAlpha = 0.46;
-    context.lineWidth = 6.5;
+    context.globalAlpha = 0.56;
+    context.lineWidth = 8.2;
   }
+
+  context.globalCompositeOperation = "screen";
+  context.strokeStyle = "#fff0bd";
+  context.globalAlpha = 0.08;
+  context.lineWidth = 1.8;
+  for (const center of DIRT_LANE_CENTER_RATIOS) {
+    for (const offset of [-0.044, 0.044]) {
+      context.beginPath();
+      for (let y = 0; y <= height; y += 6) {
+        const wobble = dirtRutWobble(y, height, center) * 0.72;
+        const x = width * (center + offset) + wobble;
+        if (y === 0) context.moveTo(x, y);
+        else context.lineTo(x, y);
+      }
+      context.stroke();
+    }
+  }
+  context.globalCompositeOperation = "source-over";
 }
 
 function createTerrainCanvas(
@@ -705,8 +1230,8 @@ function createTerrainCanvas(
 
     context.strokeStyle = `#${mark.getHexString()}`;
     context.fillStyle = context.strokeStyle;
-    context.globalAlpha = kind === "dirt" ? 0.3 : 0.23;
-    const markCount = kind === "dirt" ? 1_100 : 760;
+    context.globalAlpha = kind === "dirt" ? 0.34 : 0.23;
+    const markCount = kind === "dirt" ? 1_420 : 760;
     // Small calls retain the dense deterministic pattern without presenting one
     // large hot loop to JavaScriptCore during the first terrain paint.
     for (let offset = 0; offset < markCount; offset += TERRAIN_MARK_BATCH_SIZE) {
@@ -715,7 +1240,10 @@ function createTerrainCanvas(
       else paintGrassMarks(context, width, height, random, count);
     }
 
-    if (kind === "dirt") paintDirtLanes(context, width, height, mark);
+    if (kind === "dirt") {
+      paintDirtPebbleFlecks(context, width, height, base, mark, random);
+      paintDirtLanes(context, width, height, mark);
+    }
     context.globalAlpha = 1;
   }
   return canvas;
@@ -782,9 +1310,9 @@ function paintDirtHeightRuts(
   for (const center of DIRT_LANE_CENTER_RATIOS) {
     for (const offset of [-0.025, 0.025]) {
       const rutX = width * (center + offset);
-      context.strokeStyle = "#5d5d5d";
-      context.globalAlpha = 0.62;
-      context.lineWidth = 7;
+      context.strokeStyle = "#565656";
+      context.globalAlpha = 0.76;
+      context.lineWidth = 8.5;
       context.beginPath();
       for (let y = 0; y <= height; y += 4) {
         const wobble = dirtRutWobble(y, height, center);
@@ -793,14 +1321,14 @@ function paintDirtHeightRuts(
       }
       context.stroke();
 
-      context.strokeStyle = "#707070";
-      context.globalAlpha = 0.78;
-      context.lineWidth = 2;
+      context.strokeStyle = "#6a6a6a";
+      context.globalAlpha = 0.84;
+      context.lineWidth = 2.4;
       context.stroke();
 
-      context.strokeStyle = "#686868";
-      context.globalAlpha = 0.48;
-      context.lineWidth = 1.25;
+      context.strokeStyle = "#626262";
+      context.globalAlpha = 0.56;
+      context.lineWidth = 1.45;
       for (let y = 0; y < height; y += 16) {
         const wobble = dirtRutWobble(y, height, center);
         context.beginPath();
@@ -846,17 +1374,21 @@ function createDirtHeightCanvas(): HTMLCanvasElement {
 
   // Small clods provide near-field breakup. Wrapped edge copies keep the map
   // seamless along the 30 m UV repeat used by the course ribbon.
-  for (let index = 0; index < 320; index += 1) {
-    context.fillStyle = index % 5 === 0 ? "#aaaaaa" : "#999999";
-    context.globalAlpha = 0.28 + random() * 0.28;
+  for (let index = 0; index < 560; index += 1) {
+    context.fillStyle = index % 9 === 0
+      ? "#b0b0b0"
+      : index % 4 === 0
+        ? "#969696"
+        : "#8b8b8b";
+    context.globalAlpha = 0.18 + random() * 0.24;
     fillWrappedEllipse(
       context,
       width,
       height,
       random() * width,
       random() * height,
-      0.8 + random() * 2.5,
-      1.1 + random() * 4,
+      0.6 + random() * 2.1,
+      0.9 + random() * 3.4,
       random() * Math.PI,
     );
   }
@@ -944,6 +1476,27 @@ function createSoftShadowTexture(): THREE.CanvasTexture {
     gradient.addColorStop(0, "#ffffff");
     gradient.addColorStop(0.38, "#d8d8d8");
     gradient.addColorStop(0.72, "#555555");
+    gradient.addColorStop(1, "#000000");
+    context.fillStyle = gradient;
+    context.fillRect(0, 0, canvas.width, canvas.height);
+  }
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.minFilter = THREE.LinearFilter;
+  texture.magFilter = THREE.LinearFilter;
+  texture.generateMipmaps = false;
+  return texture;
+}
+
+function createSoftDustTexture(): THREE.CanvasTexture {
+  const canvas = document.createElement("canvas");
+  canvas.width = 64;
+  canvas.height = 64;
+  const context = canvas.getContext("2d");
+  if (context) {
+    const gradient = context.createRadialGradient(32, 32, 1, 32, 32, 31);
+    gradient.addColorStop(0, "#ffffff");
+    gradient.addColorStop(0.34, "#eeeeee");
+    gradient.addColorStop(0.68, "#777777");
     gradient.addColorStop(1, "#000000");
     context.fillStyle = gradient;
     context.fillRect(0, 0, canvas.width, canvas.height);
@@ -1464,33 +2017,1118 @@ function setShadow(group: THREE.Object3D, castShadow = true): void {
   });
 }
 
-const FOCAL_BIKE_SHADOW_CASTERS = new Set([
-  "FrontTireRing",
-  "RearTireRing",
-  "FrontTreadRing",
-  "RearTreadRing",
-  "MainFrame",
-  "Tank",
-  "Seat",
-  "RearFender",
-  "FrontFender",
-  "LeftSidePanel",
-  "RightSidePanel",
-  "RearNumberPanel",
-  "ExhaustCanister",
-]);
-
 function setFocalBikeShadows(group: THREE.Object3D): void {
   group.traverse((object) => {
     if (object instanceof THREE.Mesh) {
-      object.castShadow = FOCAL_BIKE_SHADOW_CASTERS.has(object.name);
+      object.castShadow = true;
       object.receiveShadow = true;
     }
   });
 }
 
+function tuneFocalBikeMaterialResponse(
+  group: THREE.Object3D,
+  environmentMap: THREE.Texture | null,
+): void {
+  const tuned = new Set<THREE.MeshStandardMaterial>();
+  group.traverse((object) => {
+    if (!(object instanceof THREE.Mesh)) return;
+    const materials = Array.isArray(object.material) ? object.material : [object.material];
+    for (const material of materials) {
+      if (!(material instanceof THREE.MeshStandardMaterial) || tuned.has(material)) continue;
+      tuned.add(material);
+      material.envMap = environmentMap;
+      if (material.name === "RRR_PlasticTeal") {
+        material.color.offsetHSL(0.01, 0.08, -0.055);
+        material.roughness = Math.min(material.roughness + 0.04, 0.62);
+      } else if (material.name === "RRR_PlasticCoral") {
+        material.color.offsetHSL(-0.01, 0.07, -0.06);
+        material.roughness = Math.min(material.roughness + 0.04, 0.62);
+      } else if (material.name === "RRR_PlateCream" || material.name === "RRR_NumberCream") {
+        material.color.multiplyScalar(0.82);
+        material.roughness = Math.min(material.roughness + 0.04, material.name === "RRR_PlateCream" ? 0.72 : 0.78);
+      } else if (material.name === "RRR_RiderFabric" || material.name === "RRR_RiderArmor") {
+        material.color.offsetHSL(0, 0.04, -0.045);
+      }
+      material.envMapIntensity = material.name === "RRR_MetalBright"
+        || material.name === "RRR_MetalDark"
+        ? 1.72
+        : material.name === "RRR_Visor"
+          ? 1.55
+          : material.name === "RRR_Rubber"
+            ? 0.5
+            : material.name === "RRR_PlasticTeal" || material.name === "RRR_PlasticCoral"
+              ? 1.08
+              : material.name === "RRR_RiderArmor"
+                ? 0.98
+                : 0.9;
+      material.needsUpdate = true;
+    }
+  });
+}
+
+function heroKeyLightIntensity(quality: Exclude<GameSettings["quality"], "auto">): number {
+  return quality === "high" ? 72 : quality === "medium" ? 44 : 0;
+}
+
+function heroRimLightIntensity(quality: Exclude<GameSettings["quality"], "auto">): number {
+  return quality === "high" ? 34 : quality === "medium" ? 19 : 0;
+}
+
+function heroFillLightIntensity(quality: Exclude<GameSettings["quality"], "auto">): number {
+  return quality === "high" ? 0.58 : quality === "medium" ? 0.36 : 0;
+}
+
+function assertHeroAsset(condition: unknown, message: string): asserts condition {
+  if (!condition) throw new Error(`Invalid hero bike/rider asset: ${message}`);
+}
+
+function hasFiniteTransform(object: THREE.Object3D): boolean {
+  return [
+    object.position.x,
+    object.position.y,
+    object.position.z,
+    object.quaternion.x,
+    object.quaternion.y,
+    object.quaternion.z,
+    object.quaternion.w,
+    object.scale.x,
+    object.scale.y,
+    object.scale.z,
+  ].every(Number.isFinite)
+    && object.scale.x > 0
+    && object.scale.y > 0
+    && object.scale.z > 0;
+}
+
+function hasNeutralRotationAndScale(object: THREE.Object3D): boolean {
+  const epsilon = HERO_ASSET_TRANSFORM_EPSILON;
+  return Math.abs(object.quaternion.x) <= epsilon
+    && Math.abs(object.quaternion.y) <= epsilon
+    && Math.abs(object.quaternion.z) <= epsilon
+    && Math.abs(Math.abs(object.quaternion.w) - 1) <= epsilon
+    && Math.abs(object.scale.x - 1) <= epsilon
+    && Math.abs(object.scale.y - 1) <= epsilon
+    && Math.abs(object.scale.z - 1) <= epsilon;
+}
+
+function hasIdentityTransform(object: THREE.Object3D): boolean {
+  const epsilon = HERO_ASSET_TRANSFORM_EPSILON;
+  return Math.abs(object.position.x) <= epsilon
+    && Math.abs(object.position.y) <= epsilon
+    && Math.abs(object.position.z) <= epsilon
+    && hasNeutralRotationAndScale(object);
+}
+
+function isRiderPoseRig(value: unknown): value is RiderPoseRig {
+  if (!value || typeof value !== "object") return false;
+  const candidate = value as Partial<RiderPoseRig>;
+  return candidate.torso instanceof THREE.Object3D
+    && candidate.head instanceof THREE.Object3D
+    && candidate.leftArm instanceof THREE.Object3D
+    && candidate.rightArm instanceof THREE.Object3D
+    && candidate.leftLeg instanceof THREE.Object3D
+    && candidate.rightLeg instanceof THREE.Object3D;
+}
+
+function validateHeroBikeRiderAsset(gltf: GLTF): HeroBikeRiderNodes {
+  assertHeroAsset(gltf.scenes.length === 1, "exactly one scene is required");
+  assertHeroAsset(gltf.scene === gltf.scenes[0], "the sole scene must be active");
+  assertHeroAsset(gltf.scene.name === HERO_ASSET_SCENE_NAME, "the scene name is invalid");
+  assertHeroAsset(gltf.animations.length === 0, "animations are not permitted");
+  assertHeroAsset(gltf.cameras.length === 0, "cameras are not permitted");
+  assertHeroAsset(hasIdentityTransform(gltf.scene), "the scene wrapper must be identity");
+
+  const json = gltf.parser.json as SerializedHeroGltf;
+  const serializedScenes = json.scenes ?? [];
+  const serializedNodes = json.nodes ?? [];
+  const serializedBuffers = json.buffers ?? [];
+  const serializedBufferViews = json.bufferViews ?? [];
+  const serializedAccessors = json.accessors ?? [];
+  const serializedMeshes = json.meshes ?? [];
+  const serializedImages = json.images ?? [];
+  const serializedTextures = json.textures ?? [];
+  const serializedMaterials = json.materials ?? [];
+  const extensionsUsed = json.extensionsUsed ?? [];
+  const extensionsRequired = json.extensionsRequired ?? [];
+
+  assertHeroAsset(serializedScenes.length === 1, "serialized scene count is invalid");
+  assertHeroAsset(
+    serializedScenes[0]?.name === HERO_ASSET_SCENE_NAME,
+    "serialized scene name is invalid",
+  );
+  assertHeroAsset(serializedNodes.length > 0, "serialized nodes are missing");
+  assertHeroAsset(serializedNodes.length <= HERO_ASSET_MAX_NODES, "node budget exceeded");
+  assertHeroAsset((json.cameras ?? []).length === 0, "serialized cameras are not permitted");
+  assertHeroAsset((json.skins ?? []).length === 0, "skins are not permitted");
+  assertHeroAsset((json.animations ?? []).length === 0, "serialized animations are not permitted");
+  assertHeroAsset(
+    serializedBuffers.every((buffer) => buffer.uri === undefined),
+    "external buffers are not permitted",
+  );
+  assertHeroAsset(serializedImages.length <= HERO_ASSET_MAX_TEXTURES, "image budget exceeded");
+  assertHeroAsset(serializedTextures.length <= HERO_ASSET_MAX_TEXTURES, "texture budget exceeded");
+  for (const image of serializedImages) {
+    assertHeroAsset(image.uri === undefined, "external images are not permitted");
+    assertHeroAsset(Number.isInteger(image.bufferView), "images must be embedded in the GLB");
+    assertHeroAsset(image.mimeType === "image/ktx2", "only embedded KTX2 images are permitted");
+  }
+  for (const texture of serializedTextures) {
+    const basisSource = texture.extensions?.KHR_texture_basisu?.source;
+    assertHeroAsset(texture.source === undefined, "fallback texture sources are not permitted");
+    assertHeroAsset(
+      Number.isInteger(basisSource)
+        && Number(basisSource) >= 0
+        && Number(basisSource) < serializedImages.length,
+      "textures must reference an embedded KTX2 image",
+    );
+  }
+
+  assertHeroAsset(
+    extensionsUsed.every((extension) => typeof extension === "string"),
+    "extension declarations are invalid",
+  );
+  const extensionNames = new Set(extensionsUsed as string[]);
+  assertHeroAsset(
+    extensionNames.has("EXT_meshopt_compression"),
+    "Meshopt compression is required",
+  );
+  assertHeroAsset(
+    !extensionNames.has("KHR_lights_punctual"),
+    "punctual lights are not permitted",
+  );
+  assertHeroAsset(
+    extensionsRequired.every((extension) => typeof extension === "string"),
+    "required-extension declarations are invalid",
+  );
+  const expectedRequiredExtensions = [
+    "EXT_meshopt_compression",
+    "KHR_mesh_quantization",
+    ...(serializedTextures.length > 0 ? ["KHR_texture_basisu"] : []),
+  ].sort();
+  assertHeroAsset(
+    JSON.stringify([...(extensionsUsed as string[])].sort())
+      === JSON.stringify(expectedRequiredExtensions),
+    "used-extension set is invalid",
+  );
+  assertHeroAsset(
+    JSON.stringify([...(extensionsRequired as string[])].sort())
+      === JSON.stringify(expectedRequiredExtensions),
+    "required-extension set is invalid",
+  );
+  if (serializedTextures.length > 0) {
+    assertHeroAsset(
+      extensionNames.has("KHR_texture_basisu"),
+      "KTX2 textures must declare KHR_texture_basisu",
+    );
+  }
+
+  assertHeroAsset(
+    serializedMeshes.length > 0
+      && serializedMeshes.length <= HERO_ASSET_MAX_MESH_BEARING_NODES,
+    "serialized mesh budget is invalid",
+  );
+  for (const mesh of serializedMeshes) {
+    assertHeroAsset(
+      Array.isArray(mesh.primitives) && mesh.primitives.length > 0,
+      "every serialized mesh must contain a triangle primitive",
+    );
+    for (const primitive of mesh.primitives) {
+      assertHeroAsset(
+        primitive.mode === undefined || primitive.mode === 4,
+        "only serialized triangle primitives are permitted",
+      );
+      assertHeroAsset(
+        primitive.targets === undefined
+          || (Array.isArray(primitive.targets) && primitive.targets.length === 0),
+        "morph targets are not permitted",
+      );
+      assertHeroAsset(
+        primitive.attributes !== null
+          && typeof primitive.attributes === "object"
+          && !Array.isArray(primitive.attributes),
+        "serialized primitive attributes are invalid",
+      );
+      assertHeroAsset(
+        Object.keys(primitive.attributes).every(
+          (semantic) => semantic === "POSITION"
+            || semantic === "NORMAL"
+            || semantic === "TANGENT"
+            || semantic.startsWith("TEXCOORD_")
+            || semantic.startsWith("COLOR_"),
+        ),
+        "serialized primitive attribute semantics are invalid",
+      );
+      const positionIndex = primitive.attributes.POSITION;
+      const normalIndex = primitive.attributes.NORMAL;
+      assertHeroAsset(
+        Number.isInteger(positionIndex) && Number.isInteger(normalIndex),
+        "every primitive requires POSITION and NORMAL accessors",
+      );
+      const accessorEntries = [
+        ["indices", primitive.indices],
+        ...Object.entries(primitive.attributes),
+      ] as const;
+      for (const [semantic, accessorIndex] of accessorEntries) {
+        assertHeroAsset(Number.isInteger(accessorIndex), `${semantic} accessor index is invalid`);
+        const accessor = serializedAccessors[Number(accessorIndex)];
+        assertHeroAsset(accessor !== undefined, `${semantic} accessor is missing`);
+        assertHeroAsset(
+          Number.isInteger(accessor.bufferView),
+          `${semantic} accessor must reference a buffer view`,
+        );
+        const bufferView = serializedBufferViews[Number(accessor.bufferView)];
+        assertHeroAsset(bufferView !== undefined, `${semantic} buffer view is missing`);
+        assertHeroAsset(
+          bufferView.extensions?.EXT_meshopt_compression !== undefined,
+          `${semantic} geometry must be covered by EXT_meshopt_compression`,
+        );
+      }
+
+      const positionAccessor = serializedAccessors[Number(positionIndex)]!;
+      const normalAccessor = serializedAccessors[Number(normalIndex)]!;
+      assertHeroAsset(
+        positionAccessor.type === "VEC3"
+          && positionAccessor.componentType === 5122
+          && positionAccessor.normalized === true,
+        "POSITION accessors must use normalized signed-short quantization",
+      );
+      assertHeroAsset(
+        normalAccessor.type === "VEC3"
+          && normalAccessor.componentType === 5120
+          && normalAccessor.normalized === true,
+        "NORMAL accessors must use normalized signed-byte quantization",
+      );
+      const indexAccessor = serializedAccessors[Number(primitive.indices)]!;
+      assertHeroAsset(
+        indexAccessor.type === "SCALAR"
+          && (indexAccessor.componentType === 5121
+            || indexAccessor.componentType === 5123
+            || indexAccessor.componentType === 5125),
+        "index accessor component type is invalid",
+      );
+    }
+  }
+
+  const serializedNodeNames: string[] = [];
+  for (const node of serializedNodes) {
+    assertHeroAsset(
+      typeof node.name === "string" && node.name.length > 0,
+      "every exported node must have a stable name",
+    );
+    assertHeroAsset(!/\.\d{3}$/u.test(node.name), "Blender numeric node suffixes are prohibited");
+    serializedNodeNames.push(node.name);
+  }
+  assertHeroAsset(
+    new Set(serializedNodeNames).size === serializedNodeNames.length,
+    "exported node names must be unique",
+  );
+  const sceneRootIndices = serializedScenes[0]?.nodes;
+  assertHeroAsset(
+    Array.isArray(sceneRootIndices)
+      && sceneRootIndices.length === 1
+      && Number.isInteger(sceneRootIndices[0]),
+    "one serialized scene root is required",
+  );
+  assertHeroAsset(
+    serializedNodes[Number(sceneRootIndices[0])]?.name === HERO_ASSET_ROOT_NAME,
+    "the serialized scene root is invalid",
+  );
+
+  assertHeroAsset(
+    serializedMaterials.length === HERO_ASSET_MATERIAL_SPECS.size
+      && serializedMaterials.length <= HERO_ASSET_MAX_MATERIALS,
+    "serialized material inventory is incomplete",
+  );
+  const serializedMaterialNames: string[] = [];
+  for (const material of serializedMaterials) {
+    assertHeroAsset(
+      typeof material.name === "string" && HERO_ASSET_ALLOWED_MATERIAL_NAMES.has(material.name),
+      "an unapproved material name is present",
+    );
+    serializedMaterialNames.push(material.name);
+  }
+  assertHeroAsset(
+    new Set(serializedMaterialNames).size === serializedMaterialNames.length,
+    "material names must be unique",
+  );
+  assertHeroAsset(
+    [...HERO_ASSET_MATERIAL_SPECS.keys()].every(
+      (name) => serializedMaterialNames.includes(name),
+    ),
+    "a required semantic material is missing",
+  );
+
+  const requiredMatches = new Map<string, THREE.Object3D[]>();
+  let meshCount = 0;
+  let primitiveCount = 0;
+  let triangleCount = 0;
+  const renderedTrianglesByObject = new Map<THREE.Object3D, number>();
+  const materials = new Set<THREE.Material>();
+  const textures = new Set<THREE.Texture>();
+  gltf.scene.traverse((object) => {
+    assertHeroAsset(
+      hasFiniteTransform(object),
+      `${object.name || "unnamed node"} has an invalid transform`,
+    );
+    if (HERO_ASSET_REQUIRED_NODE_NAME_SET.has(object.name)) {
+      const matches = requiredMatches.get(object.name) ?? [];
+      matches.push(object);
+      requiredMatches.set(object.name, matches);
+    }
+    assertHeroAsset(!(object instanceof THREE.Camera), "scene cameras are not permitted");
+    assertHeroAsset(!(object instanceof THREE.Light), "scene lights are not permitted");
+    assertHeroAsset(!(object instanceof THREE.Bone), "bones are not permitted");
+    assertHeroAsset(!(object instanceof THREE.SkinnedMesh), "skinned meshes are not permitted");
+    assertHeroAsset(
+      !(object instanceof THREE.Line)
+        && !(object instanceof THREE.Points)
+        && !(object instanceof THREE.Sprite),
+      "only triangle meshes are permitted",
+    );
+    if (!(object instanceof THREE.Mesh)) return;
+
+    meshCount += 1;
+    const position = object.geometry.getAttribute("position");
+    const elementCount = object.geometry.index?.count ?? position?.count ?? 0;
+    assertHeroAsset(
+      elementCount > 0 && elementCount % 3 === 0,
+      `${object.name} is not a triangle mesh`,
+    );
+    const instanceCount = object instanceof THREE.InstancedMesh ? object.count : 1;
+    const renderedTriangles = (elementCount / 3) * instanceCount;
+    triangleCount += renderedTriangles;
+    renderedTrianglesByObject.set(object, renderedTriangles);
+    const objectMaterials = Array.isArray(object.material) ? object.material : [object.material];
+    assertHeroAsset(objectMaterials.length > 0, `${object.name} has no material`);
+    primitiveCount += Array.isArray(object.material)
+      ? Math.max(1, object.geometry.groups.length)
+      : 1;
+    for (const material of objectMaterials) materials.add(material);
+  });
+
+  assertHeroAsset(
+    meshCount <= HERO_ASSET_MAX_MESH_BEARING_NODES,
+    "mesh-bearing node budget exceeded",
+  );
+  assertHeroAsset(
+    primitiveCount <= HERO_ASSET_MAX_RENDER_PRIMITIVES,
+    "render primitive budget exceeded",
+  );
+  assertHeroAsset(triangleCount <= HERO_ASSET_MAX_TRIANGLES, "triangle budget exceeded");
+  assertHeroAsset(materials.size <= HERO_ASSET_MAX_MATERIALS, "runtime material budget exceeded");
+  for (const material of materials) {
+    assertHeroAsset(
+      material instanceof THREE.MeshStandardMaterial,
+      `${material.name || "unnamed material"} is not a glTF PBR material`,
+    );
+    assertHeroAsset(
+      HERO_ASSET_ALLOWED_MATERIAL_NAMES.has(material.name),
+      `${material.name || "unnamed material"} is not approved`,
+    );
+    const response = HERO_ASSET_MATERIAL_SPECS.get(material.name);
+    assertHeroAsset(response !== undefined, `${material.name} has no response contract`);
+    assertHeroAsset(
+      material.roughness >= response.roughness[0]
+        && material.roughness <= response.roughness[1],
+      `${material.name} roughness is outside its contract`,
+    );
+    assertHeroAsset(
+      material.metalness >= response.metalness[0]
+        && material.metalness <= response.metalness[1],
+      `${material.name} metalness is outside its contract`,
+    );
+    assertHeroAsset(
+      !material.transparent
+        && material.opacity === 1
+        && material.alphaTest === 0
+        && material.depthWrite,
+      `${material.name} must remain opaque`,
+    );
+    assertHeroAsset(
+      material.emissive.toArray().every((channel) => Math.abs(channel) <= 1e-7),
+      `${material.name} must remain non-emissive`,
+    );
+    for (const value of Object.values(material)) {
+      if (value instanceof THREE.Texture) textures.add(value);
+    }
+  }
+  assertHeroAsset(
+    textures.size <= HERO_ASSET_MAX_TEXTURES,
+    "runtime texture budget exceeded",
+  );
+  assertHeroAsset(
+    materials.size === serializedMaterials.length,
+    "serialized and decoded material counts do not match",
+  );
+  assertHeroAsset(
+    textures.size === serializedTextures.length,
+    "serialized and decoded texture counts do not match",
+  );
+  for (const texture of textures) {
+    const image = texture.image as { width?: unknown; height?: unknown } | null;
+    const width = image?.width;
+    const height = image?.height;
+    assertHeroAsset(
+      typeof width === "number"
+        && Number.isFinite(width)
+        && width > 0
+        && width <= 1024
+        && typeof height === "number"
+        && Number.isFinite(height)
+        && height > 0
+        && height <= 1024,
+      "runtime texture dimensions are invalid",
+    );
+  }
+  for (const bucket of HERO_ASSET_NUMBER_BUCKETS) {
+    const object = gltf.scene.getObjectByName(bucket.name);
+    assertHeroAsset(
+      object instanceof THREE.Mesh && object.parent?.name === bucket.parent,
+      `${bucket.name} number bucket is missing or misplaced`,
+    );
+    const bucketMaterials = Array.isArray(object.material) ? object.material : [object.material];
+    assertHeroAsset(
+      bucketMaterials.length === 1 && bucketMaterials[0]?.name === "RRR_NumberCream",
+      `${bucket.name} must use only RRR_NumberCream`,
+    );
+  }
+
+  const requiredNode = (name: string): THREE.Object3D => {
+    const matches = requiredMatches.get(name);
+    if (!matches || matches.length !== 1) {
+      throw new Error(`Invalid hero bike/rider asset: ${name} must exist exactly once`);
+    }
+    return matches[0]!;
+  };
+  for (const [name, expectedParent] of Object.entries(HERO_ASSET_PARENT_BY_NAME)) {
+    const object = requiredNode(name);
+    const actualParent = object.parent === gltf.scene ? null : object.parent?.name ?? null;
+    assertHeroAsset(
+      actualParent === expectedParent,
+      `${name} must be parented to ${expectedParent ?? "the scene"}`,
+    );
+  }
+
+  const root = requiredNode(HERO_ASSET_ROOT_NAME);
+  const bike = requiredNode("RRR_BikeVisual");
+  const rider = requiredNode("player-rider");
+  const frontWheel = requiredNode("FrontTire");
+  const rearWheel = requiredNode("RearTire");
+  const countSubtreeTriangles = (subtree: THREE.Object3D): number => {
+    let total = 0;
+    subtree.traverse((object) => {
+      total += renderedTrianglesByObject.get(object) ?? 0;
+    });
+    return total;
+  };
+  const bikeTriangleCount = countSubtreeTriangles(bike);
+  const riderTriangleCount = countSubtreeTriangles(rider);
+  const wheelTriangleCount = countSubtreeTriangles(frontWheel) + countSubtreeTriangles(rearWheel);
+  assertHeroAsset(
+    bikeTriangleCount <= HERO_ASSET_MAX_BIKE_TRIANGLES,
+    "bike triangle sub-budget exceeded",
+  );
+  assertHeroAsset(
+    riderTriangleCount <= HERO_ASSET_MAX_RIDER_TRIANGLES,
+    "rider triangle sub-budget exceeded",
+  );
+  assertHeroAsset(
+    wheelTriangleCount <= HERO_ASSET_MAX_WHEEL_TRIANGLES,
+    "wheel triangle sub-budget exceeded",
+  );
+  assertHeroAsset(
+    gltf.scene.children.length === 1 && gltf.scene.children[0] === root,
+    "the scene must contain one authored root",
+  );
+  assertHeroAsset(hasIdentityTransform(root), "the authored root must be identity");
+  assertHeroAsset(hasIdentityTransform(bike), "the bike root must be identity");
+  assertHeroAsset(hasIdentityTransform(rider), "the rider root must be identity");
+  for (const name of HERO_ASSET_NEUTRAL_HOOK_NAMES) {
+    assertHeroAsset(
+      hasNeutralRotationAndScale(requiredNode(name)),
+      `${name} must ship in its neutral rotation and scale`,
+    );
+  }
+  assertHeroAsset(root.userData.asset_root === true, "root provenance marker is missing");
+  assertHeroAsset(
+    root.userData.asset_source === "Original project-authored Blender-native geometry",
+    "root source-provenance marker is invalid",
+  );
+  assertHeroAsset(
+    root.userData.reference === "docs/design/concepts/hero-bike-rider-production-reference.png",
+    "root modeling-reference marker is invalid",
+  );
+  assertHeroAsset(
+    root.userData.contract === "docs/design/HERO_BIKE_RIDER_VERTICAL_SLICE.md",
+    "root asset-contract marker is invalid",
+  );
+  assertHeroAsset(root.userData.units === "meters", "root units must be meters");
+  assertHeroAsset(root.userData.forward_axis === "+Y", "source forward-axis marker is invalid");
+  assertHeroAsset(root.userData.up_axis === "+Z", "source up-axis marker is invalid");
+  assertHeroAsset(
+    root.userData.gameplay_authority === "presentation-only",
+    "the asset must declare presentation-only authority",
+  );
+  assertHeroAsset(bike.userData.presentation_only === true, "bike authority marker is missing");
+  assertHeroAsset(
+    rider.userData.pose_pivot_count === HERO_ASSET_POSE_PIVOT_NAMES.length,
+    "rider pose-pivot marker is invalid",
+  );
+  assertHeroAsset(frontWheel.userData.animated_axis === "+X", "front wheel spin axis is invalid");
+  assertHeroAsset(rearWheel.userData.animated_axis === "+X", "rear wheel spin axis is invalid");
+
+  gltf.scene.updateMatrixWorld(true);
+  const bounds = new THREE.Box3().setFromObject(root, true);
+  assertHeroAsset(!bounds.isEmpty(), "render bounds are empty");
+  const size = bounds.getSize(new THREE.Vector3());
+  const finiteBounds = [
+    bounds.min.x,
+    bounds.min.y,
+    bounds.min.z,
+    bounds.max.x,
+    bounds.max.y,
+    bounds.max.z,
+    size.x,
+    size.y,
+    size.z,
+  ].every(Number.isFinite);
+  assertHeroAsset(finiteBounds, "render bounds are not finite");
+  assertHeroAsset(
+    bounds.min.y >= -0.011 && bounds.min.y <= 0.03,
+    "tire contact plane is invalid",
+  );
+  assertHeroAsset(
+    size.x >= 0.8 && size.x <= 3.5,
+    "asset width is outside the meter-scale envelope",
+  );
+  assertHeroAsset(
+    size.y >= 1.6 && size.y <= 3.8,
+    "asset height is outside the meter-scale envelope",
+  );
+  assertHeroAsset(
+    size.z >= 2 && size.z <= 5,
+    "asset length is outside the meter-scale envelope",
+  );
+
+  const frontAxle = frontWheel.getWorldPosition(new THREE.Vector3());
+  const rearAxle = rearWheel.getWorldPosition(new THREE.Vector3());
+  const frontWheelBounds = new THREE.Box3().setFromObject(frontWheel, true);
+  const rearWheelBounds = new THREE.Box3().setFromObject(rearWheel, true);
+  const wheelbase = frontAxle.distanceTo(rearAxle);
+  assertHeroAsset(
+    Math.abs(frontAxle.x) <= 0.2 && Math.abs(rearAxle.x) <= 0.2,
+    "wheel axles are off-center",
+  );
+  assertHeroAsset(frontAxle.z < rearAxle.z, "front and rear wheels are reversed");
+  assertHeroAsset(wheelbase >= 1.4 && wheelbase <= 4, "wheelbase is outside the meter-scale envelope");
+  assertHeroAsset(
+    Math.abs((frontAxle.z + rearAxle.z) * 0.5) <= 0.02,
+    "the asset root is not centered between wheel contact patches",
+  );
+  assertHeroAsset(
+    frontWheelBounds.min.y >= -0.011
+      && frontWheelBounds.min.y <= 0.02
+      && rearWheelBounds.min.y >= -0.011
+      && rearWheelBounds.min.y <= 0.02,
+    "both wheel assemblies must contact the local ground plane",
+  );
+  assertHeroAsset(
+    frontAxle.y >= 0.4
+      && frontAxle.y <= 1
+      && rearAxle.y >= 0.4
+      && rearAxle.y <= 1
+      && Math.abs(frontAxle.y - rearAxle.y) <= 0.15,
+    "wheel axle heights are invalid",
+  );
+
+  const seatAnchor = requiredNode("bike-seat-anchor").getWorldPosition(new THREE.Vector3());
+  const leftHandAnchor = requiredNode("bike-left-hand-anchor").getWorldPosition(new THREE.Vector3());
+  const rightHandAnchor = requiredNode("bike-right-hand-anchor").getWorldPosition(new THREE.Vector3());
+  const leftBootAnchor = requiredNode("bike-left-boot-anchor").getWorldPosition(new THREE.Vector3());
+  const rightBootAnchor = requiredNode("bike-right-boot-anchor").getWorldPosition(new THREE.Vector3());
+  assertHeroAsset(
+    leftHandAnchor.x < -0.05
+      && rightHandAnchor.x > 0.05
+      && leftBootAnchor.x < -0.05
+      && rightBootAnchor.x > 0.05,
+    "left/right contact anchors are reversed",
+  );
+  assertHeroAsset(
+    Math.abs(leftHandAnchor.x + rightHandAnchor.x) <= 0.1
+      && Math.abs(leftHandAnchor.y - rightHandAnchor.y) <= 0.1
+      && Math.abs(leftHandAnchor.z - rightHandAnchor.z) <= 0.1
+      && Math.abs(leftBootAnchor.x + rightBootAnchor.x) <= 0.1
+      && Math.abs(leftBootAnchor.y - rightBootAnchor.y) <= 0.1
+      && Math.abs(leftBootAnchor.z - rightBootAnchor.z) <= 0.1
+      && Math.abs(seatAnchor.x) <= 0.05,
+    "paired contact anchors must remain symmetric",
+  );
+  assertHeroAsset(
+    leftHandAnchor.y > leftBootAnchor.y + 0.3
+      && rightHandAnchor.y > rightBootAnchor.y + 0.3
+      && seatAnchor.y > Math.max(leftBootAnchor.y, rightBootAnchor.y),
+    "contact-anchor heights are invalid",
+  );
+  assertHeroAsset(
+    seatAnchor.z > frontAxle.z && seatAnchor.z < rearAxle.z,
+    "seat anchor must remain between the wheel axles",
+  );
+
+  return {
+    root,
+    bike,
+    rider,
+    frontWheel,
+    rearWheel,
+    rig: {
+      torso: requiredNode("rider-torso-pivot"),
+      head: requiredNode("rider-head-pivot"),
+      leftArm: requiredNode("rider-left-arm-pivot"),
+      rightArm: requiredNode("rider-right-arm-pivot"),
+      leftLeg: requiredNode("rider-left-leg-pivot"),
+      rightLeg: requiredNode("rider-right-leg-pivot"),
+    },
+    nodeCount: serializedNodes.length,
+    meshCount,
+    primitiveCount,
+    materialCount: materials.size,
+    textureCount: textures.size,
+    triangleCount,
+    bikeTriangleCount,
+    riderTriangleCount,
+    wheelTriangleCount,
+  };
+}
+
+function assertRivalPackAsset(condition: unknown, message: string): asserts condition {
+  if (!condition) throw new Error(`Invalid rival pack asset: ${message}`);
+}
+
+function validateRivalPackAsset(gltf: GLTF): RivalPackNodes {
+  assertRivalPackAsset(gltf.scenes.length === 1, "exactly one scene is required");
+  assertRivalPackAsset(gltf.scene === gltf.scenes[0], "the sole scene must be active");
+  assertRivalPackAsset(gltf.scene.name === RIVAL_PACK_SCENE_NAME, "the scene name is invalid");
+  assertRivalPackAsset(gltf.animations.length === 0, "animations are not permitted");
+  assertRivalPackAsset(gltf.cameras.length === 0, "cameras are not permitted");
+  assertRivalPackAsset(hasIdentityTransform(gltf.scene), "the scene wrapper must be identity");
+
+  const json = gltf.parser.json as SerializedHeroGltf;
+  const scenes = json.scenes ?? [];
+  const nodes = json.nodes ?? [];
+  const buffers = json.buffers ?? [];
+  const bufferViews = json.bufferViews ?? [];
+  const accessors = json.accessors ?? [];
+  const meshes = json.meshes ?? [];
+  const images = json.images ?? [];
+  const textures = json.textures ?? [];
+  const materials = json.materials ?? [];
+  assertRivalPackAsset(scenes.length === 1 && scenes[0]?.name === RIVAL_PACK_SCENE_NAME, "serialized scene");
+  assertRivalPackAsset(nodes.length === RIVAL_PACK_MAX_NODES, "serialized node count");
+  assertRivalPackAsset(meshes.length >= 8 && meshes.length <= RIVAL_PACK_MAX_MESHES, "serialized mesh budget");
+  assertRivalPackAsset(materials.length === RIVAL_PACK_MATERIAL_NAMES.size, "serialized material count");
+  assertRivalPackAsset(images.length === 1 && textures.length === 1, "number-field texture inventory");
+  assertRivalPackAsset(buffers.every((buffer) => buffer.uri === undefined), "external buffers are prohibited");
+  assertRivalPackAsset(
+    images[0]?.uri === undefined
+      && Number.isInteger(images[0]?.bufferView)
+      && images[0]?.mimeType === "image/png",
+    "the number-field image must be one embedded PNG",
+  );
+  assertRivalPackAsset(
+    Number.isInteger(textures[0]?.source) && textures[0]?.extensions?.KHR_texture_basisu === undefined,
+    "the number-field texture source is invalid",
+  );
+  assertRivalPackAsset((json.cameras ?? []).length === 0, "serialized cameras are prohibited");
+  assertRivalPackAsset((json.skins ?? []).length === 0, "skins are prohibited");
+  assertRivalPackAsset((json.animations ?? []).length === 0, "serialized animations are prohibited");
+  const expectedExtensions = ["EXT_meshopt_compression", "KHR_mesh_quantization"].sort();
+  assertRivalPackAsset(
+    JSON.stringify([...(json.extensionsUsed ?? [])].sort()) === JSON.stringify(expectedExtensions),
+    "used-extension set is invalid",
+  );
+  assertRivalPackAsset(
+    JSON.stringify([...(json.extensionsRequired ?? [])].sort()) === JSON.stringify(expectedExtensions),
+    "required-extension set is invalid",
+  );
+
+  let serializedPrimitiveCount = 0;
+  for (const mesh of meshes) {
+    assertRivalPackAsset(Array.isArray(mesh.primitives) && mesh.primitives.length > 0, "empty serialized mesh");
+    serializedPrimitiveCount += mesh.primitives.length;
+    for (const primitive of mesh.primitives) {
+      assertRivalPackAsset(primitive.mode === undefined || primitive.mode === 4, "only triangles are permitted");
+      assertRivalPackAsset(
+        primitive.targets === undefined
+          || (Array.isArray(primitive.targets) && primitive.targets.length === 0),
+        "morph targets are prohibited",
+      );
+      assertRivalPackAsset(
+        primitive.attributes !== null
+          && typeof primitive.attributes === "object"
+          && Number.isInteger(primitive.attributes.POSITION)
+          && Number.isInteger(primitive.attributes.NORMAL),
+        "POSITION and NORMAL are required",
+      );
+      const accessorIndices = [primitive.indices, ...Object.values(primitive.attributes)];
+      for (const accessorIndex of accessorIndices) {
+        assertRivalPackAsset(Number.isInteger(accessorIndex), "primitive accessor index is invalid");
+        const accessor = accessors[Number(accessorIndex)];
+        assertRivalPackAsset(accessor && Number.isInteger(accessor.bufferView), "primitive accessor is missing");
+        assertRivalPackAsset(
+          bufferViews[Number(accessor.bufferView)]?.extensions?.EXT_meshopt_compression !== undefined,
+          "all geometry must use Meshopt compression",
+        );
+      }
+    }
+  }
+  assertRivalPackAsset(
+    serializedPrimitiveCount >= 8 && serializedPrimitiveCount <= RIVAL_PACK_MAX_PRIMITIVES,
+    "serialized primitive budget",
+  );
+
+  const serializedNodeNames = nodes.map((node) => node.name);
+  assertRivalPackAsset(
+    serializedNodeNames.every((name) => typeof name === "string" && name.length > 0 && !/\.\d{3}$/u.test(name)),
+    "stable serialized node names are required",
+  );
+  assertRivalPackAsset(new Set(serializedNodeNames).size === serializedNodeNames.length, "node names must be unique");
+  assertRivalPackAsset(
+    JSON.stringify([...serializedNodeNames].sort()) === JSON.stringify([...RIVAL_PACK_REQUIRED_NODE_NAMES].sort()),
+    "serialized node inventory is invalid",
+  );
+  const materialNames = materials.map((material) => material.name);
+  assertRivalPackAsset(
+    materialNames.every((name) => typeof name === "string" && RIVAL_PACK_MATERIAL_NAMES.has(name)),
+    "an unapproved material is present",
+  );
+  assertRivalPackAsset(new Set(materialNames).size === RIVAL_PACK_MATERIAL_NAMES.size, "material names must be unique");
+
+  const requiredMatches = new Map<string, THREE.Object3D[]>();
+  const decodedMaterials = new Set<THREE.Material>();
+  const decodedTextures = new Set<THREE.Texture>();
+  const geometries = new Set<THREE.BufferGeometry>();
+  let meshCount = 0;
+  let primitiveCount = 0;
+  let triangleCount = 0;
+  gltf.scene.traverse((object) => {
+    assertRivalPackAsset(hasFiniteTransform(object), `${object.name || "unnamed node"} transform`);
+    if (RIVAL_PACK_REQUIRED_NODE_NAME_SET.has(object.name)) {
+      const matches = requiredMatches.get(object.name) ?? [];
+      matches.push(object);
+      requiredMatches.set(object.name, matches);
+    }
+    assertRivalPackAsset(!(object instanceof THREE.Camera), "scene cameras are prohibited");
+    assertRivalPackAsset(!(object instanceof THREE.Light), "scene lights are prohibited");
+    assertRivalPackAsset(!(object instanceof THREE.Bone), "bones are prohibited");
+    assertRivalPackAsset(!(object instanceof THREE.SkinnedMesh), "skinned meshes are prohibited");
+    if (!(object instanceof THREE.Mesh)) return;
+    meshCount += 1;
+    geometries.add(object.geometry);
+    const position = object.geometry.getAttribute("position");
+    const elementCount = object.geometry.index?.count ?? position?.count ?? 0;
+    assertRivalPackAsset(elementCount > 0 && elementCount % 3 === 0, `${object.name} triangle coverage`);
+    triangleCount += elementCount / 3;
+    const objectMaterials = Array.isArray(object.material) ? object.material : [object.material];
+    primitiveCount += Array.isArray(object.material)
+      ? Math.max(1, object.geometry.groups.length)
+      : 1;
+    for (const material of objectMaterials) {
+      assertRivalPackAsset(material instanceof THREE.MeshStandardMaterial, `${object.name} PBR material`);
+      assertRivalPackAsset(RIVAL_PACK_MATERIAL_NAMES.has(material.name), `${object.name} material name`);
+      assertRivalPackAsset(
+        !material.transparent && material.opacity === 1 && material.alphaTest === 0 && material.depthWrite,
+        `${material.name} must remain opaque`,
+      );
+      decodedMaterials.add(material);
+      for (const value of Object.values(material)) {
+        if (value instanceof THREE.Texture) decodedTextures.add(value);
+      }
+    }
+  });
+  assertRivalPackAsset(meshCount >= 8 && meshCount <= RIVAL_PACK_MAX_MESHES, "decoded mesh budget");
+  assertRivalPackAsset(primitiveCount >= 8 && primitiveCount <= RIVAL_PACK_MAX_PRIMITIVES, "decoded primitive budget");
+  assertRivalPackAsset(
+    triangleCount >= RIVAL_PACK_MIN_TRIANGLES && triangleCount <= RIVAL_PACK_MAX_TRIANGLES,
+    "decoded triangle budget",
+  );
+  assertRivalPackAsset(decodedMaterials.size === RIVAL_PACK_MATERIAL_NAMES.size, "decoded material count");
+  assertRivalPackAsset(decodedTextures.size === 1, "decoded texture count");
+
+  const requiredNode = (name: string): THREE.Object3D => {
+    const matches = requiredMatches.get(name) ?? [];
+    assertRivalPackAsset(matches.length === 1, `${name} must resolve exactly once`);
+    return matches[0]!;
+  };
+  for (const [name, expectedParent] of Object.entries(RIVAL_PACK_PARENT_BY_NAME)) {
+    const node = requiredNode(name);
+    if (expectedParent === null) {
+      assertRivalPackAsset(node.parent === gltf.scene, `${name} scene parent`);
+    } else {
+      assertRivalPackAsset(node.parent === requiredNode(expectedParent), `${name} parent`);
+    }
+  }
+  const root = requiredNode(RIVAL_PACK_ROOT_NAME);
+  const bike = requiredNode("RRR_RivalBikeVisual");
+  const rider = requiredNode("rival-rider");
+  const frontWheel = requiredNode("FrontTire");
+  const rearWheel = requiredNode("RearTire");
+  const numberField = requiredNode("BikeStatic_NumberField");
+  assertRivalPackAsset(numberField instanceof THREE.Mesh, "number field mesh");
+  assertRivalPackAsset(
+    numberField.geometry.getAttribute("uv")?.count === numberField.geometry.getAttribute("position")?.count,
+    "number field UV coverage",
+  );
+  assertRivalPackAsset(hasIdentityTransform(root), "root transform");
+  assertRivalPackAsset(hasIdentityTransform(bike), "bike transform");
+  assertRivalPackAsset(hasIdentityTransform(rider), "rider transform");
+  for (const name of [
+    "bike-steering-pivot",
+    "bike-front-suspension-pivot",
+    "bike-rear-suspension-pivot",
+    "FrontTire",
+    "RearTire",
+    ...HERO_ASSET_POSE_PIVOT_NAMES,
+  ]) {
+    assertRivalPackAsset(hasNeutralRotationAndScale(requiredNode(name)), `${name} neutral transform`);
+  }
+  assertRivalPackAsset(root.userData.asset_root === true, "root provenance marker");
+  assertRivalPackAsset(
+    root.userData.asset_source === "Original project-authored Blender-native geometry",
+    "root source marker",
+  );
+  assertRivalPackAsset(root.userData.source_schema === "rrr-rival-pack-v1", "root schema");
+  assertRivalPackAsset(root.userData.contract === "docs/design/RIVAL_PACK_VERTICAL_SLICE.md", "root contract marker");
+  assertRivalPackAsset(root.userData.gameplay_authority === "presentation-only", "root gameplay authority");
+  assertRivalPackAsset(root.userData.shared_geometry === true, "shared-geometry marker");
+  assertRivalPackAsset(root.userData.variant_numbers === RIVAL_PACK_VARIANT_NUMBERS.join(","), "variant marker");
+  assertRivalPackAsset(bike.userData.presentation_only === true, "bike authority marker");
+  assertRivalPackAsset(rider.userData.pose_pivot_count === HERO_ASSET_POSE_PIVOT_NAMES.length, "pose-pivot marker");
+  assertRivalPackAsset(frontWheel.userData.animated_axis === "+X", "front wheel axis");
+  assertRivalPackAsset(rearWheel.userData.animated_axis === "+X", "rear wheel axis");
+
+  gltf.scene.updateMatrixWorld(true);
+  const bounds = new THREE.Box3().setFromObject(root, true);
+  const size = bounds.getSize(new THREE.Vector3());
+  assertRivalPackAsset(!bounds.isEmpty() && [size.x, size.y, size.z].every(Number.isFinite), "bounds");
+  assertRivalPackAsset(bounds.min.y >= -0.011 && bounds.min.y <= 0.03, "ground contact");
+  assertRivalPackAsset(size.x >= 0.8 && size.x <= 3.2, "width envelope");
+  assertRivalPackAsset(size.y >= 1.6 && size.y <= 3.5, "height envelope");
+  assertRivalPackAsset(size.z >= 2 && size.z <= 4.5, "length envelope");
+  const frontAxle = frontWheel.getWorldPosition(new THREE.Vector3());
+  const rearAxle = rearWheel.getWorldPosition(new THREE.Vector3());
+  assertRivalPackAsset(frontAxle.z < rearAxle.z, "wheel order");
+  assertRivalPackAsset(frontAxle.distanceTo(rearAxle) >= 1.8, "wheelbase");
+
+  return {
+    root,
+    bike,
+    rider,
+    frontWheel,
+    rearWheel,
+    rig: {
+      torso: requiredNode("rider-torso-pivot"),
+      head: requiredNode("rider-head-pivot"),
+      leftArm: requiredNode("rider-left-arm-pivot"),
+      rightArm: requiredNode("rider-right-arm-pivot"),
+      leftLeg: requiredNode("rider-left-leg-pivot"),
+      rightLeg: requiredNode("rider-right-leg-pivot"),
+    },
+    nodeCount: nodes.length,
+    meshCount,
+    primitiveCount,
+    materialCount: decodedMaterials.size,
+    textureCount: decodedTextures.size,
+    triangleCount,
+    geometries,
+  };
+}
+
+const RIVAL_DIGIT_SEGMENTS: Readonly<Record<string, string>> = {
+  "0": "abcdef",
+  "1": "bc",
+  "2": "abdeg",
+  "3": "abcdg",
+  "4": "bcfg",
+  "5": "acdfg",
+  "6": "acdefg",
+  "7": "abc",
+  "8": "abcdefg",
+  "9": "abcdfg",
+};
+const RIVAL_SEGMENT_RECTS: Readonly<Record<string, readonly [number, number, number, number]>> = {
+  a: [7, 4, 23, 7],
+  b: [26, 8, 30, 25],
+  c: [26, 34, 30, 51],
+  d: [7, 50, 23, 53],
+  e: [3, 34, 7, 51],
+  f: [3, 8, 7, 25],
+  g: [7, 27, 23, 31],
+};
+
+function createRivalNumberTexture(
+  number: string,
+  primaryColor: number,
+  accentColor: number,
+): THREE.CanvasTexture {
+  const canvas = document.createElement("canvas");
+  canvas.width = 128;
+  canvas.height = 64;
+  const context = canvas.getContext("2d");
+  assertRivalPackAsset(context, "number-field canvas is unavailable");
+  context.fillStyle = `#${new THREE.Color(primaryColor).getHexString()}`;
+  context.fillRect(0, 0, canvas.width, canvas.height);
+  context.fillStyle = `#${new THREE.Color(accentColor).getHexString()}`;
+  context.fillRect(0, 0, canvas.width, 4);
+  context.fillRect(0, canvas.height - 4, canvas.width, 4);
+  context.fillRect(0, 0, 4, canvas.height);
+  context.fillRect(canvas.width - 4, 0, 4, canvas.height);
+  context.fillStyle = "#fff0bd";
+  for (const [digitIndex, digit] of [...number].entries()) {
+    const xOffset = 31 + digitIndex * 36;
+    for (const segment of RIVAL_DIGIT_SEGMENTS[digit] ?? "") {
+      const rectangle = RIVAL_SEGMENT_RECTS[segment];
+      if (!rectangle) continue;
+      const [left, top, right, bottom] = rectangle;
+      context.fillRect(xOffset + left, top + 3, right - left + 1, bottom - top + 1);
+    }
+  }
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.name = `rival-number-field-${number}`;
+  texture.colorSpace = THREE.SRGBColorSpace;
+  texture.flipY = false;
+  texture.minFilter = THREE.LinearMipmapLinearFilter;
+  texture.magFilter = THREE.LinearFilter;
+  texture.needsUpdate = true;
+  return texture;
+}
+
+function resolveRivalPackClone(
+  root: THREE.Object3D,
+  source: RivalPackNodes,
+): RivalPackNodes {
+  const byName = new Map<string, THREE.Object3D>();
+  const geometries = new Set<THREE.BufferGeometry>();
+  let meshCount = 0;
+  let primitiveCount = 0;
+  let triangleCount = 0;
+  const materials = new Set<THREE.Material>();
+  const textures = new Set<THREE.Texture>();
+  root.traverse((object) => {
+    assertRivalPackAsset(!byName.has(object.name), `duplicate cloned node ${object.name}`);
+    byName.set(object.name, object);
+    if (!(object instanceof THREE.Mesh)) return;
+    meshCount += 1;
+    geometries.add(object.geometry);
+    assertRivalPackAsset(source.geometries.has(object.geometry), "clone did not retain shared geometry");
+    const position = object.geometry.getAttribute("position");
+    triangleCount += (object.geometry.index?.count ?? position?.count ?? 0) / 3;
+    const objectMaterials = Array.isArray(object.material) ? object.material : [object.material];
+    primitiveCount += Array.isArray(object.material)
+      ? Math.max(1, object.geometry.groups.length)
+      : 1;
+    objectMaterials.forEach((material) => {
+      materials.add(material);
+      for (const value of Object.values(material)) {
+        if (value instanceof THREE.Texture) textures.add(value);
+      }
+    });
+  });
+  const required = (name: string): THREE.Object3D => {
+    const node = byName.get(name);
+    assertRivalPackAsset(node, `cloned node ${name} is missing`);
+    return node;
+  };
+  assertRivalPackAsset(byName.size === source.nodeCount, "cloned node count changed");
+  return {
+    root,
+    bike: required("RRR_RivalBikeVisual"),
+    rider: required("rival-rider"),
+    frontWheel: required("FrontTire"),
+    rearWheel: required("RearTire"),
+    rig: {
+      torso: required("rider-torso-pivot"),
+      head: required("rider-head-pivot"),
+      leftArm: required("rider-left-arm-pivot"),
+      rightArm: required("rider-right-arm-pivot"),
+      leftLeg: required("rider-left-leg-pivot"),
+      rightLeg: required("rider-right-leg-pivot"),
+    },
+    nodeCount: byName.size,
+    meshCount,
+    primitiveCount,
+    materialCount: materials.size,
+    textureCount: textures.size,
+    triangleCount,
+    geometries,
+  };
+}
+
+function prepareRivalVariant(
+  source: RivalPackNodes,
+  primaryColor: number,
+  accentColor: number,
+  number: string,
+): PreparedRivalVariant {
+  const root = source.root.clone(true);
+  const numberTexture = createRivalNumberTexture(number, primaryColor, accentColor);
+  const replacements = new Map<THREE.Material, THREE.MeshStandardMaterial>();
+  root.traverse((object) => {
+    if (!(object instanceof THREE.Mesh)) return;
+    const replace = (material: THREE.Material): THREE.Material => {
+      const existing = replacements.get(material);
+      if (existing) return existing;
+      assertRivalPackAsset(material instanceof THREE.MeshStandardMaterial, "variant material is not PBR");
+      const replacement = material.clone();
+      replacement.name = material.name;
+      if (material.name === "RRR_RivalPrimary") replacement.color.setHex(primaryColor);
+      if (material.name === "RRR_RivalAccent") replacement.color.setHex(accentColor);
+      if (material.name === "RRR_RivalNumberField") {
+        replacement.color.setHex(0xffffff);
+        replacement.map = numberTexture;
+      }
+      replacement.needsUpdate = true;
+      replacements.set(material, replacement);
+      return replacement;
+    };
+    object.material = Array.isArray(object.material)
+      ? object.material.map(replace)
+      : replace(object.material);
+  });
+  assertRivalPackAsset(
+    new Set([...replacements.keys()].map((material) => material.name)).size
+      === RIVAL_PACK_MATERIAL_NAMES.size,
+    "variant material inventory is incomplete",
+  );
+  const nodes = resolveRivalPackClone(root, source);
+  assertRivalPackAsset(
+    nodes.meshCount === source.meshCount
+      && nodes.primitiveCount === source.primitiveCount
+      && nodes.materialCount === RIVAL_PACK_MATERIAL_NAMES.size
+      && nodes.textureCount === 1
+      && nodes.triangleCount === source.triangleCount
+      && nodes.geometries.size === source.geometries.size,
+    "variant render metrics changed",
+  );
+  root.position.set(0, RIVAL_PACK_VERTICAL_OFFSET, 0);
+  root.updateMatrix();
+  setShadow(root);
+  nodes.rider.userData.posePivotCount = HERO_ASSET_POSE_PIVOT_NAMES.length;
+  return { root, nodes, numberTexture };
+}
+
 function laneMatches(obstacle: TrackObstacle, lane: number): boolean {
   return obstacle.lanes.includes(lane as LaneIndex);
+}
+
+interface ProceduralObstacleVisualSet {
+  readonly obstacle: TrackObstacle;
+  readonly lap: number;
+  readonly visuals: THREE.Object3D[];
+}
+
+function obstacleVisualKey(obstacleId: string, lap: number): string {
+  return `${lap}:${obstacleId}`;
 }
 
 function retainedSpeedForContact(
@@ -1500,6 +3138,10 @@ function retainedSpeedForContact(
   return contact.parent.moduleId === "bump-row"
     ? Math.pow(policy.retainedSpeed, 1 / 4)
     : policy.retainedSpeed;
+}
+
+function hasFrontWheelClearance(bike: Pick<BikeState, "wheelie" | "pitch">): boolean {
+  return bike.wheelie || bike.pitch >= FRONT_WHEEL_CLEAR_PITCH;
 }
 
 function scaleAuthoredTransform<T extends AuthoredPlacementTransform>(
@@ -1529,15 +3171,7 @@ function qaTrack(track: TrackDefinition, mode: RaceMode): TrackDefinition {
       courseLength: 1_200,
       soloTargetMs: 30_000,
       parTimeMs: 24_000,
-      obstacles: [
-        { id: "qa-cooling", kind: "cooling-gate", distance: 190, lanes: [0, 1, 2, 3], length: 18 },
-        { id: "qa-bump", kind: "bump", distance: 240, lanes: [0, 1, 2, 3], length: 10 },
-        { id: "qa-ramp", kind: "medium-ramp", distance: 280, lanes: [0, 1, 2, 3], length: 18, rampImpulse: 12 },
-        { id: "qa-choice-barrier", kind: "barrier", distance: 380, lanes: [1, 2], length: 6 },
-        { id: "qa-mud", kind: "mud", distance: 440, lanes: [0, 3], length: 30 },
-        { id: "qa-grass", kind: "grass", distance: 500, lanes: [0, 3], length: 22 },
-        { id: "qa-recovery-barrier", kind: "barrier", distance: 560, lanes: [0, 1, 2, 3], length: 6 },
-      ],
+      obstacles: TUTORIAL_OBSTACLES,
     };
   }
   if (import.meta.env.VITE_QA_MODE !== "1") return track;
@@ -1602,7 +3236,8 @@ export class GameEngine {
   private readonly existingBestMs: number | undefined;
   private readonly targetMs: number;
   private readonly onHud: (state: EngineHudState) => void;
-  private readonly onFinish: (result: RaceResult, replaySamples: Uint8Array) => void;
+  private readonly onFinishStart: () => void;
+  private readonly onFinish: (result: RaceResult, replay: RaceReplayHandoff) => void;
   private readonly onFatal: (message: string) => void;
   private readonly scene = new THREE.Scene();
   private readonly camera = new THREE.PerspectiveCamera(54, 1, 0.1, 420);
@@ -1610,8 +3245,12 @@ export class GameEngine {
   private readonly audio: AudioManager;
   private readonly renderer: THREE.WebGLRenderer;
   private readonly webglContext: WebGLRenderingContext;
+  private readonly engineInstanceId: string;
   private readonly player: THREE.Group;
   private readonly compressedAssetLoader: CompressedAssetLoader;
+  private rivalAssetLoader: CompressedAssetLoader | null = null;
+  private canyonAssetLoader: CompressedAssetLoader | null = null;
+  private environmentRenderTarget: THREE.WebGLRenderTarget | null = null;
   private environmentImageLoader: THREE.ImageBitmapLoader | null = null;
   private environmentTexture: THREE.Texture | null = null;
   private readonly visualQualificationFreeze: boolean;
@@ -1652,7 +3291,11 @@ export class GameEngine {
   private readonly dustPool: DustParticle[] = [];
   private readonly ownedTextures: THREE.Texture[] = [];
   private readonly coolingSnowflakes: THREE.InstancedMesh[] = [];
+  private readonly proceduralObstacleVisuals = new Map<string, ProceduralObstacleVisualSet>();
   private sunLight: THREE.DirectionalLight | null = null;
+  private heroKeyLight: THREE.SpotLight | null = null;
+  private heroRimLight: THREE.SpotLight | null = null;
+  private heroFillLight: THREE.PointLight | null = null;
   private highContrastTrackGuides: THREE.Group | null = null;
 
   private animationFrame = 0;
@@ -1660,20 +3303,26 @@ export class GameEngine {
   private running = false;
   private paused = false;
   private finished = false;
+  private finishFinalized = false;
+  private finishClassification: FinishClassificationWork | null = null;
   private hudElapsed = 0;
   private lastBikePhase: BikePhase = "grounded";
   private lastLanding: LandingQuality = null;
   private lastHeatWarning = false;
   private lastOverheated = false;
   private lastHudInputDevice: InputDevice = "keyboard";
+  private readonly riderPoseMemory = new WeakMap<THREE.Object3D, RiderPoseMemory>();
+  private readonly wheelPoseMemory = new WeakMap<THREE.Object3D, WheelPoseMemory>();
+  private playerLaneChangeLeanDirection: LaneChange = 0;
+  private playerLaneChangeLeanSeconds = 0;
   private lastObstacleKey = "";
   private readonly handledObstacleKeys = new Set<string>();
   private cameraShake = 0;
   private cameraInitialized = false;
-  private readonly replayBytes: number[] = [];
-  private lastReplayStep = -6;
+  private readonly replayRecorder = new ReplayRecorder(MAX_REPLAY_BYTES);
   private dustCursor = 0;
   private dustAccumulator = 0;
+  private dustEventBurstCount = 0;
   private droppedSimulationMs = 0;
   private disposed = false;
   private lifecycleActive = false;
@@ -1715,9 +3364,19 @@ export class GameEngine {
 
   constructor(options: GameEngineOptions) {
     this.canvas = options.canvas;
+    this.engineInstanceId = String(++gameEngineInstanceCounter);
+    this.canvas.dataset.engineInstanceId = this.engineInstanceId;
     this.visualQualificationFreeze = import.meta.env.VITE_QA_MODE === "1"
       && new URLSearchParams(window.location.search).has("qa-visual-freeze");
     this.canvas.dataset.bikeAsset = "loading";
+    delete this.canvas.dataset.bikeFallbackReason;
+    this.clearHeroBikeMetrics();
+    this.canvas.dataset.rivalPackAsset = (["rival", "mastery"] as RaceMode[]).includes(options.mode)
+      ? "loading"
+      : "not-applicable";
+    delete this.canvas.dataset.rivalPackFallbackReason;
+    this.clearRivalPackMetrics();
+    this.clearEnvironmentMetrics();
     this.canvas.dataset.environmentAsset = "loading";
     this.canvas.dataset.visualState = this.visualQualificationFreeze ? "loading" : "live";
     this.track = qaTrack(
@@ -1726,21 +3385,31 @@ export class GameEngine {
         : getTrack(options.trackId),
       options.mode,
     );
+    this.canvas.dataset.canyonKitAsset = this.usesAuthoredCanyonKit() ? "loading" : "not-applicable";
+    this.clearCanyonKitMetrics();
+    this.canvas.dataset.groundedDustStyle = "soft-speed-reactive-twin-wheel-plume";
+    this.canvas.dataset.groundedDustBurstCount = "0";
     this.visualProfile = WORLD_VISUAL_PROFILES[this.track.id];
     this.mode = options.mode;
     this.settings = options.settings;
     this.quality = resolveQuality(options.settings.quality);
     this.existingBestMs = options.existingBestMs;
     this.targetMs = options.mode === "mastery"
-      ? masteryTarget(this.track.soloTargetMs, options.masteryLevel ?? 0)
+      ? getMasteryTargetMs(this.track.soloTargetMs, options.masteryLevel ?? 0)
       : this.track.soloTargetMs;
     this.onHud = options.onHud;
+    this.onFinishStart = options.onFinishStart ?? (() => undefined);
     this.onFinish = options.onFinish;
     this.onFatal = options.onFatal;
     this.simulation = new RaceSimulation({
       checkpointCount: this.track.authoredCourse?.checkpoints.length ?? 3,
       totalLaps: options.mode === "tutorial" ? 1 : (options.customTrack?.laps ?? 2),
-      initialHeat: options.mode === "mastery" ? Math.min(65, 35 + (options.masteryLevel ?? 0) * 5) : 0,
+      initialHeat: import.meta.env.VITE_QA_MODE === "1"
+        && new URLSearchParams(window.location.search).has("qa-near-overheat")
+        ? 99
+        : options.mode === "mastery"
+          ? Math.min(65, 35 + (options.masteryLevel ?? 0) * 5)
+          : 0,
       retroRecovery: options.settings.controls.retroRecovery,
       ...(options.mode === "tutorial" ? { wheelieCrashSeconds: 6 } : {}),
     });
@@ -1771,8 +3440,15 @@ export class GameEngine {
       this.renderer.toneMappingExposure = this.visualProfile.exposure;
       this.renderer.shadowMap.enabled = this.quality !== "low";
       this.renderer.shadowMap.type = THREE.PCFShadowMap;
+      this.createPbrEnvironment();
       compressedAssetLoader = createCompressedAssetLoader(this.renderer);
       this.compressedAssetLoader = compressedAssetLoader;
+      if (this.usesAuthoredRivalPack()) {
+        this.rivalAssetLoader = createCompressedAssetLoader(this.renderer, { workerLimit: 1 });
+      }
+      if (this.usesAuthoredCanyonKit()) {
+        this.canyonAssetLoader = createCompressedAssetLoader(this.renderer, { workerLimit: 1 });
+      }
       const skyTexture = createSkyGradientTexture(
         this.visualProfile.background,
         this.visualProfile.fog,
@@ -1788,7 +3464,7 @@ export class GameEngine {
 
       this.player = this.createBike(PLAYER_COLOR, PLAYER_ACCENT, true, "22");
       this.player.scale.setScalar(1.3);
-      this.canvas.dataset.riderPoseStyle = "snapshot-driven-six-pivot";
+      this.canvas.dataset.riderPoseStyle = "action-state-six-pivot";
       this.playerShadow.renderOrder = 2;
       this.scene.add(this.playerShadow, this.player);
       this.createWorld();
@@ -1803,14 +3479,23 @@ export class GameEngine {
     } catch (error) {
       this.disposed = true;
       compressedAssetLoader?.dispose();
+      this.rivalAssetLoader?.dispose();
+      this.rivalAssetLoader = null;
+      this.canyonAssetLoader?.dispose();
+      this.canyonAssetLoader = null;
       this.audio.dispose();
       disposeObjectResources(this.scene, this.ownedTextures);
+      this.scene.environment = null;
+      this.environmentRenderTarget?.dispose();
+      this.environmentRenderTarget = null;
       disposeShadowRenderTargets(this.sunLight);
       releaseRenderer(this.canvas, this.renderer, this.webglContext);
       throw error;
     }
     this.preparation = Promise.all([
       this.loadCompressedPlayerBike(),
+      this.loadCompressedRivalPack(),
+      this.loadCanyonKit(),
       this.loadCanyonFestivalPanorama(),
     ]).then(() => undefined);
   }
@@ -1828,6 +3513,7 @@ export class GameEngine {
     window.addEventListener("keydown", this.unlockAudio);
     this.timer.connect(document);
     this.timer.reset();
+    this.replayRecorder.capture(this.simulation.snapshot);
     this.emitHud(this.simulation.snapshot);
     this.animationFrame = requestAnimationFrame(this.frame);
     startLifecycleResource("engineRenderLoops");
@@ -1867,6 +3553,8 @@ export class GameEngine {
     this.timer.reset();
 
     this.finished = false;
+    this.finishFinalized = false;
+    this.finishClassification = null;
     this.hudElapsed = 0;
     this.lastBikePhase = "grounded";
     this.lastLanding = null;
@@ -1876,10 +3564,12 @@ export class GameEngine {
     this.handledObstacleKeys.clear();
     this.cameraShake = 0;
     this.cameraInitialized = false;
-    this.replayBytes.length = 0;
-    this.lastReplayStep = -6;
+    this.replayRecorder.reset();
+    this.replayRecorder.capture(this.simulation.snapshot);
     this.dustCursor = 0;
     this.dustAccumulator = 0;
+    this.dustEventBurstCount = 0;
+    this.canvas.dataset.groundedDustBurstCount = "0";
     this.crashes = 0;
     this.overheats = 0;
     this.caption = "";
@@ -1887,8 +3577,14 @@ export class GameEngine {
     this.tutorialRecoveryBarrierCrashPending = false;
     for (const particle of this.dustPool) {
       particle.life = 0;
+      particle.maxLife = 0.58;
+      particle.baseScale = 0.7;
+      particle.baseOpacity = 0.42;
       particle.driftX = 0;
+      particle.driftY = 0.42;
       particle.driftZ = 0;
+      const material = Array.isArray(particle.mesh.material) ? particle.mesh.material[0] : particle.mesh.material;
+      if (material instanceof THREE.MeshBasicMaterial) material.opacity = 0;
       particle.mesh.visible = false;
     }
 
@@ -1900,6 +3596,7 @@ export class GameEngine {
 
   updateSettings(settings: GameSettings): void {
     this.settings = settings;
+    this.simulation.setRetroRecovery(settings.controls.retroRecovery);
     this.input.updateSettings(settings.controls);
     this.audio.updateSettings(settings.audio);
     this.applyRendererAccessibility();
@@ -1907,6 +3604,19 @@ export class GameEngine {
     if (quality !== this.quality) {
       this.quality = quality;
       this.renderer.shadowMap.enabled = quality !== "low";
+      this.renderer.shadowMap.type = THREE.PCFShadowMap;
+      if (this.heroKeyLight) {
+        this.heroKeyLight.intensity = heroKeyLightIntensity(quality);
+        this.heroKeyLight.visible = this.heroKeyLight.intensity > 0;
+      }
+      if (this.heroRimLight) {
+        this.heroRimLight.intensity = heroRimLightIntensity(quality);
+        this.heroRimLight.visible = this.heroRimLight.intensity > 0;
+      }
+      if (this.heroFillLight) {
+        this.heroFillLight.intensity = heroFillLightIntensity(quality);
+        this.heroFillLight.visible = this.heroFillLight.intensity > 0;
+      }
       this.resize();
     }
   }
@@ -1935,6 +3645,34 @@ export class GameEngine {
     this.canvas.dataset.coolingCueShape = coolingCueCount > 0 ? "snowflake" : "none";
   }
 
+  private createPbrEnvironment(): void {
+    let roomEnvironment: RoomEnvironment | null = null;
+    let pmremGenerator: THREE.PMREMGenerator | null = null;
+    try {
+      roomEnvironment = new RoomEnvironment();
+      pmremGenerator = new THREE.PMREMGenerator(this.renderer);
+      const size = this.quality === "low" ? 64 : this.quality === "medium" ? 128 : 256;
+      this.environmentRenderTarget = pmremGenerator.fromScene(
+        roomEnvironment,
+        0.04,
+        0.1,
+        100,
+        { size },
+      );
+      this.scene.environment = this.environmentRenderTarget.texture;
+      this.scene.environmentIntensity = this.quality === "high" ? 0.58 : this.quality === "medium" ? 0.48 : 0.34;
+      this.canvas.dataset.pbrEnvironment = "pmrem";
+    } catch {
+      this.scene.environment = null;
+      this.environmentRenderTarget?.dispose();
+      this.environmentRenderTarget = null;
+      this.canvas.dataset.pbrEnvironment = "direct-light-fallback";
+    } finally {
+      roomEnvironment?.dispose();
+      pmremGenerator?.dispose();
+    }
+  }
+
   async unlockSound(): Promise<boolean> {
     const unlocked = await this.audio.unlock();
     if (!unlocked) return false;
@@ -1953,6 +3691,11 @@ export class GameEngine {
     this.input.disconnect();
     this.audio.dispose();
     this.compressedAssetLoader.dispose();
+    this.rivalAssetLoader?.dispose();
+    this.rivalAssetLoader = null;
+    this.canyonAssetLoader?.dispose();
+    this.canyonAssetLoader = null;
+    this.proceduralObstacleVisuals.clear();
     this.environmentImageLoader?.abort();
     this.environmentImageLoader = null;
     this.timer.dispose();
@@ -1964,6 +3707,9 @@ export class GameEngine {
     window.removeEventListener("pointerdown", this.unlockAudio);
     window.removeEventListener("keydown", this.unlockAudio);
     disposeObjectResources(this.scene, this.ownedTextures);
+    this.scene.environment = null;
+    this.environmentRenderTarget?.dispose();
+    this.environmentRenderTarget = null;
     disposeShadowRenderTargets(this.sunLight);
     if (!retainRenderer) {
       releaseRenderer(this.canvas, this.renderer, this.webglContext);
@@ -1991,12 +3737,140 @@ export class GameEngine {
     this.onFatal("The graphics context was lost. Reload the race to recover.");
   };
 
+  private clearHeroBikeMetrics(): void {
+    delete this.canvas.dataset.heroBikeRoot;
+    delete this.canvas.dataset.heroBikeRootCount;
+    delete this.canvas.dataset.heroBikePosePivotCount;
+    delete this.canvas.dataset.heroBikeNodeCount;
+    delete this.canvas.dataset.heroBikeMeshCount;
+    delete this.canvas.dataset.heroBikePrimitiveCount;
+    delete this.canvas.dataset.heroBikeMaterialCount;
+    delete this.canvas.dataset.heroBikeTextureCount;
+    delete this.canvas.dataset.heroBikeTriangleCount;
+    delete this.canvas.dataset.heroBikeBikeTriangleCount;
+    delete this.canvas.dataset.heroBikeRiderTriangleCount;
+    delete this.canvas.dataset.heroBikeWheelTriangleCount;
+    delete this.canvas.dataset.heroBikeGameplayAuthority;
+    delete this.canvas.dataset.heroBikeVerticalOffset;
+    delete this.canvas.dataset.heroBikeMaterialResponse;
+    delete this.canvas.dataset.heroBikeShadowStyle;
+  }
+
+  private recordHeroBikeMetrics(nodes: HeroBikeRiderNodes): void {
+    this.canvas.dataset.heroBikeRoot = nodes.root.name;
+    this.canvas.dataset.heroBikeRootCount = "1";
+    this.canvas.dataset.heroBikePosePivotCount = String(HERO_ASSET_POSE_PIVOT_NAMES.length);
+    this.canvas.dataset.heroBikeNodeCount = String(nodes.nodeCount);
+    this.canvas.dataset.heroBikeMeshCount = String(nodes.meshCount);
+    this.canvas.dataset.heroBikePrimitiveCount = String(nodes.primitiveCount);
+    this.canvas.dataset.heroBikeMaterialCount = String(nodes.materialCount);
+    this.canvas.dataset.heroBikeTextureCount = String(nodes.textureCount);
+    this.canvas.dataset.heroBikeTriangleCount = String(nodes.triangleCount);
+    this.canvas.dataset.heroBikeBikeTriangleCount = String(nodes.bikeTriangleCount);
+    this.canvas.dataset.heroBikeRiderTriangleCount = String(nodes.riderTriangleCount);
+    this.canvas.dataset.heroBikeWheelTriangleCount = String(nodes.wheelTriangleCount);
+    this.canvas.dataset.heroBikeGameplayAuthority = "presentation-only";
+    this.canvas.dataset.heroBikeVerticalOffset = String(HERO_ASSET_VERTICAL_OFFSET);
+    this.canvas.dataset.heroBikeMaterialResponse = "pmrem-three-point";
+    this.canvas.dataset.heroBikeShadowStyle = this.quality === "low" ? "pcf-disabled-low" : "pcf-contact";
+  }
+
+  private installHeroBikeRider(
+    source: THREE.Object3D,
+    nodes: HeroBikeRiderNodes,
+  ): boolean {
+    const previousBike = this.player.userData.bikeVisual;
+    const previousRider = this.player.userData.riderVisual;
+    const previousFrontWheel = this.player.userData.frontWheel;
+    const previousBackWheel = this.player.userData.backWheel;
+    const previousRig = this.player.userData.riderPoseRig;
+    if (
+      !(previousBike instanceof THREE.Object3D)
+      || !(previousRider instanceof THREE.Object3D)
+      || !(previousFrontWheel instanceof THREE.Object3D)
+      || !(previousBackWheel instanceof THREE.Object3D)
+      || !isRiderPoseRig(previousRig)
+    ) return false;
+
+    const previousBikeVisible = previousBike.visible;
+    const previousRiderVisible = previousRider.visible;
+    let sourceAdded = false;
+    try {
+      source.position.set(0, HERO_ASSET_VERTICAL_OFFSET, 0);
+      source.updateMatrix();
+      setFocalBikeShadows(source);
+      tuneFocalBikeMaterialResponse(source, this.scene.environment);
+      this.player.add(source);
+      sourceAdded = true;
+
+      this.player.userData.bikeVisual = nodes.bike;
+      this.player.userData.riderVisual = nodes.rider;
+      this.player.userData.frontWheel = nodes.frontWheel;
+      this.player.userData.backWheel = nodes.rearWheel;
+      this.player.userData.riderPoseRig = nodes.rig;
+      nodes.rider.userData.posePivotCount = HERO_ASSET_POSE_PIVOT_NAMES.length;
+
+      previousBike.visible = false;
+      previousRider.visible = false;
+      this.recordHeroBikeMetrics(nodes);
+      this.canvas.dataset.bikeAsset = "ready";
+      delete this.canvas.dataset.bikeFallbackReason;
+      return true;
+    } catch {
+      this.player.userData.bikeVisual = previousBike;
+      this.player.userData.riderVisual = previousRider;
+      this.player.userData.frontWheel = previousFrontWheel;
+      this.player.userData.backWheel = previousBackWheel;
+      this.player.userData.riderPoseRig = previousRig;
+      previousBike.visible = previousBikeVisible;
+      previousRider.visible = previousRiderVisible;
+      if (sourceAdded) source.removeFromParent();
+      source.position.set(0, 0, 0);
+      source.updateMatrix();
+      this.clearHeroBikeMetrics();
+      return false;
+    }
+  }
+
+  private settleLoadedHeroBike(gltf: GLTF): void {
+    if (this.disposed) {
+      this.compressedAssetLoader.dispose();
+      disposeObjectResources(gltf.scene);
+      return;
+    }
+
+    let installed = false;
+    let fallbackReason = "install-failed";
+    try {
+      const nodes = validateHeroBikeRiderAsset(gltf);
+      installed = this.installHeroBikeRider(gltf.scene, nodes);
+    } catch (error) {
+      fallbackReason = error instanceof Error
+        ? `contract-invalid: ${error.message}`
+        : "contract-invalid";
+    }
+    this.compressedAssetLoader.dispose();
+    if (installed) {
+      if (this.caption.includes("safe built-in model active")) {
+        this.caption = "Authored bike ready";
+        this.captionUntil = this.simulation.snapshot.timeSeconds + 2.5;
+        this.emitHud(this.simulation.snapshot);
+      }
+      return;
+    }
+    disposeObjectResources(gltf.scene);
+    this.activateBuiltInBikeFallback(
+      "Compressed bike unavailable — safe built-in model active",
+      fallbackReason,
+    );
+  }
+
   private async loadCompressedPlayerBike(): Promise<void> {
     const shouldFailForQa = import.meta.env.VITE_QA_MODE === "1"
       && new URLSearchParams(window.location.search).has("qa-asset-failure");
     const loadOutcome = (shouldFailForQa
       ? Promise.reject(new Error("QA asset failure"))
-      : this.compressedAssetLoader.load(FESTIVAL_TRAIL_BIKE_URL)
+      : this.compressedAssetLoader.load(HERO_BIKE_RIDER_URL)
     ).then(
       (gltf) => ({ kind: "loaded" as const, gltf }),
       () => ({ kind: "failed" as const }),
@@ -2012,50 +3886,608 @@ export class GameEngine {
     window.clearTimeout(deadlineTimer);
 
     if (outcome.kind === "timeout") {
-      // The built-in bike is already usable. Keep the race gate bounded and
-      // abort this isolated loader before it can survive a restart. The late
-      // handler remains defensive for browsers that settle during the abort.
-      this.compressedAssetLoader.dispose();
       void loadOutcome.then((lateOutcome) => {
-        if (lateOutcome.kind === "loaded") disposeObjectResources(lateOutcome.gltf.scene);
+        if (lateOutcome.kind === "loaded") {
+          this.settleLoadedHeroBike(lateOutcome.gltf);
+          return;
+        }
+        this.compressedAssetLoader.dispose();
       });
-      this.activateBuiltInBikeFallback("Bike load timed out — safe built-in model active");
+      this.activateBuiltInBikeFallback(
+        "Bike load timed out — safe built-in model active",
+        "timeout",
+      );
       return;
     }
     if (outcome.kind === "failed") {
-      this.activateBuiltInBikeFallback("Compressed bike unavailable — safe built-in model active");
+      this.compressedAssetLoader.dispose();
+      this.activateBuiltInBikeFallback(
+        "Compressed bike unavailable — safe built-in model active",
+        "load-failed",
+      );
       return;
     }
+    this.settleLoadedHeroBike(outcome.gltf);
+  }
+
+  private usesAuthoredRivalPack(): boolean {
+    return (["rival", "mastery"] as RaceMode[]).includes(this.mode);
+  }
+
+  private clearRivalPackMetrics(): void {
+    delete this.canvas.dataset.rivalPackRoot;
+    delete this.canvas.dataset.rivalPackCloneCount;
+    delete this.canvas.dataset.rivalPackNodeCount;
+    delete this.canvas.dataset.rivalPackMeshCount;
+    delete this.canvas.dataset.rivalPackPrimitiveCount;
+    delete this.canvas.dataset.rivalPackMaterialCount;
+    delete this.canvas.dataset.rivalPackTextureCount;
+    delete this.canvas.dataset.rivalPackTriangleCount;
+    delete this.canvas.dataset.rivalPackSharedGeometryCount;
+    delete this.canvas.dataset.rivalPackGeometryInstanceCount;
+    delete this.canvas.dataset.rivalPackGameplayAuthority;
+    delete this.canvas.dataset.rivalPackVerticalOffset;
+  }
+
+  private recordRivalPackMetrics(nodes: RivalPackNodes): void {
+    this.canvas.dataset.rivalPackRoot = nodes.root.name;
+    this.canvas.dataset.rivalPackCloneCount = String(this.aiRiders.length);
+    this.canvas.dataset.rivalPackNodeCount = String(nodes.nodeCount);
+    this.canvas.dataset.rivalPackMeshCount = String(nodes.meshCount);
+    this.canvas.dataset.rivalPackPrimitiveCount = String(nodes.primitiveCount);
+    this.canvas.dataset.rivalPackMaterialCount = String(nodes.materialCount);
+    this.canvas.dataset.rivalPackTextureCount = String(nodes.textureCount);
+    this.canvas.dataset.rivalPackTriangleCount = String(nodes.triangleCount);
+    this.canvas.dataset.rivalPackSharedGeometryCount = String(nodes.geometries.size);
+    this.canvas.dataset.rivalPackGeometryInstanceCount = String(
+      nodes.geometries.size * this.aiRiders.length,
+    );
+    this.canvas.dataset.rivalPackGameplayAuthority = "presentation-only";
+    this.canvas.dataset.rivalPackVerticalOffset = String(RIVAL_PACK_VERTICAL_OFFSET);
+  }
+
+  private activateBuiltInRivalFallback(reason: string): void {
+    if (this.disposed || !this.usesAuthoredRivalPack()) return;
+    this.canvas.dataset.rivalPackAsset = "fallback";
+    this.canvas.dataset.rivalBikeStyle = "shared-knobby-brake-panel-exhaust";
+    this.clearRivalPackMetrics();
+    this.canvas.dataset.rivalPackFallbackReason = reason;
+  }
+
+  private installRivalPack(source: RivalPackNodes): boolean {
+    if (this.aiRiders.length !== AI_FIELD.length) return false;
+    const prepared: PreparedRivalVariant[] = [];
+    const disposePrepared = (): void => {
+      const materials = new Set<THREE.Material>();
+      for (const variant of prepared) {
+        variant.root.removeFromParent();
+        variant.root.traverse((object) => {
+          if (!(object instanceof THREE.Mesh)) return;
+          const objectMaterials = Array.isArray(object.material)
+            ? object.material
+            : [object.material];
+          objectMaterials.forEach((material) => materials.add(material));
+        });
+        variant.numberTexture.dispose();
+      }
+      materials.forEach((material) => material.dispose());
+    };
+
+    try {
+      for (const entrant of AI_FIELD) {
+        prepared.push(prepareRivalVariant(
+          source,
+          entrant.color,
+          entrant.accentColor,
+          entrant.number,
+        ));
+      }
+    } catch {
+      disposePrepared();
+      return false;
+    }
+
+    const previous = this.aiRiders.map((ai) => ({
+      bike: ai.group.userData.bikeVisual as unknown,
+      rider: ai.group.userData.riderVisual as unknown,
+      frontWheel: ai.group.userData.frontWheel as unknown,
+      rearWheel: ai.group.userData.backWheel as unknown,
+      rig: ai.group.userData.riderPoseRig as unknown,
+      bikeVisible: (ai.group.userData.bikeVisual as THREE.Object3D | undefined)?.visible ?? true,
+      riderVisible: (ai.group.userData.riderVisual as THREE.Object3D | undefined)?.visible ?? true,
+      detailStyle: ai.group.userData.bikeDetailStyle as unknown,
+    }));
+    if (previous.some((entry) => (
+      !(entry.bike instanceof THREE.Object3D)
+      || !(entry.rider instanceof THREE.Object3D)
+      || !(entry.frontWheel instanceof THREE.Object3D)
+      || !(entry.rearWheel instanceof THREE.Object3D)
+      || !isRiderPoseRig(entry.rig)
+    ))) {
+      disposePrepared();
+      return false;
+    }
+
+    let installedCount = 0;
+    try {
+      for (const [index, ai] of this.aiRiders.entries()) {
+        const variant = prepared[index]!;
+        ai.group.add(variant.root);
+        installedCount += 1;
+        ai.group.userData.bikeVisual = variant.nodes.bike;
+        ai.group.userData.riderVisual = variant.nodes.rider;
+        ai.group.userData.frontWheel = variant.nodes.frontWheel;
+        ai.group.userData.backWheel = variant.nodes.rearWheel;
+        ai.group.userData.riderPoseRig = variant.nodes.rig;
+        ai.group.userData.bikeDetailStyle = "authored-shared-rival-pack";
+      }
+      for (const entry of previous) {
+        (entry.bike as THREE.Object3D).visible = false;
+        (entry.rider as THREE.Object3D).visible = false;
+      }
+      this.ownedTextures.push(...prepared.map((variant) => variant.numberTexture));
+      this.recordRivalPackMetrics(source);
+      this.canvas.dataset.rivalPackAsset = "ready";
+      delete this.canvas.dataset.rivalPackFallbackReason;
+      this.canvas.dataset.rivalBikeStyle = "authored-shared-rival-pack";
+      return true;
+    } catch {
+      for (const [index, ai] of this.aiRiders.entries()) {
+        const entry = previous[index]!;
+        ai.group.userData.bikeVisual = entry.bike;
+        ai.group.userData.riderVisual = entry.rider;
+        ai.group.userData.frontWheel = entry.frontWheel;
+        ai.group.userData.backWheel = entry.rearWheel;
+        ai.group.userData.riderPoseRig = entry.rig;
+        ai.group.userData.bikeDetailStyle = entry.detailStyle;
+        (entry.bike as THREE.Object3D).visible = entry.bikeVisible;
+        (entry.rider as THREE.Object3D).visible = entry.riderVisible;
+      }
+      for (let index = 0; index < installedCount; index += 1) {
+        prepared[index]?.root.removeFromParent();
+      }
+      disposePrepared();
+      this.clearRivalPackMetrics();
+      return false;
+    }
+  }
+
+  private settleLoadedRivalPack(loader: CompressedAssetLoader, gltf: GLTF): void {
     if (this.disposed) {
-      disposeObjectResources(outcome.gltf.scene);
+      loader.dispose();
+      if (this.rivalAssetLoader === loader) this.rivalAssetLoader = null;
+      disposeObjectResources(gltf.scene);
       return;
     }
-    const compressedBike = outcome.gltf.scene;
-    compressedBike.name = "compressed-festival-trail-bike";
-    compressedBike.position.y = -0.62;
-    compressedBike.scale.setScalar(1.04);
-    setFocalBikeShadows(compressedBike);
-    const previousBike = this.player.userData.bikeVisual as THREE.Object3D | undefined;
-    if (previousBike) previousBike.visible = false;
-    this.player.add(compressedBike);
-    this.player.userData.bikeVisual = compressedBike;
-    const frontWheel = compressedBike.getObjectByName("FrontTire");
-    const backWheel = compressedBike.getObjectByName("RearTire");
-    if (frontWheel) this.player.userData.frontWheel = frontWheel;
-    if (backWheel) this.player.userData.backWheel = backWheel;
-    this.canvas.dataset.bikeAsset = "ready";
+
+    let installed = false;
+    let fallbackReason = "install-failed";
+    try {
+      installed = this.installRivalPack(validateRivalPackAsset(gltf));
+    } catch (error) {
+      fallbackReason = error instanceof Error
+        ? `contract-invalid: ${error.message}`
+        : "contract-invalid";
+    }
+    loader.dispose();
+    if (this.rivalAssetLoader === loader) this.rivalAssetLoader = null;
+    if (installed) {
+      // The five variants retain the decoded BufferGeometry instances, but
+      // every material and number texture has been replaced by an owned clone.
+      disposeObjectMaterialResources(gltf.scene);
+    } else {
+      disposeObjectResources(gltf.scene);
+      this.activateBuiltInRivalFallback(fallbackReason);
+    }
+  }
+
+  private async loadCompressedRivalPack(): Promise<void> {
+    const loader = this.rivalAssetLoader;
+    if (!loader) return;
+    const shouldFailForQa = import.meta.env.VITE_QA_MODE === "1"
+      && new URLSearchParams(window.location.search).has("qa-rival-asset-failure");
+    const loadOutcome = (shouldFailForQa
+      ? Promise.reject(new Error("QA rival asset failure"))
+      : loader.load(RIVAL_PACK_URL)
+    ).then(
+      (gltf) => ({ kind: "loaded" as const, gltf }),
+      () => ({ kind: "failed" as const }),
+    );
+    let deadlineTimer = 0;
+    const deadline = new Promise<{ kind: "timeout" }>((resolve) => {
+      deadlineTimer = window.setTimeout(
+        () => resolve({ kind: "timeout" }),
+        RIVAL_PACK_READINESS_TIMEOUT_MS,
+      );
+    });
+    const outcome = await Promise.race([loadOutcome, deadline]);
+    window.clearTimeout(deadlineTimer);
+
+    if (outcome.kind === "timeout") {
+      this.activateBuiltInRivalFallback("timeout");
+      void loadOutcome.then((lateOutcome) => {
+        if (lateOutcome.kind === "loaded") {
+          this.settleLoadedRivalPack(loader, lateOutcome.gltf);
+          return;
+        }
+        loader.dispose();
+        if (this.rivalAssetLoader === loader) this.rivalAssetLoader = null;
+      });
+      return;
+    }
+    if (outcome.kind === "failed") {
+      loader.dispose();
+      if (this.rivalAssetLoader === loader) this.rivalAssetLoader = null;
+      this.activateBuiltInRivalFallback("load-failed");
+      return;
+    }
+    this.settleLoadedRivalPack(loader, outcome.gltf);
+  }
+
+  private usesAuthoredCanyonKit(): boolean {
+    return this.track.id === "canyon-kickoff" && this.track.authoredCourse === undefined;
+  }
+
+  private clearCanyonKitMetrics(): void {
+    delete this.canvas.dataset.canyonKitRootCount;
+    delete this.canvas.dataset.canyonKitPlacementCount;
+    delete this.canvas.dataset.canyonKitMeshCount;
+    delete this.canvas.dataset.canyonKitGameplayAuthority;
+    delete this.canvas.dataset.canyonKitProceduralReplacementCount;
+    delete this.canvas.dataset.canyonKitReplacedProceduralVisualCount;
+    delete this.canvas.dataset.canyonKitRetainedCoolingCueCount;
+    delete this.canvas.dataset.canyonKitCoolingGateStyle;
+    delete this.canvas.dataset.canyonKitCoolingGateArchCount;
+    delete this.canvas.dataset.canyonKitTabletopRole;
+    delete this.canvas.dataset.canyonKitFailure;
+    delete this.canvas.dataset.canyonKitMissingRoot;
+    delete this.canvas.dataset.canyonKitAvailableRoots;
+  }
+
+  private activateCanyonKitFallback(reason = "unknown"): void {
+    if (this.disposed) return;
+    this.canvas.dataset.canyonKitAsset = "procedural-fallback";
+    this.canvas.dataset.canyonKitFailure = reason;
+    this.clearCanyonKitMetrics();
+    this.canvas.dataset.canyonKitFailure = reason;
+  }
+
+  private async loadCanyonKit(): Promise<void> {
+    if (!this.usesAuthoredCanyonKit()) {
+      this.canvas.dataset.canyonKitAsset = "not-applicable";
+      return;
+    }
+    const loader = this.canyonAssetLoader;
+    if (!loader) {
+      this.activateCanyonKitFallback();
+      return;
+    }
+    const shouldFailForQa = import.meta.env.VITE_QA_MODE === "1"
+      && new URLSearchParams(window.location.search).has("qa-canyon-asset-failure");
+    const loadOutcome = (shouldFailForQa
+      ? Promise.reject(new Error("QA Canyon asset failure"))
+      : loader.load(CANYON_KIT_URL)
+    ).then(
+      (gltf) => ({ kind: "loaded" as const, gltf }),
+      (error: unknown) => ({
+        kind: "failed" as const,
+        reason: error instanceof Error ? error.message : String(error),
+      }),
+    );
+    let deadlineTimer = 0;
+    const deadline = new Promise<{ kind: "timeout" }>((resolve) => {
+      deadlineTimer = window.setTimeout(
+        () => resolve({ kind: "timeout" }),
+        CANYON_KIT_READINESS_TIMEOUT_MS,
+      );
+    });
+    const outcome = await Promise.race([loadOutcome, deadline]);
+    window.clearTimeout(deadlineTimer);
+
+    if (this.disposed) {
+      loader.dispose();
+      if (this.canyonAssetLoader === loader) this.canyonAssetLoader = null;
+      if (outcome.kind === "loaded") {
+        disposeObjectResources(outcome.gltf.scene);
+      } else if (outcome.kind === "timeout") {
+        void loadOutcome.then((lateOutcome) => {
+          if (lateOutcome.kind === "loaded") disposeObjectResources(lateOutcome.gltf.scene);
+        });
+      }
+      return;
+    }
+
+    if (outcome.kind === "timeout") {
+      loader.dispose();
+      if (this.canyonAssetLoader === loader) this.canyonAssetLoader = null;
+      void loadOutcome.then((lateOutcome) => {
+        if (lateOutcome.kind === "loaded") disposeObjectResources(lateOutcome.gltf.scene);
+      });
+      this.activateCanyonKitFallback("timeout");
+      return;
+    }
+    if (outcome.kind === "failed") {
+      loader.dispose();
+      if (this.canyonAssetLoader === loader) this.canyonAssetLoader = null;
+      this.activateCanyonKitFallback(outcome.reason);
+      return;
+    }
+
+    let installed: boolean;
+    try {
+      installed = this.installCanyonKit(outcome.gltf.scene);
+    } catch (error) {
+      this.canvas.dataset.canyonKitFailure = error instanceof Error ? error.message : String(error);
+      installed = false;
+    }
+    loader.dispose();
+    if (this.canyonAssetLoader === loader) this.canyonAssetLoader = null;
+    if (!installed) {
+      disposeObjectResources(outcome.gltf.scene);
+      this.activateCanyonKitFallback(this.canvas.dataset.canyonKitFailure ?? "install-validation");
+      return;
+    }
+    this.canvas.dataset.canyonKitAsset = "ready";
+  }
+
+  private installCanyonKit(source: THREE.Group): boolean {
+    const rootNames = [
+      "CYN_CoolingGate_A",
+      "CYN_WheelieBarrier_A",
+      "CYN_TabletopRamp_A",
+      "CYN_RockCluster_A",
+      "CYN_Pine_A",
+      "CYN_DesertPlants_A",
+      "CYN_SpectatorStand_A",
+      "CYN_FestivalTent_A",
+      "CYN_Workshop_A",
+      "CYN_MarshalTower_A",
+      "CYN_ServiceProps_A",
+    ] as const;
+    const roots = new Map<string, THREE.Object3D>();
+    for (const name of rootNames) {
+      const asset = source.getObjectByName(name);
+      if (!asset) {
+        this.canvas.dataset.canyonKitMissingRoot = name;
+        this.canvas.dataset.canyonKitAvailableRoots = source.children
+          .map((child) => child.name)
+          .filter((childName) => childName.startsWith("CYN_"))
+          .join(",");
+        return false;
+      }
+      roots.set(name, asset);
+    }
+
+    interface Placement {
+      readonly asset: typeof rootNames[number];
+      readonly progress: number;
+      readonly lateral: number;
+      readonly elevation?: number;
+      readonly rotationY?: number;
+      readonly scale?: number | readonly [number, number, number];
+      readonly replacementKey?: string;
+    }
+    const placements: Placement[] = [];
+    const totalLaps = this.simulation.snapshot.race.totalLaps;
+    const tabletopTarget = this.track.obstacles.find((obstacle) => obstacle.kind === "medium-ramp")
+      ?? this.track.obstacles.find((obstacle) => obstacle.kind === "small-ramp")
+      ?? this.track.obstacles.find((obstacle) => obstacle.kind === "large-ramp");
+    for (let lap = 0; lap < totalLaps; lap += 1) {
+      const lapProgress = lap * this.track.courseLength;
+      for (const obstacle of this.track.obstacles) {
+        const replacementKey = obstacleVisualKey(obstacle.id, lap);
+        if (obstacle.kind === "cooling-gate") {
+          for (const lane of obstacle.lanes) {
+            placements.push({
+              asset: "CYN_CoolingGate_A",
+              progress: lapProgress + obstacle.distance,
+              lateral: LANE_POSITIONS[lane],
+              elevation: 0.02,
+              scale: [0.58, 1, 1],
+              replacementKey,
+            });
+          }
+        } else if (obstacle.kind === "barrier") {
+          for (const lane of obstacle.lanes) {
+            placements.push({
+              asset: "CYN_WheelieBarrier_A",
+              progress: lapProgress + obstacle.distance,
+              lateral: LANE_POSITIONS[lane],
+              elevation: 0.02,
+              scale: [2.45 / 3.8, 0.84, 0.84],
+              replacementKey,
+            });
+          }
+        }
+      }
+      if (tabletopTarget) {
+        const lanePositions = tabletopTarget.lanes.map((lane) => LANE_POSITIONS[lane]);
+        const minimum = Math.min(...lanePositions);
+        const maximum = Math.max(...lanePositions);
+        const visualWidth = maximum - minimum + 2.45;
+        const visualLength = resolveObstacleContacts(tabletopTarget)[0]?.length ?? 8;
+        const visualHeight = tabletopTarget.kind === "small-ramp" ? 1.05
+          : tabletopTarget.kind === "medium-ramp" ? 1.75
+            : 2.65;
+        placements.push({
+          asset: "CYN_TabletopRamp_A",
+          progress: lapProgress + tabletopTarget.distance,
+          lateral: (minimum + maximum) / 2,
+          elevation: 0.02,
+          scale: [visualWidth / 5.9, visualHeight / 1.55, visualLength / 8.35],
+          replacementKey: obstacleVisualKey(tabletopTarget.id, lap),
+        });
+      }
+    }
+
+    const decorativePlacements: Placement[] = [
+      { asset: "CYN_FestivalTent_A", progress: 36, lateral: 12.6, rotationY: Math.PI / 2, scale: 1.02 },
+      { asset: "CYN_FestivalTent_A", progress: 48, lateral: -12.6, rotationY: -Math.PI / 2, scale: 0.98 },
+      { asset: "CYN_SpectatorStand_A", progress: 54, lateral: 13.2, rotationY: Math.PI / 2, scale: 1.14 },
+      { asset: "CYN_SpectatorStand_A", progress: 68, lateral: -13.2, rotationY: -Math.PI / 2, scale: 1.18 },
+      { asset: "CYN_ServiceProps_A", progress: 86, lateral: 11.4, rotationY: Math.PI / 2, scale: 0.94 },
+      { asset: "CYN_Workshop_A", progress: 270, lateral: 15.2, rotationY: Math.PI / 2, scale: 1.05 },
+      { asset: "CYN_MarshalTower_A", progress: 360, lateral: -12.8, rotationY: -Math.PI / 2, scale: 0.92 },
+      { asset: "CYN_ServiceProps_A", progress: 181, lateral: 11.8, rotationY: Math.PI / 2, scale: 0.88 },
+      { asset: "CYN_RockCluster_A", progress: 110, lateral: -17.2, rotationY: 0.42, scale: 1.45 },
+      { asset: "CYN_RockCluster_A", progress: 318, lateral: 16.4, rotationY: -0.28, scale: 1.12 },
+      { asset: "CYN_DesertPlants_A", progress: 96, lateral: 12.2, rotationY: -0.25, scale: 0.86 },
+      { asset: "CYN_DesertPlants_A", progress: 286, lateral: -13.4, rotationY: 0.38, scale: 1.04 },
+    ];
+    if (this.quality !== "low") {
+      decorativePlacements.push(
+        { asset: "CYN_SpectatorStand_A", progress: 484, lateral: 14.6, rotationY: Math.PI / 2, scale: 1.02 },
+        { asset: "CYN_FestivalTent_A", progress: 612, lateral: -14.8, rotationY: -Math.PI / 2, scale: 0.9 },
+        { asset: "CYN_MarshalTower_A", progress: 720, lateral: 12.9, rotationY: Math.PI / 2, scale: 0.88 },
+      { asset: "CYN_RockCluster_A", progress: 548, lateral: -17.1, rotationY: 0.7, scale: 1.26 },
+        { asset: "CYN_FestivalTent_A", progress: 532, lateral: 11.8, rotationY: Math.PI / 2, scale: 0.96 },
+        { asset: "CYN_SpectatorStand_A", progress: 566, lateral: -17.2, rotationY: -Math.PI / 2, scale: 1.08 },
+        { asset: "CYN_DesertPlants_A", progress: 586, lateral: 10.7, rotationY: -0.22, scale: 0.92 },
+        { asset: "CYN_Pine_A", progress: 438, lateral: -18.2, rotationY: 0.15, scale: 1.05 },
+      );
+    }
+    if (this.quality === "high") {
+      decorativePlacements.push(
+        { asset: "CYN_ServiceProps_A", progress: 604, lateral: -11.7, rotationY: -Math.PI / 2, scale: 0.82 },
+        { asset: "CYN_RockCluster_A", progress: 824, lateral: 16.8, rotationY: -0.55, scale: 1.18 },
+        { asset: "CYN_DesertPlants_A", progress: 1012, lateral: 13.9, rotationY: 0.22, scale: 0.92 },
+      );
+    }
+    const structuralDecor = new Set<Placement["asset"]>([
+      "CYN_SpectatorStand_A",
+      "CYN_FestivalTent_A",
+      "CYN_Workshop_A",
+      "CYN_MarshalTower_A",
+    ]);
+    const festivalPocketPositions = resolveFestivalPocketPlacements({
+      handcraftedCanyon: true,
+      quality: this.quality,
+      totalLength: this.track.courseLength * totalLaps + 120,
+      trackOrder: this.track.order,
+      coolingGateDistances: this.track.obstacles
+        .filter((obstacle) => obstacle.kind === "cooling-gate")
+        .map((obstacle) => obstacle.distance),
+    }).pocketPlacements.map((pocket) => {
+      const position = new THREE.Vector3();
+      this.courseRoute.sample(-pocket.z, pocket.x, 0, position);
+      return position;
+    });
+    const structuralPosition = new THREE.Vector3();
+    for (let lap = 0; lap < totalLaps; lap += 1) {
+      const lapProgress = lap * this.track.courseLength;
+      for (const placement of decorativePlacements) {
+        const progress = lapProgress + placement.progress;
+        if (structuralDecor.has(placement.asset)) {
+          this.courseRoute.sample(progress, placement.lateral, placement.elevation ?? 0, structuralPosition);
+          if (festivalPocketPositions.some((pocket) => (
+            structuralPosition.distanceTo(pocket) < FESTIVAL_SHOWCASE_CLEARANCE
+          ))) continue;
+        }
+        placements.push({ ...placement, progress });
+      }
+    }
+
+    const replacementKeys = new Set(
+      placements.flatMap((placement) => placement.replacementKey ? [placement.replacementKey] : []),
+    );
+    const coolingGateArchCount = placements.filter(
+      (placement) => placement.asset === "CYN_CoolingGate_A",
+    ).length;
+    for (const replacementKey of replacementKeys) {
+      if ((this.proceduralObstacleVisuals.get(replacementKey)?.visuals.length ?? 0) === 0) return false;
+    }
+
+    const group = new THREE.Group();
+    group.name = "authored-canyon-modular-kit";
+    let meshCount = 0;
+    for (const [index, placement] of placements.entries()) {
+      const sourceRoot = roots.get(placement.asset);
+      if (!sourceRoot) return false;
+      const clone = sourceRoot.clone(true);
+      clone.name = `${placement.asset}_Placement_${index + 1}`;
+      clone.userData.replacesProceduralObstacle = placement.replacementKey ?? null;
+      if (placement.asset === "CYN_CoolingGate_A") {
+        // The former four-lane stretch turned this translucent volume into an
+        // opaque wall. Lane-sized arches stay open and retain the separate,
+        // shape-coded snowflake cue supplied by the gameplay visual.
+        const coolingField = clone.getObjectByName("Gate_CoolingField");
+        if (coolingField) coolingField.visible = false;
+      }
+      clone.position.set(
+        placement.lateral,
+        placement.elevation ?? 0,
+        -placement.progress,
+      );
+      clone.rotation.y = placement.rotationY ?? 0;
+      if (typeof placement.scale === "number") {
+        clone.scale.setScalar(placement.scale);
+      } else if (placement.scale) {
+        clone.scale.set(...placement.scale);
+      }
+      clone.traverse((object) => {
+        if (!(object instanceof THREE.Mesh)) return;
+        meshCount += 1;
+        const materials = Array.isArray(object.material) ? object.material : [object.material];
+        const transparent = materials.some((material) => material.transparent);
+        object.castShadow = this.quality !== "low" && !transparent;
+        object.receiveShadow = !transparent;
+      });
+      this.applyCourseTransform(clone);
+      group.add(clone);
+    }
+    const visibilitySnapshot = new Map<THREE.Object3D, boolean>();
+    let replacedProceduralVisualCount = 0;
+    let retainedCoolingCueCount = 0;
+    try {
+      this.scene.add(group);
+      for (const replacementKey of replacementKeys) {
+        const visualSet = this.proceduralObstacleVisuals.get(replacementKey);
+        if (!visualSet) continue;
+        for (const visual of visualSet.visuals) {
+          replacedProceduralVisualCount += 1;
+          if (visualSet.obstacle.kind === "cooling-gate") {
+            for (const child of visual.children) {
+              visibilitySnapshot.set(child, child.visible);
+              child.visible = child.name === "cooling-gate-snowflake-cue";
+              if (child.visible) retainedCoolingCueCount += 1;
+            }
+          } else {
+            visibilitySnapshot.set(visual, visual.visible);
+            visual.visible = false;
+          }
+        }
+      }
+      this.canvas.dataset.canyonKitRootCount = String(rootNames.length);
+      this.canvas.dataset.canyonKitPlacementCount = String(placements.length);
+      this.canvas.dataset.canyonKitMeshCount = String(meshCount);
+      this.canvas.dataset.canyonKitGameplayAuthority = "presentation-only";
+      this.canvas.dataset.canyonKitProceduralReplacementCount = String(replacementKeys.size);
+      this.canvas.dataset.canyonKitReplacedProceduralVisualCount = String(replacedProceduralVisualCount);
+      this.canvas.dataset.canyonKitRetainedCoolingCueCount = String(retainedCoolingCueCount);
+      this.canvas.dataset.canyonKitCoolingGateStyle = "per-lane-open-arch";
+      this.canvas.dataset.canyonKitCoolingGateArchCount = String(coolingGateArchCount);
+      this.canvas.dataset.canyonKitTabletopRole = "gameplay-ramp-shell";
+      return true;
+    } catch {
+      for (const [object, visible] of visibilitySnapshot) object.visible = visible;
+      group.removeFromParent();
+      this.clearCanyonKitMetrics();
+      return false;
+    }
   }
 
   private async loadCanyonFestivalPanorama(): Promise<void> {
     if (this.track.id !== "canyon-kickoff" || this.track.authoredCourse !== undefined) {
-      this.canvas.dataset.environmentAsset = "not-applicable";
+      this.markEnvironmentNotApplicable();
       return;
     }
     if (typeof createImageBitmap !== "function") {
-      this.activateEnvironmentFallback();
+      this.activateEnvironmentFallback("unsupported", 0);
       return;
     }
 
+    const loadStartedAt = performance.now();
+    const elapsedLoadMs = () => Math.max(0, Math.round(performance.now() - loadStartedAt));
     const shouldFailForQa = import.meta.env.VITE_QA_MODE === "1"
       && new URLSearchParams(window.location.search).has("qa-environment-failure");
     const bitmapOptions: ImageBitmapOptions = {
@@ -2087,25 +4519,31 @@ export class GameEngine {
     window.clearTimeout(deadlineTimer);
 
     if (outcome.kind === "timeout") {
-      loader.abort();
-      this.environmentImageLoader = null;
+      this.activateEnvironmentFallback("timeout", elapsedLoadMs());
       void loadOutcome.then((lateOutcome) => {
-        if (lateOutcome.kind === "loaded") lateOutcome.bitmap.close();
+        if (this.environmentImageLoader === loader) this.environmentImageLoader = null;
+        if (lateOutcome.kind !== "loaded") return;
+        this.activateEnvironmentBitmap(lateOutcome.bitmap, elapsedLoadMs());
       });
-      this.activateEnvironmentFallback();
       return;
     }
     this.environmentImageLoader = null;
     if (outcome.kind === "failed") {
-      this.activateEnvironmentFallback();
+      this.activateEnvironmentFallback("load-failed", elapsedLoadMs());
       return;
     }
     if (this.disposed) {
       outcome.bitmap.close();
       return;
     }
+    this.activateEnvironmentBitmap(outcome.bitmap, elapsedLoadMs());
+  }
 
-    const bitmap = outcome.bitmap;
+  private activateEnvironmentBitmap(bitmap: ImageBitmap, loadMs: number): void {
+    if (this.disposed || !this.ownsCanvasDiagnostics()) {
+      bitmap.close();
+      return;
+    }
     let bitmapClosed = false;
     const texture = new THREE.Texture(bitmap);
     texture.name = "canyon-festival-panorama";
@@ -2125,15 +4563,45 @@ export class GameEngine {
     this.updateEnvironmentTextureTransform();
     this.ownedTextures.push(texture);
     this.canvas.dataset.environmentAsset = "ready";
+    this.canvas.dataset.environmentLoadMs = String(loadMs);
+    delete this.canvas.dataset.environmentFallbackReason;
     this.canvas.dataset.environmentWidth = String(bitmap.width);
     this.canvas.dataset.environmentHeight = String(bitmap.height);
   }
 
-  private activateEnvironmentFallback(): void {
-    if (this.disposed) return;
+  private activateEnvironmentFallback(
+    reason: "unsupported" | "load-failed" | "timeout",
+    loadMs: number,
+  ): void {
+    if (this.disposed || !this.ownsCanvasDiagnostics()) return;
     this.canvas.dataset.environmentAsset = "fallback";
+    this.canvas.dataset.environmentFallbackReason = reason;
+    this.canvas.dataset.environmentLoadMs = String(loadMs);
     delete this.canvas.dataset.environmentWidth;
     delete this.canvas.dataset.environmentHeight;
+  }
+
+  private clearEnvironmentMetrics(): void {
+    clearCanvasDatasetAttribute(this.canvas, "environmentFallbackReason");
+    clearCanvasDatasetAttribute(this.canvas, "environmentLoadMs");
+    clearCanvasDatasetAttribute(this.canvas, "environmentWidth");
+    clearCanvasDatasetAttribute(this.canvas, "environmentHeight");
+  }
+
+  private markEnvironmentNotApplicable(): void {
+    const clearIfCurrent = () => {
+      if (this.disposed || !this.ownsCanvasDiagnostics()) return;
+      this.clearEnvironmentMetrics();
+      this.canvas.dataset.environmentAsset = "not-applicable";
+    };
+    clearIfCurrent();
+    window.requestAnimationFrame(clearIfCurrent);
+    window.setTimeout(clearIfCurrent, 0);
+    window.setTimeout(clearIfCurrent, 120);
+  }
+
+  private ownsCanvasDiagnostics(): boolean {
+    return this.canvas.dataset.engineInstanceId === this.engineInstanceId;
   }
 
   private updateEnvironmentTextureTransform(): void {
@@ -2155,14 +4623,20 @@ export class GameEngine {
       texture.repeat.y = imageAspect / viewportAspect;
       texture.offset.y = (1 - texture.repeat.y) / 2;
     }
+    // Canyon already has a production-painted skyline. Crop a small amount of
+    // empty zenith so its layered mesas sit in the midground instead of hiding
+    // entirely behind the route-following cut banks.
+    texture.repeat.y *= 0.84;
     texture.updateMatrix();
   }
 
-  private activateBuiltInBikeFallback(caption: string): void {
+  private activateBuiltInBikeFallback(caption: string, reason: string): void {
     if (this.disposed) return;
     this.canvas.dataset.bikeAsset = "fallback";
+    this.canvas.dataset.bikeFallbackReason = reason;
+    this.clearHeroBikeMetrics();
     this.caption = caption;
-    this.captionUntil = 6;
+    this.captionUntil = this.simulation.snapshot.timeSeconds + 6;
     this.emitHud(this.simulation.snapshot);
   }
 
@@ -2200,6 +4674,9 @@ export class GameEngine {
       ? clamp(measuredDelta, 0, MAX_DELTA_SECONDS)
       : 0;
 
+    if (!this.visualQualificationFreeze && this.finished && !this.finishFinalized) {
+      this.continueFinishClassification();
+    }
     if (!this.visualQualificationFreeze && !this.paused && !this.finished) {
       this.update(delta);
     } else if (!this.visualQualificationFreeze && this.paused && !this.finished) {
@@ -2223,10 +4700,17 @@ export class GameEngine {
     const input = this.input.sample();
     this.advanceRaceSimulation(delta, input);
     const state = this.simulation.snapshot;
+    if (
+      input.laneChange !== 0
+      && state.bike.phase === "grounded"
+      && !this.settings.accessibility.reducedMotion
+    ) {
+      this.playerLaneChangeLeanDirection = input.laneChange;
+      this.playerLaneChangeLeanSeconds = RIDER_LANE_CHANGE_LEAN_HOLD_SECONDS;
+    }
 
     if (state.race.finished) this.finishRace();
     this.updateDust(delta, state);
-    this.captureReplay(state);
     this.audio.updateEngine(state.bike.speed, input.turbo, state.bike.surface);
     this.hudElapsed += delta;
     if (this.hudElapsed >= 0.08) {
@@ -2256,13 +4740,16 @@ export class GameEngine {
 
       const afterPlayerStep = this.simulation.snapshot;
       this.processTrackEvents(before, afterPlayerStep);
+      this.updateAi(this.simulation.snapshot);
       const playerState = this.simulation.snapshot;
       this.processBikeEvents(playerState);
       this.captureDemonstratedMechanics(before, playerState, input);
-      this.updateAi(playerState);
+      const replayState = this.simulation.snapshot;
+      if (replayState.race.finished) this.replayRecorder.finalize(replayState);
+      else this.replayRecorder.capture(replayState);
       fixedSteps += 1;
 
-      if (playerState.race.finished || this.paused) break;
+      if (replayState.race.finished || this.paused) break;
     }
 
     return fixedSteps;
@@ -2285,63 +4772,204 @@ export class GameEngine {
 
   private setRiderPose(
     rider: THREE.Object3D,
-    speed: number,
-    progress: number,
-    pitch: number,
+    bike: SimulationState["bike"],
     lean: number,
-    height: number,
-    crashed: boolean,
     reducedMotion: boolean,
-  ): void {
-    const riderVisual = rider.userData.riderVisual as THREE.Group | undefined;
-    if (!riderVisual) return;
-    const rig = rider.userData.riderPoseRig as RiderPoseRig | undefined;
-    const speedFactor = clamp(speed / 22, 0, 1);
-    const speedTuck = resolveRiderSpeedTuck(speed, crashed, reducedMotion);
-    riderVisual.rotation.x = speedTuck * 0.28;
-    riderVisual.position.y = crashed || reducedMotion
-      ? 0
-      : Math.sin(progress * 3.2) * 0.014 * speedFactor;
-    if (!rig) return;
-
-    if (crashed) {
-      rig.torso.rotation.set(-0.18, 0.08, 0.34);
-      rig.head.rotation.set(0.24, -0.18, 0.22);
-      rig.leftArm.rotation.set(0.42, -0.08, 0.58);
-      rig.rightArm.rotation.set(-0.18, 0.12, -0.46);
-      rig.leftLeg.rotation.set(-0.32, 0.08, 0.24);
-      rig.rightLeg.rotation.set(0.26, -0.08, -0.2);
-      return;
+    delta: number,
+  ): ResolvedRiderPose {
+    let memory = this.riderPoseMemory.get(rider);
+    if (!memory) {
+      memory = {
+        previousPhase: bike.phase,
+        previousLanding: bike.lastLanding,
+        landingAgeSeconds: Number.POSITIVE_INFINITY,
+        presentationRecoveryProgress: 0,
+        pose: createResolvedRiderPose(),
+      };
+      this.riderPoseMemory.set(rider, memory);
     }
 
-    if (reducedMotion) {
-      rig.torso.rotation.set(0, 0, 0);
-      rig.head.rotation.set(0, 0, 0);
-      rig.leftArm.rotation.set(0, 0, 0);
-      rig.rightArm.rotation.set(0, 0, 0);
-      rig.leftLeg.rotation.set(0, 0, 0);
-      rig.rightLeg.rotation.set(0, 0, 0);
-      return;
+    const landed = bike.phase === "grounded"
+      && bike.lastLanding !== null
+      && (
+        memory.previousPhase === "airborne"
+        || memory.previousLanding === null
+      );
+    if (landed) {
+      memory.landingAgeSeconds = 0;
+    } else if (Number.isFinite(memory.landingAgeSeconds)) {
+      memory.landingAgeSeconds += delta;
     }
+    if (bike.phase === "airborne") {
+      memory.previousLanding = null;
+      memory.landingAgeSeconds = Number.POSITIVE_INFINITY;
+    } else {
+      memory.previousLanding = bike.lastLanding;
+    }
+    if (bike.phase === "crashed" || bike.phase === "recovering") {
+      memory.landingAgeSeconds = Number.POSITIVE_INFINITY;
+    }
+    memory.previousPhase = bike.phase;
 
-    const pitchPose = clamp(pitch, -0.55, 0.55);
-    const leanPose = clamp(lean, -0.17, 0.17);
-    const airborneFactor = clamp(height / 1.6, 0, 1);
-    const groundCadence = Math.sin(progress * 2.7) * 0.018 * speedFactor * (1 - airborneFactor);
-    const torsoPitch = speedTuck * 1.45 - pitchPose * 0.12 * airborneFactor;
-    const armPitch = -torsoPitch * 0.7 - pitchPose * 0.16 * airborneFactor;
-    const legPitch = speedFactor * 0.025 + airborneFactor * (0.08 + pitchPose * 0.16);
-
-    rig.torso.rotation.set(torsoPitch, 0, leanPose * 0.46);
-    rig.head.rotation.set(
-      -torsoPitch * 0.62 + pitchPose * 0.18 * airborneFactor,
-      0,
-      -leanPose * 0.3,
+    memory.presentationRecoveryProgress = resolvePresentationRecoveryProgress(
+      bike.phase,
+      bike.recoveryProgress,
+      memory.presentationRecoveryProgress,
+      delta,
     );
-    rig.leftArm.rotation.set(armPitch - groundCadence, 0, leanPose * 0.24);
-    rig.rightArm.rotation.set(armPitch + groundCadence, 0, leanPose * 0.24);
-    rig.leftLeg.rotation.set(legPitch + groundCadence, 0, leanPose * 0.28);
-    rig.rightLeg.rotation.set(legPitch - groundCadence, 0, leanPose * 0.28);
+
+    const pose = resolveRiderPose({
+      speed: bike.speed,
+      progress: bike.forwardPosition,
+      phase: bike.phase,
+      pitch: bike.pitch,
+      lean,
+      height: bike.height,
+      wheelie: bike.wheelie,
+      recoveryProgress: memory.presentationRecoveryProgress,
+      landingAgeSeconds: memory.landingAgeSeconds,
+      lastLanding: bike.lastLanding,
+      reducedMotion,
+    }, memory.pose);
+    const riderVisual = rider.userData.riderVisual as THREE.Object3D | undefined;
+    if (!riderVisual) return pose;
+    const rig = rider.userData.riderPoseRig as RiderPoseRig | undefined;
+    riderVisual.rotation.set(
+      pose.rootRotationX,
+      pose.rootRotationY,
+      pose.rootRotationZ,
+    );
+    riderVisual.position.set(
+      pose.rootPositionX,
+      pose.rootPositionY,
+      pose.rootPositionZ,
+    );
+    if (rig) {
+      rig.torso.rotation.set(...pose.rig.torso);
+      rig.head.rotation.set(...pose.rig.head);
+      rig.leftArm.rotation.set(...pose.rig.leftArm);
+      rig.rightArm.rotation.set(...pose.rig.rightArm);
+      rig.leftLeg.rotation.set(...pose.rig.leftLeg);
+      rig.rightLeg.rotation.set(...pose.rig.rightLeg);
+    }
+
+    const frontWheel = rider.userData.frontWheel as THREE.Object3D | undefined;
+    const rearWheel = rider.userData.backWheel as THREE.Object3D | undefined;
+    if (frontWheel && rearWheel) {
+      let wheelMemory = this.wheelPoseMemory.get(rider);
+      if (
+        !wheelMemory
+        || wheelMemory.frontWheel !== frontWheel
+        || wheelMemory.rearWheel !== rearWheel
+      ) {
+        wheelMemory = {
+          frontWheel,
+          rearWheel,
+          frontRestPosition: frontWheel.position.clone(),
+          rearRestPosition: rearWheel.position.clone(),
+        };
+        this.wheelPoseMemory.set(rider, wheelMemory);
+      }
+      frontWheel.position.copy(wheelMemory.frontRestPosition);
+      rearWheel.position.copy(wheelMemory.rearRestPosition);
+      frontWheel.position.y += pose.frontSuspensionCompression;
+      rearWheel.position.y += pose.rearSuspensionCompression;
+    }
+    return pose;
+  }
+
+  private recordQaPlayerMotionSnapshot(
+    bike: SimulationState["bike"],
+    steeringRoll: number,
+    presentationPitch: number,
+    reducedMotion: boolean,
+    pose: ResolvedRiderPose,
+  ): void {
+    const state = this.simulation.snapshot;
+    const bikeVisual = this.player.userData.bikeVisual as THREE.Object3D;
+    const riderVisual = this.player.userData.riderVisual as THREE.Object3D;
+    const frontWheel = this.player.userData.frontWheel as THREE.Object3D;
+    const rearWheel = this.player.userData.backWheel as THREE.Object3D;
+    const rig = this.player.userData.riderPoseRig as RiderPoseRig;
+    const round = (value: number) => Number(value.toFixed(4));
+    const rotation = (object: THREE.Object3D) => [
+      round(object.rotation.x),
+      round(object.rotation.y),
+      round(object.rotation.z),
+    ];
+    const landingAgeSeconds = this.riderPoseMemory.get(this.player)?.landingAgeSeconds;
+    const steeringDirection = bike.phase === "crashed" || bike.phase === "recovering"
+      ? "none"
+      : steeringRoll > 0.02
+        ? "left"
+        : steeringRoll < -0.02
+          ? "right"
+          : "none";
+
+    this.canvas.dataset.playerMotionSnapshot = JSON.stringify({
+      asset: this.canvas.dataset.bikeAsset ?? "unknown",
+      fallbackReason: this.canvas.dataset.bikeFallbackReason ?? null,
+      trackId: this.track.id,
+      mode: this.mode,
+      courseLength: this.track.courseLength,
+      stepCount: state.stepCount,
+      timeSeconds: round(state.timeSeconds),
+      phase: bike.phase,
+      lane: bike.lane,
+      lanePosition: round(bike.lanePosition),
+      forwardPosition: round(bike.forwardPosition),
+      speed: round(bike.speed),
+      pitch: round(bike.pitch),
+      presentationPitch: round(presentationPitch),
+      height: round(bike.height),
+      verticalVelocity: round(bike.verticalVelocity),
+      wheelie: bike.wheelie,
+      lastLanding: bike.lastLanding,
+      crashCause: bike.crashCause,
+      recoveryProgress: round(bike.recoveryProgress),
+      inputDevice: this.input.activeDevice,
+      steeringRoll: round(steeringRoll),
+      presentationRoll: round(steeringRoll),
+      steeringDirection,
+      reducedMotion,
+      actionState: pose.actionState,
+      landingAgeSeconds: landingAgeSeconds !== undefined && Number.isFinite(landingAgeSeconds)
+        ? round(landingAgeSeconds)
+        : null,
+      landingCompression: round(pose.landingCompression),
+      suspensionCompression: {
+        front: round(pose.frontSuspensionCompression),
+        rear: round(pose.rearSuspensionCompression),
+      },
+      playerScale: round(this.player.scale.x),
+      activeBikeName: bikeVisual.name,
+      activeRiderName: riderVisual.name,
+      wheelNames: {
+        front: frontWheel.name,
+        rear: rearWheel.name,
+      },
+      distinctWheelObjects: frontWheel !== rearWheel,
+      wheelX: {
+        front: round(frontWheel.rotation.x),
+        rear: round(rearWheel.rotation.x),
+      },
+      riderRoot: {
+        rotationX: round(riderVisual.rotation.x),
+        rotationY: round(riderVisual.rotation.y),
+        rotationZ: round(riderVisual.rotation.z),
+        positionX: round(riderVisual.position.x),
+        positionY: round(riderVisual.position.y),
+        positionZ: round(riderVisual.position.z),
+      },
+      rig: {
+        torso: rotation(rig.torso),
+        head: rotation(rig.head),
+        leftArm: rotation(rig.leftArm),
+        rightArm: rotation(rig.rightArm),
+        leftLeg: rotation(rig.leftLeg),
+        rightLeg: rotation(rig.rightLeg),
+      },
+    });
   }
 
   private addCourseAnchored(...objects: THREE.Object3D[]): void {
@@ -2418,22 +5046,44 @@ export class GameEngine {
     const localDistance = bike.forwardPosition % this.track.courseLength;
     const playerRouteHeight = this.authoredRouteHeight(localDistance, bike.lanePosition);
     const playerBaseY = 0.1 + 0.62 * this.player.scale.y;
-    const playerCrashed = bike.phase === "crashed";
-    const playerSteeringRoll = resolveRiderSteeringRoll(
+    const basePlayerSteeringRoll = resolveRiderPresentationRoll(
       LANE_POSITIONS[bike.lane as LaneIndex],
       bike.lanePosition,
-      playerCrashed,
+      bike.phase,
+      bike.recoveryProgress,
       reducedMotion,
     );
+    if (
+      reducedMotion
+      || bike.phase === "crashed"
+      || bike.phase === "recovering"
+      || this.playerLaneChangeLeanSeconds <= 0
+    ) {
+      this.playerLaneChangeLeanDirection = 0;
+      this.playerLaneChangeLeanSeconds = 0;
+    }
+    const playerSteeringRoll = resolveHeldLaneChangePresentationRoll(
+      basePlayerSteeringRoll,
+      this.playerLaneChangeLeanDirection,
+      this.playerLaneChangeLeanSeconds,
+      bike.phase,
+      reducedMotion,
+    );
+    this.playerLaneChangeLeanSeconds = Math.max(0, this.playerLaneChangeLeanSeconds - delta);
+    if (this.playerLaneChangeLeanSeconds <= 0) this.playerLaneChangeLeanDirection = 0;
 
-    this.setRiderPose(
+    const playerPose = this.setRiderPose(
       this.player,
-      bike.speed,
-      bike.forwardPosition,
-      bike.pitch,
+      bike,
       playerSteeringRoll,
-      bike.height,
-      playerCrashed,
+      reducedMotion,
+      delta,
+    );
+    const playerPresentationPitch = resolveBikePresentationPitch(
+      bike.phase,
+      bike.pitch,
+      bike.wheelie,
+      playerPose.landingCompression,
       reducedMotion,
     );
     this.setRiderPresentation(
@@ -2441,7 +5091,7 @@ export class GameEngine {
       bike.forwardPosition,
       bike.lanePosition,
       playerBaseY + playerRouteHeight + bike.height,
-      bike.pitch,
+      playerPresentationPitch,
       playerSteeringRoll,
     );
     const shadowOrientation = this.courseRoute.sample(
@@ -2456,38 +5106,55 @@ export class GameEngine {
       .copy(this.courseYaw)
       .multiply(this.coursePitch)
       .multiply(SHADOW_ORIENTATION);
+    const crashGrounding = bike.phase === "crashed" || bike.phase === "recovering";
     this.playerShadow.scale.set(
-      1.7 + clamp(bike.speed / 25, 0, 1) * 0.18,
-      2.8,
+      (1.7 + clamp(bike.speed / 25, 0, 1) * 0.18) * (crashGrounding ? 1.55 : 1),
+      2.8 * (crashGrounding ? 1.25 : 1),
       1,
     );
     const playerShadowMaterial = this.playerShadow.material as THREE.MeshBasicMaterial;
-    playerShadowMaterial.opacity = 0.3 * clamp(1 - bike.height / 4.5, 0.1, 1);
-    this.playerShadow.visible = bike.phase !== "crashed";
+    playerShadowMaterial.opacity = 0.3
+      * clamp(1 - bike.height / 4.5, 0.1, 1)
+      * (crashGrounding ? 1.18 : 1);
+    this.playerShadow.visible = true;
     this.player.userData.frontWheel.rotation.x -= wheelSpin;
     this.player.userData.backWheel.rotation.x -= wheelSpin;
+    if (import.meta.env.VITE_QA_MODE === "1") {
+      this.recordQaPlayerMotionSnapshot(
+        bike,
+        playerSteeringRoll,
+        playerPresentationPitch,
+        reducedMotion,
+        playerPose,
+      );
+    }
 
     for (const ai of this.aiRiders) {
       const bike = ai.simulation.snapshot.bike;
       const crashed = bike.phase === "crashed";
-      const steeringRoll = resolveRiderSteeringRoll(
+      const steeringRoll = resolveRiderPresentationRoll(
         LANE_POSITIONS[bike.lane as LaneIndex],
         bike.lanePosition,
-        crashed,
+        bike.phase,
+        bike.recoveryProgress,
         reducedMotion,
       );
       const routeHeight = this.authoredRouteHeight(
         bike.forwardPosition % this.track.courseLength,
         bike.lanePosition,
       );
-      this.setRiderPose(
+      const aiPose = this.setRiderPose(
         ai.group,
-        bike.speed,
-        bike.forwardPosition,
-        bike.pitch,
+        bike,
         steeringRoll,
-        bike.height,
-        crashed,
+        reducedMotion,
+        delta,
+      );
+      const aiPresentationPitch = resolveBikePresentationPitch(
+        bike.phase,
+        bike.pitch,
+        bike.wheelie,
+        aiPose.landingCompression,
         reducedMotion,
       );
       this.setRiderPresentation(
@@ -2495,7 +5162,7 @@ export class GameEngine {
         bike.forwardPosition,
         bike.lanePosition,
         0.72 + routeHeight + bike.height,
-        bike.pitch,
+        aiPresentationPitch,
         steeringRoll,
       );
       ai.group.visible = true;
@@ -2515,7 +5182,7 @@ export class GameEngine {
     const speedLift = reducedMotion ? 0 : clamp(bike.speed / 20, 0, 1) * 0.58;
     const cameraOrientation = this.courseRoute.sample(
       bike.forwardPosition - presentation.trailingDistance,
-      bike.lanePosition * presentation.laneFollow,
+      bike.lanePosition * presentation.laneFollow + presentation.lateralOffset,
       presentation.height + playerRouteHeight + speedLift,
       this.cameraTarget,
     );
@@ -2559,6 +5226,30 @@ export class GameEngine {
         this.sunTarget.position,
       );
       this.sunTarget.updateMatrixWorld();
+    }
+    if (this.heroKeyLight) {
+      this.courseRoute.sample(
+        bike.forwardPosition - 3.5,
+        bike.lanePosition + 5.5,
+        8.5 + playerRouteHeight,
+        this.heroKeyLight.position,
+      );
+    }
+    if (this.heroRimLight) {
+      this.courseRoute.sample(
+        bike.forwardPosition + 4.2,
+        bike.lanePosition - 4.8,
+        5.8 + playerRouteHeight,
+        this.heroRimLight.position,
+      );
+    }
+    if (this.heroFillLight) {
+      this.courseRoute.sample(
+        bike.forwardPosition - 1.2,
+        bike.lanePosition - 2.8,
+        3.1 + playerRouteHeight,
+        this.heroFillLight.position,
+      );
     }
     this.renderer.render(this.scene, this.camera);
   }
@@ -2682,26 +5373,47 @@ export class GameEngine {
     if (contact && state.bike.phase === "grounded") {
       const key = `${lapIndex}:${contact.key}`;
       const policy = this.obstaclePolicy(contact.parent);
-      if (!this.handledObstacleKeys.has(key) && policy.crashesOnContact) {
+      const outcome = getObstacleContactOutcome(
+        contact.kind,
+        policy,
+        hasFrontWheelClearance(state.bike),
+      );
+      if (
+        !this.handledObstacleKeys.has(key)
+        && (policy.crashesOnContact || policy.retainedSpeed < 1)
+      ) {
         this.handledObstacleKeys.add(key);
-        if (this.mode === "tutorial" && contact.parent.id === "qa-recovery-barrier") {
-          this.tutorialEvents.recoveryBarrierCrash = true;
-          this.tutorialRecoveryBarrierCrashPending = true;
-          this.observeTutorialLesson("recovery-barrier-crash");
-        }
-        this.simulation.forceCrash("obstacle");
-        this.captionEvent("Barrier hit — hold recover", "crash");
-      } else if (!this.handledObstacleKeys.has(key) && policy.retainedSpeed < 1) {
-        this.handledObstacleKeys.add(key);
-        if (state.bike.wheelie) {
+        if (outcome === "crash") {
+          if (this.mode === "tutorial" && contact.parent.id === "qa-recovery-barrier") {
+            this.tutorialEvents.recoveryBarrierCrash = true;
+            this.tutorialRecoveryBarrierCrashPending = true;
+            this.observeTutorialLesson("recovery-barrier-crash");
+          }
+          this.simulation.forceCrash("obstacle");
+          this.captionEvent("Barrier hit — hold recover", "crash");
+        } else if (outcome === "slowdown") {
+          this.simulation.applySpeedPenalty(retainedSpeedForContact(contact, policy));
+          if (contact.kind === "barrier") {
+            this.demonstrated.hazardAvoided = true;
+            if (this.mode === "tutorial" && contact.parent.id === "qa-choice-barrier") {
+              this.tutorialEvents.choiceBarrierAvoided = true;
+              this.observeTutorialLesson("choice-barrier-avoided");
+            }
+            this.captionEvent(
+              this.mode === "tutorial" && contact.parent.id === "qa-recovery-barrier"
+                ? "Barrier cleared — retry with front wheel down"
+                : "Front wheel clear — barrier cost speed",
+              "rough-landing",
+            );
+          } else {
+            this.captionEvent("Bump strike — wheelie next time", "rough-landing");
+          }
+        } else {
           if (this.mode === "tutorial" && contact.parent.id === "qa-bump") {
             this.tutorialEvents.trainingBumpClearedInWheelie = true;
             this.observeTutorialLesson("training-bump-wheelie");
           }
           this.captionEvent("Front wheel clear — bump speed held", "landing");
-        } else {
-          this.simulation.applySpeedPenalty(retainedSpeedForContact(contact, policy));
-          this.captionEvent("Bump strike — wheelie next time", "rough-landing");
         }
       }
     }
@@ -2718,6 +5430,7 @@ export class GameEngine {
         bike.lastLanding === "clean" ? "landing" : bike.lastLanding === "rough" ? "rough-landing" : "crash",
       );
       if (bike.lastLanding === "clean") this.observeTutorialLesson("clean-landing");
+      if (bike.lastLanding === "rough") this.emitContactDustBurst(state, "rough-landing");
       if (bike.lastLanding === "crash") this.crashes += 1;
     }
     this.lastLanding = bike.lastLanding;
@@ -2728,8 +5441,10 @@ export class GameEngine {
     if (enteredCrash && !(landingChanged && bike.lastLanding === "crash")) {
       this.crashes += 1;
     }
+    if (enteredCrash) this.emitContactDustBurst(state, "crash");
     if (bike.phase === "crashed") this.demonstrated.crash = true;
     if (previousPhase === "recovering" && bike.phase === "grounded") {
+      this.emitContactDustBurst(state, "recovery");
       this.demonstrated.recovery = true;
       if (this.tutorialRecoveryBarrierCrashPending) {
         this.tutorialEvents.recoveryBarrierRecovered = true;
@@ -2739,7 +5454,7 @@ export class GameEngine {
     }
     this.lastBikePhase = bike.phase;
 
-    const heatWarning = bike.heat >= 78 && !bike.overheated;
+    const heatWarning = bike.heat >= CRITICAL_HEAT_WARNING && !bike.overheated;
     if (heatWarning && !this.lastHeatWarning) {
       this.captionEvent("Heat critical — release turbo or find cyan", "overheat");
       void this.input.warnOverheat();
@@ -2760,12 +5475,13 @@ export class GameEngine {
   ): void {
     const rideAtUsableSpeed = input.throttle
       && state.bike.phase === "grounded"
-      && state.bike.speed >= 5;
-    const coast = before.bike.speed >= 5
+      && state.bike.speed >= TUTORIAL_USABLE_SPEED;
+    const coast = before.bike.speed >= TUTORIAL_USABLE_SPEED
       && !input.throttle
       && !input.turbo
       && state.bike.speed < before.bike.speed;
-    const criticalHeatReached = before.bike.heat < 78 && state.bike.heat >= 78;
+    const criticalHeatReached = before.bike.heat < CRITICAL_HEAT_WARNING
+      && state.bike.heat >= CRITICAL_HEAT_WARNING;
     const coolingRelease = before.bike.surface !== "cooling"
       && state.bike.surface === "cooling"
       && !input.turbo;
@@ -2776,7 +5492,7 @@ export class GameEngine {
 
     this.demonstrated.rideAtUsableSpeed ||= rideAtUsableSpeed;
     this.demonstrated.coast ||= coast;
-    this.demonstrated.criticalHeatReached ||= state.bike.heat >= 78;
+    this.demonstrated.criticalHeatReached ||= state.bike.heat >= CRITICAL_HEAT_WARNING;
     this.demonstrated.coolingRelease ||= state.bike.surface === "cooling" && !input.turbo;
     if (rideAtUsableSpeed) this.observeTutorialLesson("ride-at-usable-speed");
     if (coast) this.observeTutorialLesson("coast");
@@ -2926,14 +5642,22 @@ export class GameEngine {
       ai.recoveryDelaySeconds = 0;
     }
 
-    if (currentContact && bike.phase === "grounded") {
-      const key = `${Math.floor(bike.forwardPosition / this.track.courseLength)}:${currentContact.key}`;
+    const afterLocal = after.forwardPosition % this.track.courseLength;
+    const afterContact = this.nearestObstacleContact(afterLocal, after.lane, after.height);
+    const afterPolicy = this.obstaclePolicy(afterContact?.parent);
+    if (afterContact && after.phase === "grounded") {
+      const key = `${Math.floor(after.forwardPosition / this.track.courseLength)}:${afterContact.key}`;
       if (key !== ai.lastObstacleKey) {
         ai.lastObstacleKey = key;
-        if (currentPolicy.crashesOnContact) {
+        const outcome = getObstacleContactOutcome(
+          afterContact.kind,
+          afterPolicy,
+          hasFrontWheelClearance(after),
+        );
+        if (outcome === "crash") {
           this.crashAi(ai, profile);
-        } else if (currentPolicy.retainedSpeed < 1 && !bike.wheelie) {
-          ai.simulation.applySpeedPenalty(retainedSpeedForContact(currentContact, currentPolicy));
+        } else if (outcome === "slowdown") {
+          ai.simulation.applySpeedPenalty(retainedSpeedForContact(afterContact, afterPolicy));
         }
       }
     }
@@ -3034,7 +5758,7 @@ export class GameEngine {
       ? recoverPrompt
       : state.bike.overheated
         ? "Controls return when heat cools to 35%"
-        : state.bike.heat >= 78
+        : state.bike.heat >= CRITICAL_HEAT_WARNING
           ? "Release turbo or line up a cyan cooling gate"
           : state.bike.phase === "airborne"
             ? "Pitch for a level two-wheel landing"
@@ -3112,13 +5836,57 @@ export class GameEngine {
   private finishRace(): void {
     if (this.finished) return;
     this.finished = true;
-    this.audio.play("finish");
     const state = this.simulation.snapshot;
-    const elapsedMs = Math.round(state.race.elapsedSeconds * 1_000);
-    if (!this.completeAiClassification(state)) {
+    this.finishClassification = {
+      playerState: state,
+      profile: getAiDifficultyProfile(this.settings.difficulty),
+      ticks: 0,
+    };
+    this.audio.play("finish");
+    this.onFinishStart();
+    this.continueFinishClassification(0);
+  }
+
+  private continueFinishClassification(
+    tickBudget = AI_CLASSIFICATION_STEPS_PER_FRAME,
+  ): void {
+    const work = this.finishClassification;
+    if (!work || this.finishFinalized) return;
+
+    const status = this.advanceAiClassification(work, tickBudget);
+    if (status === "pending") return;
+
+    this.finishFinalized = true;
+    this.finishClassification = null;
+    if (status === "exhausted") {
       this.onFatal("The official field result could not be completed. Retry the race.");
       return;
     }
+    this.deliverFinishResult(work.playerState);
+  }
+
+  private advanceAiClassification(
+    work: FinishClassificationWork,
+    tickBudget: number,
+  ): FinishClassificationStatus {
+    if (this.aiRiders.every((ai) => ai.finishTimeMs !== undefined)) return "complete";
+
+    const remainingTicks = Math.max(0, MAX_AI_CLASSIFICATION_STEPS - work.ticks);
+    const sliceTicks = Math.min(Math.max(0, Math.floor(tickBudget)), remainingTicks);
+    for (let tick = 0; tick < sliceTicks; tick += 1) {
+      for (const [index, ai] of this.aiRiders.entries()) {
+        this.stepAi(ai, index, work.profile, work.playerState);
+      }
+      this.resolveAiPairCollisions(work.profile, false);
+      work.ticks += 1;
+      if (this.aiRiders.every((ai) => ai.finishTimeMs !== undefined)) return "complete";
+    }
+
+    return work.ticks >= MAX_AI_CLASSIFICATION_STEPS ? "exhausted" : "pending";
+  }
+
+  private deliverFinishResult(state: SimulationState): void {
+    const elapsedMs = Math.round(state.race.elapsedSeconds * 1_000);
     const classification = this.buildClassification(elapsedMs);
     const playerClassification = classification.find((entry) => entry.isPlayer);
     const position = playerClassification?.position ?? 1;
@@ -3152,23 +5920,18 @@ export class GameEngine {
       overheats: this.overheats,
       coachingHint,
     };
-    const replaySamples = new Uint8Array(this.replayBytes);
-    this.onFinish(result, replaySamples);
-  }
-
-  private completeAiClassification(playerState: SimulationState): boolean {
-    if (this.aiRiders.length === 0) return true;
-    const profile = getAiDifficultyProfile(this.settings.difficulty);
-    let steps = 0;
-    while (this.aiRiders.some((ai) => ai.finishTimeMs === undefined)) {
-      for (const [index, ai] of this.aiRiders.entries()) {
-        this.stepAi(ai, index, profile, playerState);
-      }
-      this.resolveAiPairCollisions(profile, false);
-      steps += 1;
-      if (steps >= MAX_AI_CLASSIFICATION_STEPS) return false;
+    const replayStatus = this.replayRecorder.status;
+    if (!replayStatus.complete) {
+      this.onFinish(result, {
+        status: "unavailable",
+        reason: replayStatus.failureReason ?? "incomplete",
+      });
+      return;
     }
-    return true;
+    this.onFinish(result, {
+      status: "complete",
+      samples: this.replayRecorder.toUint8Array(),
+    });
   }
 
   private buildClassification(playerFinishTimeMs: number): RaceClassificationEntry[] {
@@ -3198,23 +5961,6 @@ export class GameEngine {
     }));
   }
 
-  private captureReplay(state: SimulationState): void {
-    if (state.stepCount - this.lastReplayStep < 6) return;
-    if (this.replayBytes.length + 7 > MAX_REPLAY_BYTES) return;
-    this.lastReplayStep = state.stepCount;
-    const forward = clamp(Math.round(state.bike.forwardPosition * 2), 0, 65_535);
-    const pitch = clamp(Math.round(((state.bike.pitch + Math.PI / 2) / Math.PI) * 255), 0, 255);
-    this.replayBytes.push(
-      forward & 0xff,
-      (forward >> 8) & 0xff,
-      state.bike.lane,
-      clamp(Math.round(state.bike.speed * 10), 0, 255),
-      clamp(Math.round(state.bike.heat * 2.55), 0, 255),
-      pitch,
-      clamp(Math.round(state.bike.height * 10), 0, 255),
-    );
-  }
-
   private capturePerformance(delta: number, frameTimeMs: number): void {
     const windowState = this.performanceWindow;
     windowState.elapsed += delta;
@@ -3230,16 +5976,37 @@ export class GameEngine {
   }
 
   private createDustPool(): void {
-    const count = this.quality === "low" ? 10 : this.quality === "medium" ? 16 : 24;
-    const geometry = new THREE.DodecahedronGeometry(0.16, 0);
-    const material = makeMaterial(this.track.palette.dirtDark, 1);
+    const count = this.quality === "low" ? 12 : this.quality === "medium" ? 22 : 34;
+    const geometry = new THREE.PlaneGeometry(0.88, 0.62);
+    const dustTexture = createSoftDustTexture();
+    this.ownedTextures.push(dustTexture);
+    const dustColor = new THREE.Color(this.track.palette.dirtDark).offsetHSL(0.018, 0.02, 0.08).getHex();
     for (let index = 0; index < count; index += 1) {
+      const material = new THREE.MeshBasicMaterial({
+        color: dustColor,
+        transparent: true,
+        opacity: 0,
+        alphaMap: dustTexture,
+        depthWrite: false,
+        side: THREE.DoubleSide,
+        toneMapped: false,
+      });
       const mesh = new THREE.Mesh(geometry, material);
       mesh.visible = false;
       mesh.castShadow = false;
       mesh.receiveShadow = false;
+      mesh.renderOrder = 2;
       this.scene.add(mesh);
-      this.dustPool.push({ mesh, life: 0, driftX: 0, driftZ: 0 });
+      this.dustPool.push({
+        mesh,
+        life: 0,
+        maxLife: 0.58,
+        baseScale: 0.7,
+        baseOpacity: 0.42,
+        driftX: 0,
+        driftY: 0.42,
+        driftZ: 0,
+      });
     }
   }
 
@@ -3253,9 +6020,15 @@ export class GameEngine {
       }
       particle.mesh.position.x += particle.driftX * delta;
       particle.mesh.position.z += particle.driftZ * delta;
-      particle.mesh.position.y += 0.42 * delta;
-      const scale = 0.7 + (0.58 - particle.life) * 2.1;
+      particle.mesh.position.y += particle.driftY * delta;
+      const elapsed = Math.max(0, particle.maxLife - particle.life);
+      const scale = particle.baseScale + elapsed * 2.1;
       particle.mesh.scale.setScalar(scale);
+      particle.mesh.lookAt(this.camera.position);
+      const material = Array.isArray(particle.mesh.material) ? particle.mesh.material[0] : particle.mesh.material;
+      if (material instanceof THREE.MeshBasicMaterial) {
+        material.opacity = particle.baseOpacity * Math.pow(clamp(particle.life / particle.maxLife, 0, 1), 1.35);
+      }
     }
 
     if (
@@ -3265,28 +6038,95 @@ export class GameEngine {
       || state.bike.surface === "cooling"
     ) return;
     this.dustAccumulator += delta;
-    const interval = this.quality === "low" ? 0.16 : 0.09;
+    const speedFactor = clamp((state.bike.speed - 4) / 18, 0.35, 1.15);
+    const surfaceFactor = state.bike.surface === "mud" ? 1.22 : state.bike.surface === "grass" ? 0.68 : 1;
+    const interval = (this.quality === "low" ? 0.14 : this.quality === "medium" ? 0.08 : 0.06)
+      / clamp(speedFactor * surfaceFactor, 0.65, 1.35);
     if (this.dustAccumulator < interval) return;
     this.dustAccumulator %= interval;
-    const particle = this.dustPool[this.dustCursor % this.dustPool.length];
-    this.dustCursor += 1;
-    if (!particle) return;
-    const side = this.dustCursor % 2 === 0 ? -1 : 1;
-    particle.life = 0.58;
-    const drift = side * (0.25 + (this.dustCursor % 3) * 0.08);
-    particle.mesh.scale.setScalar(0.7);
-    const orientation = this.courseRoute.sample(
-      state.bike.forwardPosition - 0.85,
-      state.bike.lanePosition + side * 0.26,
-      0.18 + this.authoredRouteHeight(
-        state.bike.forwardPosition % this.track.courseLength,
-        state.bike.lanePosition,
-      ),
-      particle.mesh.position,
-    );
-    particle.driftX = orientation.rightX * drift;
-    particle.driftZ = orientation.rightZ * drift;
-    particle.mesh.visible = true;
+    const emissions = this.quality === "low" ? 1 : 2;
+    const baseSide = this.dustCursor % 2 === 0 ? -1 : 1;
+    for (let index = 0; index < emissions; index += 1) {
+      const particle = this.dustPool[this.dustCursor % this.dustPool.length];
+      this.dustCursor += 1;
+      if (!particle) continue;
+      const side = emissions === 1 ? baseSide : index === 0 ? -1 : 1;
+      const rearOffset = 1.08 + speedFactor * 0.52 + index * 0.14;
+      const laneOffset = side * (0.36 + speedFactor * 0.18);
+      const orientation = this.courseRoute.sample(
+        state.bike.forwardPosition - rearOffset,
+        state.bike.lanePosition + laneOffset,
+        0.42 + this.authoredRouteHeight(
+          state.bike.forwardPosition % this.track.courseLength,
+          state.bike.lanePosition,
+        ),
+        particle.mesh.position,
+      );
+      const lateralDrift = side * (0.24 + speedFactor * 0.26);
+      const rearDrift = -(0.22 + speedFactor * 0.34);
+      particle.life = 0.62 + speedFactor * 0.16;
+      particle.maxLife = particle.life;
+      particle.baseScale = (0.92 + speedFactor * 0.44) * surfaceFactor;
+      particle.baseOpacity = (0.42 + speedFactor * 0.14) * (state.bike.surface === "grass" ? 0.72 : 1);
+      particle.mesh.scale.setScalar(particle.baseScale);
+      particle.mesh.lookAt(this.camera.position);
+      const material = Array.isArray(particle.mesh.material) ? particle.mesh.material[0] : particle.mesh.material;
+      if (material instanceof THREE.MeshBasicMaterial) material.opacity = particle.baseOpacity;
+      particle.driftX = orientation.rightX * lateralDrift + orientation.forwardX * rearDrift;
+      particle.driftY = 0.34 + speedFactor * 0.18;
+      particle.driftZ = orientation.rightZ * lateralDrift + orientation.forwardZ * rearDrift;
+      particle.mesh.visible = true;
+    }
+  }
+
+  private emitContactDustBurst(
+    state: SimulationState,
+    kind: "rough-landing" | "crash" | "recovery",
+  ): void {
+    if (this.settings.accessibility.reducedMotion || this.dustPool.length === 0) return;
+    const burstCount = kind === "crash"
+      ? (this.quality === "low" ? 5 : this.quality === "medium" ? 8 : 11)
+      : kind === "rough-landing"
+        ? (this.quality === "low" ? 3 : this.quality === "medium" ? 5 : 7)
+        : (this.quality === "low" ? 2 : this.quality === "medium" ? 3 : 4);
+    const speedFactor = clamp(state.bike.speed / 22, 0.45, 1.15);
+    const forwardBase = state.bike.forwardPosition - (kind === "crash" ? 1.15 : 0.8);
+    const life = kind === "crash" ? 0.82 : kind === "rough-landing" ? 0.68 : 0.5;
+    const baseScale = kind === "crash" ? 1.05 : kind === "rough-landing" ? 0.86 : 0.62;
+    for (let index = 0; index < burstCount; index += 1) {
+      const particle = this.dustPool[this.dustCursor % this.dustPool.length];
+      this.dustCursor += 1;
+      if (!particle) continue;
+      const sideSign = index % 2 === 0 ? -1 : 1;
+      const spreadStep = Math.floor(index / 2);
+      const laneOffset = sideSign * (0.18 + spreadStep * 0.11);
+      const forwardOffset = (index % 3) * 0.18;
+      const orientation = this.courseRoute.sample(
+        forwardBase - forwardOffset,
+        state.bike.lanePosition + laneOffset,
+        0.28 + this.authoredRouteHeight(
+          state.bike.forwardPosition % this.track.courseLength,
+          state.bike.lanePosition,
+        ),
+        particle.mesh.position,
+      );
+      const lateralDrift = sideSign * (0.44 + spreadStep * 0.12) * speedFactor;
+      const rearDrift = -(0.35 + (index % 3) * 0.14) * speedFactor;
+      particle.life = life;
+      particle.maxLife = life;
+      particle.baseScale = baseScale + spreadStep * 0.08;
+      particle.baseOpacity = kind === "crash" ? 0.62 : kind === "rough-landing" ? 0.54 : 0.42;
+      particle.driftX = orientation.rightX * lateralDrift + orientation.forwardX * rearDrift;
+      particle.driftY = kind === "crash" ? 0.58 + (index % 4) * 0.05 : 0.44 + (index % 3) * 0.04;
+      particle.driftZ = orientation.rightZ * lateralDrift + orientation.forwardZ * rearDrift;
+      particle.mesh.scale.setScalar(particle.baseScale);
+      particle.mesh.lookAt(this.camera.position);
+      const material = Array.isArray(particle.mesh.material) ? particle.mesh.material[0] : particle.mesh.material;
+      if (material instanceof THREE.MeshBasicMaterial) material.opacity = particle.baseOpacity;
+      particle.mesh.visible = true;
+    }
+    this.dustEventBurstCount += 1;
+    this.canvas.dataset.groundedDustBurstCount = String(this.dustEventBurstCount);
   }
 
   private createWorld(): void {
@@ -3313,6 +6153,47 @@ export class GameEngine {
     sun.shadow.normalBias = 0.025;
     this.sunLight = sun;
     this.scene.add(sun, this.sunTarget);
+
+    const heroKey = new THREE.SpotLight(
+      0xc8edff,
+      heroKeyLightIntensity(this.quality),
+      28,
+      Math.PI / 5,
+      0.72,
+      1.35,
+    );
+    heroKey.name = "hero-bike-cool-key";
+    heroKey.castShadow = false;
+    heroKey.target = this.player;
+    heroKey.visible = heroKey.intensity > 0;
+    this.heroKeyLight = heroKey;
+    this.scene.add(heroKey);
+
+    const heroRim = new THREE.SpotLight(
+      0xffbd7a,
+      heroRimLightIntensity(this.quality),
+      24,
+      Math.PI / 4.8,
+      0.78,
+      1.5,
+    );
+    heroRim.name = "hero-bike-warm-rim";
+    heroRim.castShadow = false;
+    heroRim.target = this.player;
+    heroRim.visible = heroRim.intensity > 0;
+    this.heroRimLight = heroRim;
+    this.scene.add(heroRim);
+
+    const heroFill = new THREE.PointLight(
+      0x58f3ff,
+      heroFillLightIntensity(this.quality),
+      12,
+      1.7,
+    );
+    heroFill.name = "hero-bike-cyan-fill";
+    heroFill.visible = heroFill.intensity > 0;
+    this.heroFillLight = heroFill;
+    this.scene.add(heroFill);
 
     const totalLaps = this.simulation.snapshot.race.totalLaps;
     const totalLength = this.track.courseLength * totalLaps + 120;
@@ -3341,11 +6222,14 @@ export class GameEngine {
     const dirtMaterial = new THREE.MeshStandardMaterial({
       map: dirtTexture,
       bumpMap: dirtHeightTexture,
-      bumpScale: 0.105,
+      bumpScale: 0.135,
       color: 0xffffff,
-      roughness: 0.88,
+      roughness: 0.94,
       metalness: 0,
     });
+    this.canvas.dataset.dirtTextureDetailStyle = DIRT_TEXTURE_DETAIL_STYLE;
+    this.canvas.dataset.dirtTextureResolution = `${dirtTexture.image?.width ?? 0}x${dirtTexture.image?.height ?? 0}`;
+    this.canvas.dataset.dirtHeightTextureResolution = `${dirtHeightTexture.image?.width ?? 0}x${dirtHeightTexture.image?.height ?? 0}`;
     const grass = new THREE.Mesh(
       createCourseRibbonGeometry(this.courseRoute, {
         startProgress: routeStart,
@@ -3442,7 +6326,7 @@ export class GameEngine {
     }
     this.createScenery(totalLength);
     this.createTrackEdgeDetail(totalLength);
-    this.createSkyDecor(totalLength);
+    if (this.track.id !== "canyon-kickoff") this.createSkyDecor(totalLength);
     this.createThemeDecor(totalLength);
     this.createFestivalDecor(totalLength);
   }
@@ -3894,6 +6778,13 @@ export class GameEngine {
 
   private createObstacle(obstacle: TrackObstacle, lap: number): void {
     const z = -(lap * this.track.courseLength + obstacle.distance);
+    const visualKey = obstacleVisualKey(obstacle.id, lap);
+    const visualSet: ProceduralObstacleVisualSet = {
+      obstacle,
+      lap,
+      visuals: [],
+    };
+    this.proceduralObstacleVisuals.set(visualKey, visualSet);
     const materials: ObstacleMaterials = {
       dirt: makeMaterial(this.track.palette.dirtDark),
       wood: makeMaterial(0xb8763f),
@@ -3924,6 +6815,10 @@ export class GameEngine {
       } else {
         this.addCourseAnchored(mesh);
       }
+      mesh.userData.proceduralObstacleVisual = true;
+      mesh.userData.obstacleId = obstacle.id;
+      mesh.userData.obstacleLap = lap;
+      visualSet.visuals.push(mesh);
     }
   }
 
@@ -4465,18 +7360,20 @@ export class GameEngine {
       ? continuousSegments * 2
       : zoneCount * blocksPerSide * 2;
     const blocks = new THREE.InstancedMesh(
-      new THREE.BoxGeometry(1.35, 0.58, 1),
+      new THREE.BoxGeometry(1.05, 0.46, 1),
       makeMaterial(0xffffff, 0.74),
       blockCount,
     );
     blocks.name = continuousCanyon
       ? "canyon-continuous-safety-wall"
       : "festival-safety-zones";
-    const blockColors = [
-      new THREE.Color(0xf3ead4),
-      new THREE.Color(0xef604f),
-      new THREE.Color(0x1fb7b6),
-    ];
+    const blockColors = continuousCanyon
+      ? [new THREE.Color(0xf3ead4), new THREE.Color(0xd94c3d)]
+      : [
+        new THREE.Color(0xf3ead4),
+        new THREE.Color(0xef604f),
+        new THREE.Color(0x1fb7b6),
+      ];
     const matrix = new THREE.Matrix4();
     const position = new THREE.Vector3();
     const rotation = new THREE.Quaternion();
@@ -4488,7 +7385,7 @@ export class GameEngine {
         const depth = Math.min(continuousSpan, totalLength - segment * continuousSpan);
         const z = 20 - segment * continuousSpan - depth / 2;
         for (const side of [-1, 1]) {
-          position.set(side * 7.7, 0.36, z);
+          position.set(side * 7.45, 0.28, z);
           scale.set(1, 1, depth + continuousOverlap);
           matrix.compose(position, rotation, scale);
           blocks.setMatrixAt(blockIndex, matrix);
@@ -4711,11 +7608,11 @@ export class GameEngine {
       const mesaCaps = new THREE.InstancedMesh(new THREE.CylinderGeometry(2.55, 2.85, 1.1, 7), capMaterial, mesaCount);
       for (let index = 0; index < mesaCount; index += 1) {
         const side = index % 2 === 0 ? -1 : 1;
-        const z = -15 - (index / mesaCount) * totalLength;
-        const x = side * (18.5 + ((index * 19) % 13));
+        const z = -56 - (index / mesaCount) * totalLength;
+        const x = side * (20.5 + ((index * 19) % 13));
         const terraceLift = this.sceneryElevation(x);
-        const width = 0.95 + (index % 4) * 0.22;
-        const height = 0.78 + ((index * 7) % 6) * 0.13;
+        const width = 0.88 + (index % 4) * 0.2;
+        const height = 0.72 + ((index * 7) % 6) * 0.12;
         const rotation = new THREE.Quaternion().setFromEuler(new THREE.Euler(0, index * 0.47, 0));
         matrix.compose(
           new THREE.Vector3(x, terraceLift + 3.25 * height, z),
@@ -4844,6 +7741,11 @@ export class GameEngine {
     }
     huts.castShadow = this.quality !== "low";
     hutRoofs.castShadow = this.quality !== "low";
+    this.canvas.dataset.coastlineWaterStyle = "right-side-water-boardwalk";
+    this.canvas.dataset.coastlineBoardwalkStyle = "route-following-planks";
+    this.canvas.dataset.coastlineHutStyle = "colorful-boardwalk-huts";
+    this.canvas.dataset.coastlineHutCount = String(hutCount);
+    this.canvas.dataset.coastlineThemeBatchCount = "4";
     this.scene.add(water, boardwalk);
     this.addCourseAnchored(huts, hutRoofs);
   }
@@ -5198,6 +8100,7 @@ export class GameEngine {
 
   private createCanyonThemeDecor(totalLength: number): void {
     const matrix = new THREE.Matrix4();
+    this.createCanyonShoulderDressing(totalLength);
     const archMaterial = makeMaterial(this.track.palette.rock, 0.9);
     const arches = new THREE.InstancedMesh(
       new THREE.TorusGeometry(3.6, 0.95, 6, 12, Math.PI),
@@ -5244,6 +8147,145 @@ export class GameEngine {
     this.addCourseAnchored(cacti);
   }
 
+  private createCanyonShoulderDressing(totalLength: number): void {
+    if (this.track.authoredCourse !== undefined) {
+      this.canvas.dataset.canyonShoulderDressingStyle = "authored-excluded";
+      this.canvas.dataset.canyonShoulderShelfCount = "0";
+      this.canvas.dataset.canyonShoulderRockCount = "0";
+      this.canvas.dataset.canyonShoulderAgaveCount = "0";
+      return;
+    }
+
+    const matrix = new THREE.Matrix4();
+    const random = seededRandom(this.track.order * 811_721);
+    const shoulderRibbonMaterial = makeMaterial(
+      new THREE.Color(this.track.palette.rock).offsetHSL(0.01, 0.025, 0.015).getHex(),
+      0.96,
+    );
+    const shoulderRibbons = [-1, 1].map((side) => {
+      const ribbon = new THREE.Mesh(
+        createCourseRibbonGeometry(this.courseRoute, {
+          startProgress: -30,
+          endProgress: totalLength - 30,
+          left: side < 0 ? -7.05 : 6.05,
+          right: side < 0 ? -6.05 : 7.05,
+          yOffset: 0.018,
+          segmentLength: 3,
+        }),
+        shoulderRibbonMaterial,
+      );
+      ribbon.name = side < 0
+        ? "canyon-left-visible-cut-bank-ribbon"
+        : "canyon-right-visible-cut-bank-ribbon";
+      ribbon.receiveShadow = true;
+      ribbon.userData.presentationOnly = true;
+      return ribbon;
+    });
+    const shelfCount = this.quality === "low" ? 34 : this.quality === "medium" ? 54 : 78;
+    const shelfMaterial = makeMaterial(
+      new THREE.Color(this.track.palette.rock).offsetHSL(0.01, 0.03, -0.045).getHex(),
+      0.94,
+    );
+    const shelves = new THREE.InstancedMesh(
+      new THREE.BoxGeometry(1, 1, 1),
+      shelfMaterial,
+      shelfCount,
+    );
+    const shelfColors = [
+      new THREE.Color(0xa64d33),
+      new THREE.Color(0xc66742),
+      new THREE.Color(0x7f392a),
+      new THREE.Color(0xd27a4e),
+    ];
+    for (let index = 0; index < shelfCount; index += 1) {
+      const side = index % 2 === 0 ? -1 : 1;
+      const distance = 18 + ((index + 0.35) / shelfCount) * Math.max(60, totalLength - 34);
+      const lateral = side * (7.9 + random() * 1.05);
+      const scaleX = 0.8 + random() * 0.9;
+      const scaleY = 0.36 + random() * 0.5;
+      const scaleZ = 3.4 + random() * 6.4;
+      matrix.compose(
+        new THREE.Vector3(
+          lateral,
+          this.sceneryElevation(lateral) + scaleY * 0.5,
+          -distance,
+        ),
+        new THREE.Quaternion().setFromEuler(new THREE.Euler(0, side * (0.08 + random() * 0.18), 0)),
+        new THREE.Vector3(scaleX, scaleY, scaleZ),
+      );
+      shelves.setMatrixAt(index, matrix);
+      shelves.setColorAt(index, shelfColors[index % shelfColors.length] ?? new THREE.Color(0xa64d33));
+    }
+    if (shelves.instanceColor) shelves.instanceColor.needsUpdate = true;
+    shelves.name = "canyon-route-following-cut-bank-shelves";
+    shelves.userData.presentationOnly = true;
+    shelves.castShadow = this.quality === "high";
+    shelves.receiveShadow = true;
+
+    const rockCount = this.quality === "low" ? 72 : this.quality === "medium" ? 124 : 184;
+    const shoulderRocks = new THREE.InstancedMesh(
+      new THREE.DodecahedronGeometry(0.34, 0),
+      makeMaterial(new THREE.Color(this.track.palette.rock).offsetHSL(0, 0.02, 0.02).getHex(), 0.96),
+      rockCount,
+    );
+    for (let index = 0; index < rockCount; index += 1) {
+      const side = index % 2 === 0 ? -1 : 1;
+      const distance = 12 + random() * Math.max(52, totalLength - 18);
+      const lateral = side * (7.9 + random() * 1.8);
+      const scale = 0.42 + random() * 1.2;
+      matrix.compose(
+        new THREE.Vector3(
+          lateral,
+          this.sceneryElevation(lateral) + 0.18 * scale,
+          -distance,
+        ),
+        new THREE.Quaternion().setFromEuler(new THREE.Euler(random() * 0.45, random() * Math.PI, random() * 0.2)),
+        new THREE.Vector3(scale * (1.1 + random() * 1.25), scale * 0.58, scale),
+      );
+      shoulderRocks.setMatrixAt(index, matrix);
+    }
+    shoulderRocks.name = "canyon-shoulder-pebble-bands";
+    shoulderRocks.userData.presentationOnly = true;
+    shoulderRocks.castShadow = this.quality === "high";
+    shoulderRocks.receiveShadow = true;
+
+    const agaveCount = this.quality === "low" ? 20 : this.quality === "medium" ? 34 : 52;
+    const agaves = new THREE.InstancedMesh(
+      createCanyonAgaveGeometry(),
+      makeMaterial(0x6d8b3a, 0.98),
+      agaveCount,
+    );
+    for (let index = 0; index < agaveCount; index += 1) {
+      const side = index % 2 === 0 ? -1 : 1;
+      const distance = 24 + ((index + random()) / agaveCount) * Math.max(80, totalLength - 44);
+      const lateral = side * (8.18 + random() * 1.95);
+      const scale = 0.62 + random() * 0.72;
+      matrix.compose(
+        new THREE.Vector3(
+          lateral,
+          this.sceneryElevation(lateral) + 0.13 * scale,
+          -distance,
+        ),
+        new THREE.Quaternion().setFromEuler(new THREE.Euler(0, random() * Math.PI * 2, 0)),
+        new THREE.Vector3(scale, scale, scale),
+      );
+      agaves.setMatrixAt(index, matrix);
+    }
+    agaves.name = "canyon-agave-route-clusters";
+    agaves.userData.presentationOnly = true;
+    agaves.castShadow = this.quality !== "low";
+    agaves.receiveShadow = true;
+
+    this.canvas.dataset.canyonShoulderDressingStyle = "route-following-cut-bank";
+    this.canvas.dataset.canyonShoulderShelfCount = String(shelfCount);
+    this.canvas.dataset.canyonShoulderRockCount = String(rockCount);
+    this.canvas.dataset.canyonShoulderAgaveCount = String(agaveCount);
+    this.canvas.dataset.canyonShoulderRibbonCount = String(shoulderRibbons.length);
+    this.canvas.dataset.canyonShoulderDressingBatchCount = "4";
+    this.scene.add(...shoulderRibbons);
+    this.addSurfaceCourseAnchored(shelves, shoulderRocks, agaves);
+  }
+
   private createFestivalDecor(totalLength: number): void {
     const timber = makeMaterial(0x7f4e2e);
     const roofMaterial = makeMaterial(0x159ca2);
@@ -5253,8 +8295,122 @@ export class GameEngine {
     this.createFestivalTents(timber);
     this.createFestivalBanners(totalLength);
     this.createFestivalRoutePockets(totalLength, timber);
+    this.createCanyonRouteCrowdRails(totalLength, timber);
     this.createFestivalBillboards(timber);
     this.createFestivalLandmark(timber, roofMaterial);
+  }
+
+  private createCanyonRouteCrowdRails(
+    totalLength: number,
+    timber: THREE.MeshStandardMaterial,
+  ): void {
+    if (this.track.id !== "canyon-kickoff" || this.track.authoredCourse !== undefined) {
+      delete this.canvas.dataset.canyonRouteCrowdStyle;
+      delete this.canvas.dataset.canyonRouteCrowdGroupCount;
+      delete this.canvas.dataset.canyonRouteCrowdSpectatorCount;
+      delete this.canvas.dataset.canyonRouteCrowdTierCount;
+      return;
+    }
+    const groupCount = this.quality === "low" ? 8 : this.quality === "medium" ? 14 : 22;
+    const peoplePerGroup = this.quality === "low" ? 4 : this.quality === "medium" ? 7 : 9;
+    const spectatorCount = groupCount * peoplePerGroup;
+    const tierCount = groupCount * 2;
+    const platforms = new THREE.InstancedMesh(
+      new THREE.BoxGeometry(1, 1, 1),
+      timber,
+      tierCount,
+    );
+    const people = new THREE.InstancedMesh(
+      new THREE.CapsuleGeometry(0.2, 0.6, 3, 6),
+      makeMaterial(0xffffff, 0.82),
+      spectatorCount,
+    );
+    const heads = new THREE.InstancedMesh(
+      new THREE.SphereGeometry(0.2, 7, 5),
+      makeMaterial(0xffffff, 0.86),
+      spectatorCount,
+    );
+    const peopleColors = [
+      new THREE.Color(0xf4c94b),
+      new THREE.Color(0x1eb9b7),
+      new THREE.Color(0xef6354),
+      new THREE.Color(0x355fa8),
+      new THREE.Color(0xf0dfc0),
+    ];
+    const skinColors = [
+      new THREE.Color(0xf2c18f),
+      new THREE.Color(0xb87855),
+      new THREE.Color(0x7f4c38),
+      new THREE.Color(0xe0a877),
+    ];
+    const matrix = new THREE.Matrix4();
+    const rotation = new THREE.Quaternion();
+    const localPosition = new THREE.Vector3();
+    const random = seededRandom(0x43_52_57_44 + this.track.order);
+    const usableLength = Math.max(220, totalLength - 130);
+    let tierIndex = 0;
+    let personIndex = 0;
+    for (let group = 0; group < groupCount; group += 1) {
+      const side: -1 | 1 = group % 2 === 0 ? -1 : 1;
+      const progressRatio = group / Math.max(1, groupCount - 1);
+      const distance = 82 + progressRatio * usableLength + (random() - 0.5) * 11;
+      const x = side * (10.35 + (group % 3) * 0.28 + random() * 0.16);
+      const elevation = this.sceneryElevation(x);
+      const yaw = side < 0 ? 0.1 : -0.1;
+      rotation.setFromEuler(new THREE.Euler(0, yaw, 0));
+      for (let tier = 0; tier < 2; tier += 1) {
+        matrix.compose(
+          new THREE.Vector3(
+            x + side * (0.18 + tier * 0.58),
+            elevation + 0.45 + tier * 0.32,
+            -distance + (tier - 0.5) * 0.22,
+          ),
+          rotation,
+          new THREE.Vector3(3.2, 0.28 + tier * 0.1, 0.72),
+        );
+        platforms.setMatrixAt(tierIndex, matrix);
+        tierIndex += 1;
+      }
+      for (let person = 0; person < peoplePerGroup; person += 1) {
+        const column = person % 3;
+        const row = Math.floor(person / 3);
+        localPosition
+          .set(
+            side * (0.28 + row * 0.44),
+            0,
+            -0.78 + column * 0.78 + (random() - 0.5) * 0.12,
+          )
+          .applyQuaternion(rotation);
+        const bodyY = elevation + 1.12 + row * 0.32;
+        matrix.makeTranslation(x + localPosition.x, bodyY, -distance + localPosition.z);
+        people.setMatrixAt(personIndex, matrix);
+        people.setColorAt(
+          personIndex,
+          peopleColors[(person + group) % peopleColors.length] ?? new THREE.Color(0xf4c94b),
+        );
+        matrix.makeTranslation(x + localPosition.x, bodyY + 0.58, -distance + localPosition.z);
+        heads.setMatrixAt(personIndex, matrix);
+        heads.setColorAt(
+          personIndex,
+          skinColors[(person + group) % skinColors.length] ?? new THREE.Color(0xe0a877),
+        );
+        personIndex += 1;
+      }
+    }
+    platforms.name = "canyon-route-crowd-rail-bleachers";
+    people.name = "canyon-route-crowd-rail-people";
+    heads.name = "canyon-route-crowd-rail-heads";
+    platforms.castShadow = this.quality !== "low";
+    people.castShadow = this.quality === "high";
+    heads.castShadow = this.quality === "high";
+    platforms.userData.presentationOnly = true;
+    people.userData.presentationOnly = true;
+    heads.userData.presentationOnly = true;
+    this.canvas.dataset.canyonRouteCrowdStyle = "route-following-rail-bleachers-v2";
+    this.canvas.dataset.canyonRouteCrowdGroupCount = String(groupCount);
+    this.canvas.dataset.canyonRouteCrowdSpectatorCount = String(spectatorCount);
+    this.canvas.dataset.canyonRouteCrowdTierCount = String(tierCount);
+    this.addCourseAnchored(platforms, people, heads);
   }
 
   private createFestivalRoutePockets(
@@ -5265,39 +8421,15 @@ export class GameEngine {
     // keeps this campaign venue treatment out of custom curves and banks.
     const handcraftedCanyon = this.track.id === "canyon-kickoff"
       && this.track.authoredCourse === undefined;
-    const spacing = handcraftedCanyon
-      ? this.quality === "low" ? 230 : this.quality === "medium" ? 150 : 110
-      : this.quality === "low" ? 250 : this.quality === "medium" ? 180 : 135;
-    const routePocketCount = Math.max(4, Math.floor((totalLength - 150) / spacing));
-    const random = seededRandom(this.track.order * 377_911);
-    const routePockets = Array.from({ length: routePocketCount }, (_, pocket) => {
-      const side: -1 | 1 = (pocket + this.track.order) % 2 === 0 ? -1 : 1;
-      return {
-        side,
-        x: side * (11.85 + random() * 0.45),
-        z: -125 - pocket * spacing - (random() - 0.5) * 34,
-        rotationY: side * (0.04 + random() * 0.035),
-        elevatedWatchtower: false,
-      };
+    const { coolingGatePockets, pocketPlacements } = resolveFestivalPocketPlacements({
+      handcraftedCanyon,
+      quality: this.quality,
+      totalLength,
+      trackOrder: this.track.order,
+      coolingGateDistances: this.track.obstacles
+        .filter((obstacle) => obstacle.kind === "cooling-gate")
+        .map((obstacle) => obstacle.distance),
     });
-    const canyonCoolingGates = handcraftedCanyon
-      ? this.track.obstacles.filter((obstacle) => obstacle.kind === "cooling-gate").slice(0, 2)
-      : [];
-    const coolingGatePockets = canyonCoolingGates.flatMap((obstacle, gateIndex) => (
-      ([-1, 1] as const).map((side) => ({
-        side,
-        x: side * (12.35 + gateIndex * 0.2),
-        z: -(obstacle.distance + 12),
-        rotationY: side * 0.06,
-        elevatedWatchtower: true,
-      }))
-    ));
-    const separatedRoutePockets = handcraftedCanyon
-      ? routePockets.filter((routePocket) => coolingGatePockets.every((gatePocket) => (
-        Math.hypot(routePocket.x - gatePocket.x, routePocket.z - gatePocket.z) >= 5.6
-      )))
-      : routePockets;
-    const pocketPlacements = [...separatedRoutePockets, ...coolingGatePockets];
     const pocketCount = pocketPlacements.length;
     const peoplePerPocket = handcraftedCanyon
       ? this.quality === "low" ? 4 : this.quality === "medium" ? 8 : 10
@@ -5482,7 +8614,7 @@ export class GameEngine {
   ): void {
     const matrix = new THREE.Matrix4();
     const rowCount = this.quality === "low" ? 4 : this.quality === "medium" ? 5 : 6;
-    const standCenter = 19.4;
+    const standCenter = 14.4;
     const stands = new THREE.InstancedMesh(new THREE.BoxGeometry(7.8, 0.5, 5.2), timber, 2);
     const standRoofs = new THREE.InstancedMesh(new THREE.BoxGeometry(8.4, 0.3, 5.8), roofMaterial, 2);
     const bleachers = new THREE.InstancedMesh(
@@ -5548,7 +8680,7 @@ export class GameEngine {
       const side = index < rowCount * columnCount ? -1 : 1;
       const column = localIndex % columnCount;
       const row = Math.floor(localIndex / columnCount);
-      const standX = side * 19.4;
+      const standX = side * 14.4;
       const elevation = this.sceneryElevation(standX);
       const x = standX - 3.2 + column * (6.4 / Math.max(1, columnCount - 1));
       const z = -16.5 - row * 0.78;
@@ -5581,12 +8713,12 @@ export class GameEngine {
       clusterCount,
     );
     const placements = [
-      { x: -17, z: -27, rotationY: 0.18 },
-      { x: 17, z: -31, rotationY: -0.18 },
-      { x: -17.4, z: -59, rotationY: 0.24 },
-      { x: 17.4, z: -63, rotationY: -0.24 },
-      { x: -16.9, z: -92, rotationY: 0.14 },
-      { x: 16.9, z: -96, rotationY: -0.14 },
+      { x: -12.2, z: -27, rotationY: 0.18 },
+      { x: 12.2, z: -31, rotationY: -0.18 },
+      { x: -12.8, z: -59, rotationY: 0.24 },
+      { x: 12.8, z: -63, rotationY: -0.24 },
+      { x: -13.2, z: -92, rotationY: 0.14 },
+      { x: 13.2, z: -96, rotationY: -0.14 },
     ] as const;
     const matrix = new THREE.Matrix4();
     for (let index = 0; index < clusterCount; index += 1) {
@@ -5630,11 +8762,11 @@ export class GameEngine {
     const firstObstacleDistance = this.track.obstacles[0]?.distance ?? 72;
     const secondObstacleDistance = this.track.obstacles[1]?.distance ?? 132;
     const tentPositions = [
-      new THREE.Vector3(-17, 0, -14),
-      new THREE.Vector3(17, 0, -14),
-      new THREE.Vector3(-17.5, 0, -firstObstacleDistance),
-      new THREE.Vector3(17.5, 0, -firstObstacleDistance),
-      new THREE.Vector3(-17.5, 0, -secondObstacleDistance),
+      new THREE.Vector3(-12.8, 0, -14),
+      new THREE.Vector3(12.8, 0, -14),
+      new THREE.Vector3(-13.2, 0, -firstObstacleDistance),
+      new THREE.Vector3(13.2, 0, -firstObstacleDistance),
+      new THREE.Vector3(-13.2, 0, -secondObstacleDistance),
     ];
     let tentPostIndex = 0;
     for (let index = 0; index < tentCount; index += 1) {
@@ -5667,13 +8799,15 @@ export class GameEngine {
   private createFestivalBanners(totalLength: number): void {
     const matrix = new THREE.Matrix4();
     const poleMaterial = makeMaterial(0x6f472d);
-    const bannerDistances = [43, 96];
+    const bannerDistances = this.track.id === "canyon-kickoff"
+      ? [43, 315, 535, 755, 975, 1_195]
+      : [43, 96];
     const lapCount = this.simulation.snapshot.race.totalLaps;
     for (let lap = 1; lap <= lapCount; lap += 1) {
       bannerDistances.push(Math.min(totalLength - 25, lap * this.track.courseLength - 30));
     }
     const bannerPoles = new THREE.InstancedMesh(
-      new THREE.CylinderGeometry(0.09, 0.12, 6.2, 6),
+      new THREE.CylinderGeometry(0.09, 0.12, 7.8, 6),
       poleMaterial,
       bannerDistances.length * 2,
     );
@@ -5692,15 +8826,15 @@ export class GameEngine {
     let flagIndex = 0;
     for (const [lineIndex, distance] of bannerDistances.entries()) {
       for (const side of [-1, 1]) {
-        matrix.makeTranslation(side * 8.2, 3.1, -distance);
+        matrix.makeTranslation(side * 8.2, 3.9, -distance);
         bannerPoles.setMatrixAt(lineIndex * 2 + (side > 0 ? 1 : 0), matrix);
       }
-      matrix.makeTranslation(0, 5.5, -distance);
+      matrix.makeTranslation(0, 7.2, -distance);
       ropes.setMatrixAt(lineIndex, matrix);
       for (let index = 0; index < flagsPerLine; index += 1) {
         const ratio = index / (flagsPerLine - 1);
         matrix.compose(
-          new THREE.Vector3(-7.45 + ratio * 14.9, 5.15 - Math.sin(ratio * Math.PI) * 0.34, -distance),
+          new THREE.Vector3(-7.45 + ratio * 14.9, 6.85 - Math.sin(ratio * Math.PI) * 0.34, -distance),
           new THREE.Quaternion().setFromEuler(new THREE.Euler(0, 0, Math.PI)),
           new THREE.Vector3(1, 1, 1),
         );
@@ -5712,6 +8846,151 @@ export class GameEngine {
     bannerPoles.castShadow = this.quality !== "low";
     flags.castShadow = this.quality === "high";
     this.addCourseAnchored(bannerPoles, ropes, flags);
+    if (this.track.id === "canyon-kickoff" && this.track.authoredCourse === undefined) {
+      this.createCanyonRouteSponsorBanners(totalLength, poleMaterial);
+    } else {
+      delete this.canvas.dataset.canyonRouteBannerStyle;
+      delete this.canvas.dataset.canyonRouteBannerCount;
+      delete this.canvas.dataset.canyonRouteBannerPoleCount;
+      delete this.canvas.dataset.canyonRouteBannerTextureVariantCount;
+    }
+  }
+
+  private createCanyonSponsorBannerMaterial(
+    background: string,
+    accent: string,
+    mark: string,
+    label: string,
+  ): THREE.MeshBasicMaterial {
+    const canvas = document.createElement("canvas");
+    canvas.width = 256;
+    canvas.height = 512;
+    const context = canvas.getContext("2d");
+    if (context) {
+      context.fillStyle = background;
+      context.fillRect(0, 0, canvas.width, canvas.height);
+      context.fillStyle = accent;
+      context.fillRect(0, 0, canvas.width, 34);
+      context.fillRect(0, canvas.height - 34, canvas.width, 34);
+      context.globalAlpha = 0.22;
+      context.fillStyle = "#ffffff";
+      for (let stripe = -2; stripe < 6; stripe += 1) {
+        context.beginPath();
+        context.moveTo(stripe * 62, 512);
+        context.lineTo(stripe * 62 + 34, 512);
+        context.lineTo(stripe * 62 + 252, 0);
+        context.lineTo(stripe * 62 + 218, 0);
+        context.closePath();
+        context.fill();
+      }
+      context.globalAlpha = 1;
+      context.fillStyle = mark;
+      context.beginPath();
+      context.moveTo(150, 82);
+      context.lineTo(91, 246);
+      context.lineTo(136, 236);
+      context.lineTo(103, 430);
+      context.lineTo(178, 202);
+      context.lineTo(131, 214);
+      context.closePath();
+      context.fill();
+      context.strokeStyle = "#082035";
+      context.globalAlpha = 0.36;
+      context.lineWidth = 8;
+      context.stroke();
+      context.globalAlpha = 1;
+      context.fillStyle = "#082035";
+      context.font = '900 48px "Ridge Display", sans-serif';
+      context.textAlign = "center";
+      context.textBaseline = "middle";
+      context.save();
+      context.translate(128, 384);
+      context.rotate(-Math.PI / 2);
+      context.fillText(label, 0, 0, 310);
+      context.restore();
+    }
+    const texture = new THREE.CanvasTexture(canvas);
+    texture.colorSpace = THREE.SRGBColorSpace;
+    texture.anisotropy = Math.min(8, this.renderer.capabilities.getMaxAnisotropy());
+    this.ownedTextures.push(texture);
+    return new THREE.MeshBasicMaterial({
+      map: texture,
+      side: THREE.DoubleSide,
+      toneMapped: false,
+    });
+  }
+
+  private createCanyonRouteSponsorBanners(
+    totalLength: number,
+    poleMaterial: THREE.MeshStandardMaterial,
+  ): void {
+    const bannersPerSide = this.quality === "low" ? 12 : this.quality === "medium" ? 24 : 38;
+    const bannerCount = bannersPerSide * 2;
+    const bannerMaterials = [
+      this.createCanyonSponsorBannerMaterial("#14b8b6", "#f6d64a", "#f15f50", "RIVET"),
+      this.createCanyonSponsorBannerMaterial("#f15f50", "#18c3c1", "#ffe56d", "RIDGE"),
+      this.createCanyonSponsorBannerMaterial("#f4cb43", "#083250", "#18c3c1", "RALLY"),
+      this.createCanyonSponsorBannerMaterial("#0b7894", "#f15f50", "#f5edda", "BOOST"),
+    ];
+    const panelMeshes = bannerMaterials.map((material, index) => {
+      const mesh = new THREE.InstancedMesh(new THREE.PlaneGeometry(1.55, 3.7), material, bannerCount);
+      mesh.name = `canyon-route-sponsor-banner-panels-${index + 1}`;
+      mesh.count = 0;
+      return mesh;
+    });
+    const poles = new THREE.InstancedMesh(
+      new THREE.CylinderGeometry(0.055, 0.075, 3.35, 6),
+      poleMaterial,
+      bannerCount,
+    );
+    const matrix = new THREE.Matrix4();
+    const rotation = new THREE.Quaternion();
+    const random = seededRandom(0x52_52_52 + this.track.order);
+    const usableLength = Math.max(180, totalLength - 105);
+    let bannerIndex = 0;
+    const materialCounts = bannerMaterials.map(() => 0);
+    for (const side of [-1, 1] as const) {
+      for (let index = 0; index < bannersPerSide; index += 1) {
+        const progressRatio = index / Math.max(1, bannersPerSide - 1);
+        const distance = 58 + progressRatio * usableLength + (random() - 0.5) * 5.5;
+        const x = side * (9.95 + (index % 3) * 0.26 + random() * 0.14);
+        const baseY = this.sceneryElevation(x);
+        // Keep the panels mostly broadside to the chase camera. The safety wall
+        // still separates them from the lanes, but they now read as the concept's
+        // repeated vertical sponsor flags instead of disappearing edge-on.
+        const yaw = side * -0.16 + (random() - 0.5) * 0.08;
+        rotation.setFromEuler(new THREE.Euler(0, yaw, side * (0.04 + random() * 0.05)));
+        matrix.compose(
+          new THREE.Vector3(x, baseY + 2.58, -distance),
+          rotation,
+          new THREE.Vector3(1, 1, 1),
+        );
+        const materialIndex = (index + (side > 0 ? 2 : 0)) % panelMeshes.length;
+        const materialInstanceIndex = materialCounts[materialIndex] ?? 0;
+        panelMeshes[materialIndex]?.setMatrixAt(materialInstanceIndex, matrix);
+        materialCounts[materialIndex] = materialInstanceIndex + 1;
+        matrix.compose(
+          new THREE.Vector3(x + side * 0.08, baseY + 1.68, -distance),
+          new THREE.Quaternion(),
+          new THREE.Vector3(1, 1, 1),
+        );
+        poles.setMatrixAt(bannerIndex, matrix);
+        bannerIndex += 1;
+      }
+    }
+    for (const [index, panels] of panelMeshes.entries()) {
+      panels.count = materialCounts[index] ?? 0;
+      panels.castShadow = this.quality === "high";
+      panels.userData.presentationOnly = true;
+    }
+    poles.name = "canyon-route-sponsor-banner-poles";
+    poles.castShadow = this.quality !== "low";
+    poles.userData.presentationOnly = true;
+    this.canvas.dataset.canyonRouteBannerStyle = "route-following-textured-sponsor-v2";
+    this.canvas.dataset.canyonRouteBannerCount = String(bannerCount);
+    this.canvas.dataset.canyonRouteBannerPoleCount = String(bannerCount);
+    this.canvas.dataset.canyonRouteBannerTextureVariantCount = String(bannerMaterials.length);
+    this.addCourseAnchored(...panelMeshes, poles);
   }
 
   private createFestivalBillboards(timber: THREE.MeshStandardMaterial): void {

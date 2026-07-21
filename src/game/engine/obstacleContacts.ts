@@ -8,6 +8,8 @@ import type {
 const DEFAULT_CONTACT_LENGTH = 8;
 const LANE_CENTERS = [-4.5, -1.5, 1.5, 4.5] as const;
 const BARRIER_BLOCK_DEPTH = 0.72;
+const SHORT_BARRIER_BLOCK_DEPTH = 0.5;
+const SHORT_BARRIER_BLOCK_WIDTH_RATIO = 0.92;
 const BARRIER_BLOCK_WIDTH_RATIO = 0.52;
 const BARRIER_LATERAL_OFFSET_RATIO = 0.22;
 const BARRIER_ROUTE_OFFSET_RATIO = 0.27;
@@ -69,6 +71,23 @@ function oneContact(obstacle: TrackObstacle): readonly ObstacleContactSection[] 
   return freezeSections(obstacle, [{
     distance: obstacle.distance,
     length,
+    lanes: obstacle.lanes,
+    sourceIndex: 0,
+  }]);
+}
+
+function shortBarrierContact(obstacle: TrackObstacle): readonly ObstacleContactSection[] {
+  const parentLength = resolvedParentLength(obstacle);
+  const sideways = obstacle.rotation === 90 || obstacle.rotation === 270;
+  const requestedLength = sideways
+    && obstacle.unrotatedWidth !== undefined
+    && Number.isFinite(obstacle.unrotatedWidth)
+    && obstacle.unrotatedWidth > 0
+    ? obstacle.unrotatedWidth * SHORT_BARRIER_BLOCK_WIDTH_RATIO
+    : SHORT_BARRIER_BLOCK_DEPTH;
+  return freezeSections(obstacle, [{
+    distance: obstacle.distance,
+    length: boundedSectionLength(parentLength, requestedLength),
     lanes: obstacle.lanes,
     sourceIndex: 0,
   }]);
@@ -164,7 +183,7 @@ export function resolveObstacleContacts(
   obstacle: TrackObstacle,
 ): readonly ObstacleContactSection[] {
   const sideways = obstacle.rotation === 90 || obstacle.rotation === 270;
-  if (sideways && obstacle.moduleId !== "barrier-offset") {
+  if (sideways && obstacle.kind !== "barrier") {
     return oneContact(obstacle);
   }
   if (obstacle.kind === "jump-chain") {
@@ -178,6 +197,9 @@ export function resolveObstacleContacts(
   }
   if (obstacle.moduleId === "barrier-offset") {
     return offsetBarrierContacts(obstacle);
+  }
+  if (obstacle.kind === "barrier") {
+    return shortBarrierContact(obstacle);
   }
   return oneContact(obstacle);
 }

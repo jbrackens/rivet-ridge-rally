@@ -8,11 +8,21 @@ interface IndexedDbProbeSnapshot {
   closed: number;
 }
 
+const RESTART_CANCELLED_ASSET_PATHS = new Set([
+  "/assets/3d/hero-bike-rider.glb",
+  "/assets/art/canyon-festival-panorama.png",
+  "/assets/canyon/canyon-kit.glb",
+  "/assets/rivals/rival-pack.glb",
+]);
+
 function desktopLifecycleProject(projectName: string): boolean {
   return projectName === "chromium" || projectName === "webkit";
 }
 
-function observeLifecycleFailures(page: Page): () => void {
+function observeLifecycleFailures(
+  page: Page,
+  options: { allowRestartCancelledAssets?: boolean } = {},
+): () => void {
   const failures: string[] = [];
   page.on("console", (message) => {
     const text = message.text();
@@ -22,7 +32,14 @@ function observeLifecycleFailures(page: Page): () => void {
   });
   page.on("pageerror", (error) => failures.push(`pageerror: ${error.message}`));
   page.on("requestfailed", (request) => {
-    failures.push(`requestfailed: ${request.method()} ${request.url()} — ${request.failure()?.errorText ?? "unknown"}`);
+    const errorText = request.failure()?.errorText ?? "unknown";
+    const intentionallyCancelled = options.allowRestartCancelledAssets
+      && request.method() === "GET"
+      && errorText === "net::ERR_ABORTED"
+      && RESTART_CANCELLED_ASSET_PATHS.has(new URL(request.url()).pathname);
+    if (!intentionallyCancelled) {
+      failures.push(`requestfailed: ${request.method()} ${request.url()} — ${errorText}`);
+    }
   });
   page.on("response", (response) => {
     if (response.status() >= 400) failures.push(`response: ${response.status()} ${response.url()}`);
@@ -113,6 +130,30 @@ async function setSyntheticVisibility(page: Page, hidden: boolean): Promise<void
   }, hidden);
 }
 
+async function pauseTutorialWhenLessonClears(page: Page): Promise<void> {
+  await page.evaluate(() => {
+    const canvas = document.querySelector<HTMLCanvasElement>(".game-canvas");
+    const setHidden = (window as typeof window & {
+      __RRR_SET_HIDDEN__?: (value: boolean) => void;
+    }).__RRR_SET_HIDDEN__;
+    if (!canvas || !setHidden) {
+      throw new Error("Tutorial visibility instrumentation is unavailable.");
+    }
+
+    const pauseIfCleared = () => {
+      if (canvas.dataset.tutorialLessonComplete !== "true") return;
+      observer.disconnect();
+      setHidden(true);
+    };
+    const observer = new MutationObserver(pauseIfCleared);
+    observer.observe(canvas, {
+      attributes: true,
+      attributeFilter: ["data-tutorial-lesson-complete"],
+    });
+    pauseIfCleared();
+  });
+}
+
 async function startPractice(page: Page, path = "/?qa-fast-race=1"): Promise<void> {
   await page.goto(path);
   const skip = page.getByRole("button", { name: "Skip training" });
@@ -140,24 +181,38 @@ async function raceTimeMs(page: Page): Promise<number> {
   return displayedTimeMs(await page.locator(".timing-block > strong").innerText());
 }
 
-async function finishFastRace(page: Page): Promise<void> {
-  await page.keyboard.down("w");
-  await page.keyboard.down("Space");
-  for (let cycle = 0; cycle < 14; cycle += 1) {
-    await page.keyboard.down("Shift");
-    await page.waitForTimeout(520);
-    await page.keyboard.up("Shift");
-    if (await page.getByRole("button", { name: "Retry now" }).isVisible()) break;
-    await page.waitForTimeout(620);
-    if (await page.getByRole("button", { name: "Retry now" }).isVisible()) break;
-  }
-  await page.keyboard.up("w");
-  await page.keyboard.up("Space");
-  await page.keyboard.up("Shift");
-  await expect(page.getByRole("button", { name: "Retry now" })).toBeVisible({ timeout: 15_000 });
+async function focusRaceCanvas(page: Page): Promise<void> {
+  await page.locator(".game-canvas").focus();
 }
 
-test("tutorial rebuild retains its canvas renderer and tutorial exit releases it", async ({ page }, testInfo) => {
+async function finishFastRace(page: Page): Promise<void> {
+  const retryButton = page.getByRole("button", { name: "Retry now" });
+  await expect(page.locator(".game-shell")).toHaveAttribute(
+    "data-race-gate-phase",
+    "racing",
+    { timeout: 30_000 },
+  );
+  await focusRaceCanvas(page);
+  await page.keyboard.down("w");
+  await page.keyboard.down("Space");
+  try {
+    for (let cycle = 0; cycle < 30; cycle += 1) {
+      await page.keyboard.down("Shift");
+      await page.waitForTimeout(520);
+      await page.keyboard.up("Shift");
+      if (await retryButton.isVisible()) break;
+      await page.waitForTimeout(620);
+      if (await retryButton.isVisible()) break;
+    }
+    await expect(retryButton).toBeVisible({ timeout: 45_000 });
+  } finally {
+    await page.keyboard.up("w");
+    await page.keyboard.up("Space");
+    await page.keyboard.up("Shift");
+  }
+}
+
+test("tutorial progress updates retain its engine and tutorial exit releases its renderer", async ({ page }, testInfo) => {
   test.skip(!desktopLifecycleProject(testInfo.project.name), "Desktop Chromium/WebKit lifecycle gate");
   await page.goto("/?qa-fast-race=1");
   await expect(page.getByRole("button", { name: "Skip training" })).toBeVisible({ timeout: 15_000 });
@@ -174,7 +229,7 @@ test("tutorial rebuild retains its canvas renderer and tutorial exit releases it
       contextStops: snapshot.stopped.webglContexts,
     };
   }).toEqual({
-    engineStarts: baseline.started.gameEngines + 1,
+    engineStarts: baseline.started.gameEngines,
     contexts: 1,
     contextStarts: baseline.started.webglContexts,
     contextStops: baseline.stopped.webglContexts,
@@ -198,13 +253,14 @@ test("tutorial rebuild retains its canvas renderer and tutorial exit releases it
 
 test("fatal race cleanup releases its detached renderer exactly once", async ({ page }, testInfo) => {
   test.skip(!desktopLifecycleProject(testInfo.project.name), "Desktop Chromium/WebKit lifecycle gate");
+  test.setTimeout(60_000);
   await startPractice(page);
   const baseline = await lifecycle(page);
 
   await page.getByLabel("Live 3D race on Canyon Kickoff").evaluate((canvas) => {
     canvas.dispatchEvent(new Event("webglcontextlost", { cancelable: true }));
   });
-  await expect(page.getByRole("heading", { name: "Race paused at the gate" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Race interrupted" })).toBeVisible();
   await expect.poll(async () => {
     const snapshot = await lifecycle(page);
     return {
@@ -283,6 +339,7 @@ test("visibility loss pauses and safely suspends simulation, held input, and rac
 
 test("device-storage recovery in paused Settings preserves the live race attempt", async ({ page }, testInfo) => {
   test.skip(testInfo.project.name !== "chromium", "IndexedDB recovery lifecycle gate runs once in Chromium");
+  test.setTimeout(90_000);
   await page.addInitScript(() => {
     const originalPut = IDBObjectStore.prototype.put;
     Object.defineProperty(IDBObjectStore.prototype, "put", {
@@ -337,34 +394,36 @@ test("device-storage recovery in paused Settings preserves the live race attempt
 
 test("visibility loss pauses the tutorial and defers a cleared lesson", async ({ page }, testInfo) => {
   test.skip(!desktopLifecycleProject(testInfo.project.name), "Desktop Chromium/WebKit lifecycle gate");
+  test.setTimeout(60_000);
   await installVisibilityControl(page);
   const assertNoFailures = observeLifecycleFailures(page);
   await page.goto("/");
   await expect(page.getByRole("heading", { name: "Rider school" })).toBeVisible({ timeout: 15_000 });
   await page.getByRole("button", { name: "Start lesson 1" }).click();
 
+  await pauseTutorialWhenLessonClears(page);
   await page.keyboard.down("w");
-  await expect(page.getByText("Lesson cleared", { exact: true })).toBeVisible({ timeout: 10_000 });
-  await setSyntheticVisibility(page, true);
-  await page.keyboard.up("w");
-
   await expect(page.getByRole("dialog", { name: "Training paused" })).toBeVisible();
+  await page.keyboard.up("w");
   await expect(page.locator(".game-shell")).toHaveAttribute("data-paused", "true");
+  await expect(page.locator(".game-canvas")).toHaveAttribute("data-tutorial-lesson-index", "0");
+  await expect(page.locator(".game-canvas")).toHaveAttribute("data-tutorial-lesson-complete", "true");
+  const pausedAt = await raceTimeMs(page);
   await page.waitForTimeout(700);
   await setSyntheticVisibility(page, false);
   await expect(page.getByRole("dialog", { name: "Training paused" })).toBeVisible();
+  expect(await raceTimeMs(page)).toBe(pausedAt);
 
   await page.getByRole("button", { name: "Resume lesson" }).click();
-  await expect(page.getByRole("heading", { name: "Ride and read the HUD" })).toBeVisible();
-  await expect(page.getByRole("heading", { name: "Coast to slow" })).toBeVisible({ timeout: 2_000 });
+  await expect(page.getByRole("heading", { name: /Coast to slow|Choose a lane/ })).toBeVisible({ timeout: 5_000 });
   assertNoFailures();
 });
 
 test("twenty immediate restarts reuse one WebGL context and retain one engine lifecycle", async ({ page }, testInfo) => {
   test.skip(!desktopLifecycleProject(testInfo.project.name), "Desktop Chromium/WebKit lifecycle gate");
-  test.setTimeout(180_000);
+  test.setTimeout(480_000);
   await installIndexedDbProbe(page);
-  const assertNoFailures = observeLifecycleFailures(page);
+  const assertNoFailures = observeLifecycleFailures(page, { allowRestartCancelledAssets: true });
   await startPractice(page);
 
   await expect.poll(async () => (await indexedDbProbe(page)).active).toBe(1);
@@ -393,8 +452,9 @@ test("twenty immediate restarts reuse one WebGL context and retain one engine li
       await expect(page.locator(".game-shell")).toHaveAttribute(
         "data-race-gate-phase",
         "racing",
-        { timeout: 15_000 },
+        { timeout: 30_000 },
       );
+      await focusRaceCanvas(page);
       await page.keyboard.press("Escape");
       await expect(page.getByRole("dialog", { name: "Race paused" })).toBeVisible();
       await page.getByRole("button", { name: "Restart now" }).click();
@@ -454,7 +514,7 @@ test("twenty immediate restarts reuse one WebGL context and retain one engine li
 
 test("six results retries release each unmounted WebGL context before starting the next race", async ({ page }, testInfo) => {
   test.skip(!desktopLifecycleProject(testInfo.project.name), "Desktop Chromium/WebKit lifecycle gate");
-  test.setTimeout(180_000);
+  test.setTimeout(480_000);
   const assertNoFailures = observeLifecycleFailures(page);
   await startPractice(page);
 

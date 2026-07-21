@@ -1,0 +1,46 @@
+name: CI
+
+# Minimal mechanical gate for agent-authored PRs: typecheck (TS7 native),
+# lint (eslint via the TS6 API shim), and the unit suite. The heavier
+# release machinery (assets:verify, release manifest/attestation, e2e,
+# visual regression) stays in the repo's own evidence flow — it is
+# environment-pinned (npm 11.17.0 / Node 26) and owner-gated by design.
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+# Least privilege: npm ci runs third-party lifecycle scripts; nothing here needs write.
+permissions:
+  contents: read
+
+jobs:
+  checks:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install
+        run: npm ci
+
+      - name: Typecheck (TypeScript 7 native)
+        run: npm run typecheck
+
+      - name: Lint
+        run: npx eslint .
+
+      - name: Unit tests
+        run: npx vitest run
+

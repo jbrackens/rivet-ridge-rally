@@ -38,8 +38,33 @@ describe("race result delivery", () => {
       activeRace: { mode: "solo", trackId: "canyon-kickoff" },
       latestResult: null,
       latestResultAttempt: null,
+      latestReplayFailureReason: null,
       raceAttempt: 7,
     });
+  });
+
+  it("keeps the result and progression when its replay is unavailable", () => {
+    useAppStore.getState().finishRace(result(), {
+      raceAttempt: 7,
+      presentResults: false,
+      replayFailureReason: "cadence",
+    });
+
+    expect(useAppStore.getState()).toMatchObject({
+      latestResultAttempt: 7,
+      latestResult: { finishTimeMs: 82_000 },
+      latestReplayFailureReason: "cadence",
+    });
+    expect(useAppStore.getState().latestResult).not.toHaveProperty("replayFailureReason");
+    expect(useAppStore.getState().progress.tracks["canyon-kickoff"].bestSoloMs).toBe(82_000);
+
+    useAppStore.getState().finishRace(result(70_000), {
+      raceAttempt: 7,
+      presentResults: false,
+      replayFailureReason: "capacity",
+    });
+    expect(useAppStore.getState().latestResult?.finishTimeMs).toBe(82_000);
+    expect(useAppStore.getState().latestReplayFailureReason).toBe("cadence");
   });
 
   it("commits a finished attempt once before presenting its results", () => {
@@ -79,6 +104,7 @@ describe("race result delivery", () => {
       raceAttempt: 8,
       latestResult: null,
       latestResultAttempt: null,
+      latestReplayFailureReason: null,
     });
     expect(useAppStore.getState().progress.tracks["canyon-kickoff"].bestSoloMs).toBe(82_000);
 

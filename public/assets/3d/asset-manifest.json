@@ -1,114 +1,465 @@
 {
-  "schemaVersion": 1,
-  "generator": "scripts/build-3d-assets.mjs",
+  "schemaVersion": 2,
+  "generator": "scripts/build-hero-bike-rider-assets.mjs",
+  "sourcePairId": "31000dd4-2c42-4c74-ad5d-28b5e4aec32f",
   "design": {
-    "name": "Festival Trail Bike",
-    "origin": "Original project-authored procedural geometry and texture; no source model or source image"
+    "name": "RIVET RIDGE RALLY Hero Bike and Rider A",
+    "origin": "Original project-authored Blender-native geometry and solid-color PBR materials; no source model, texture, downloaded asset, or external resource",
+    "reference": "docs/design/concepts/hero-bike-rider-production-reference.png",
+    "referenceOrigin": "Project-specific original modeling reference generated with OpenAI ImageGen from project-owned gameplay concepts; no third-party model or texture was supplied",
+    "referenceUsage": "Modeling and material guide only; not sampled, projected, or shipped as a runtime texture",
+    "contract": "docs/design/HERO_BIKE_RIDER_VERTICAL_SLICE.md",
+    "authoringProcedure": "art-source/blender/hero-bike-rider/build_hero_bike_rider.py",
+    "authoringTool": "Blender 4.5.11 LTS",
+    "coordinateSystem": "1 unit = 1 meter; Blender +X rider-right/+Y forward/+Z up; glTF +X rider-right/+Y up/-Z forward",
+    "gameplayAuthority": "Presentation only; TypeScript simulation, collision, controls, course, camera, timing, and replay data remain authoritative",
+    "runtimeMotion": "Code-driven wheel spin and six-pivot rider pose; no skin or baked animation",
+    "approvedIdentity": "Original coral/teal/cream rivet-ridge language and player number 22 only; no third-party marks or trade dress"
+  },
+  "contract": {
+    "scene": "RRR_HeroBikeRiderScene",
+    "roots": [
+      "RRR_HeroBikeRider"
+    ],
+    "nodes": [
+      "RRR_HeroBikeRider",
+      "RRR_BikeVisual",
+      "Bike_ChassisShell",
+      "Bike_TankAndRadiator",
+      "Bike_Seat",
+      "Bike_RearFender",
+      "Bike_LeftSidePanel",
+      "Bike_RightSidePanel",
+      "Bike_Engine",
+      "Bike_Exhaust",
+      "Bike_ChainDrive",
+      "bike-steering-pivot",
+      "Bike_Handlebar",
+      "Bike_FrontFork",
+      "Bike_FrontFender",
+      "NumberPlate",
+      "bike-front-suspension-pivot",
+      "FrontTire",
+      "FrontTireRing",
+      "FrontTreadRing",
+      "FrontHub",
+      "FrontSpokes",
+      "FrontBrakeDisc",
+      "bike-rear-suspension-pivot",
+      "Bike_Swingarm",
+      "RearTire",
+      "RearTireRing",
+      "RearTreadRing",
+      "RearHub",
+      "RearSpokes",
+      "RearBrakeDisc",
+      "RearNumberPanel",
+      "RearNumber22",
+      "bike-seat-anchor",
+      "bike-left-hand-anchor",
+      "bike-right-hand-anchor",
+      "bike-left-boot-anchor",
+      "bike-right-boot-anchor",
+      "player-rider",
+      "rider-torso-pivot",
+      "Rider_Torso",
+      "Rider_ChestArmor",
+      "Rider_BackPlate",
+      "JerseyNumber22",
+      "rider-head-pivot",
+      "Rider_Head",
+      "Rider_Helmet",
+      "Rider_Visor",
+      "Rider_HelmetPeak",
+      "rider-left-arm-pivot",
+      "Rider_LeftArm",
+      "rider-right-arm-pivot",
+      "Rider_RightArm",
+      "Rider_Hips",
+      "rider-left-leg-pivot",
+      "Rider_LeftLeg",
+      "rider-right-leg-pivot",
+      "Rider_RightLeg"
+    ],
+    "parentByName": {
+      "RRR_HeroBikeRider": null,
+      "RRR_BikeVisual": "RRR_HeroBikeRider",
+      "Bike_ChassisShell": "RRR_BikeVisual",
+      "Bike_TankAndRadiator": "RRR_BikeVisual",
+      "Bike_Seat": "RRR_BikeVisual",
+      "Bike_RearFender": "RRR_BikeVisual",
+      "Bike_LeftSidePanel": "RRR_BikeVisual",
+      "Bike_RightSidePanel": "RRR_BikeVisual",
+      "Bike_Engine": "RRR_BikeVisual",
+      "Bike_Exhaust": "RRR_BikeVisual",
+      "Bike_ChainDrive": "RRR_BikeVisual",
+      "bike-steering-pivot": "RRR_BikeVisual",
+      "Bike_Handlebar": "bike-steering-pivot",
+      "Bike_FrontFork": "bike-steering-pivot",
+      "Bike_FrontFender": "bike-steering-pivot",
+      "NumberPlate": "bike-steering-pivot",
+      "bike-front-suspension-pivot": "bike-steering-pivot",
+      "FrontTire": "bike-front-suspension-pivot",
+      "FrontTireRing": "FrontTire",
+      "FrontTreadRing": "FrontTire",
+      "FrontHub": "FrontTire",
+      "FrontSpokes": "FrontTire",
+      "FrontBrakeDisc": "FrontTire",
+      "bike-rear-suspension-pivot": "RRR_BikeVisual",
+      "Bike_Swingarm": "bike-rear-suspension-pivot",
+      "RearTire": "bike-rear-suspension-pivot",
+      "RearTireRing": "RearTire",
+      "RearTreadRing": "RearTire",
+      "RearHub": "RearTire",
+      "RearSpokes": "RearTire",
+      "RearBrakeDisc": "RearTire",
+      "RearNumberPanel": "RRR_BikeVisual",
+      "RearNumber22": "RearNumberPanel",
+      "bike-seat-anchor": "RRR_BikeVisual",
+      "bike-left-hand-anchor": "RRR_BikeVisual",
+      "bike-right-hand-anchor": "RRR_BikeVisual",
+      "bike-left-boot-anchor": "RRR_BikeVisual",
+      "bike-right-boot-anchor": "RRR_BikeVisual",
+      "player-rider": "RRR_HeroBikeRider",
+      "rider-torso-pivot": "player-rider",
+      "Rider_Torso": "rider-torso-pivot",
+      "Rider_ChestArmor": "rider-torso-pivot",
+      "Rider_BackPlate": "rider-torso-pivot",
+      "JerseyNumber22": "Rider_BackPlate",
+      "rider-head-pivot": "rider-torso-pivot",
+      "Rider_Head": "rider-head-pivot",
+      "Rider_Helmet": "rider-head-pivot",
+      "Rider_Visor": "rider-head-pivot",
+      "Rider_HelmetPeak": "rider-head-pivot",
+      "rider-left-arm-pivot": "rider-torso-pivot",
+      "Rider_LeftArm": "rider-left-arm-pivot",
+      "rider-right-arm-pivot": "rider-torso-pivot",
+      "Rider_RightArm": "rider-right-arm-pivot",
+      "Rider_Hips": "player-rider",
+      "rider-left-leg-pivot": "player-rider",
+      "Rider_LeftLeg": "rider-left-leg-pivot",
+      "rider-right-leg-pivot": "player-rider",
+      "Rider_RightLeg": "rider-right-leg-pivot"
+    },
+    "wheelSpinRoots": [
+      "FrontTire",
+      "RearTire"
+    ],
+    "poseHooks": [
+      "rider-torso-pivot",
+      "rider-head-pivot",
+      "rider-left-arm-pivot",
+      "rider-right-arm-pivot",
+      "rider-left-leg-pivot",
+      "rider-right-leg-pivot"
+    ],
+    "anchors": [
+      "bike-seat-anchor",
+      "bike-left-hand-anchor",
+      "bike-right-hand-anchor",
+      "bike-left-boot-anchor",
+      "bike-right-boot-anchor"
+    ],
+    "preservedAtomically": true
   },
   "compression": {
     "geometry": "EXT_meshopt_compression (required, high/filter mode)",
     "quantization": "KHR_mesh_quantization (required)",
-    "uncompressedGlbBytes": 54868,
-    "compressedGlbBytes": 29132,
-    "glbReductionPercent": 46.9,
-    "texture": "KTX2 ETC1S with BasisLZ supercompression, sRGB transfer, and 8 mip levels",
-    "textureDimensions": [
-      128,
-      128
-    ],
-    "gltfTextureExtension": "KHR_texture_basisu (required)"
+    "rawGlbBytes": 2379208,
+    "optimizedGlbBytes": 517664,
+    "glbReductionPercent": 78.2,
+    "textures": "None; solid-color glTF PBR materials only"
+  },
+  "budgets": {
+    "maximumTriangles": 70000,
+    "maximumBikeTriangles": 40000,
+    "maximumRiderTriangles": 30000,
+    "maximumWheelTriangles": 18000,
+    "maximumMaterials": 10,
+    "maximumNodes": 96,
+    "maximumRuntimeMeshBearingNodes": 28,
+    "maximumRuntimeRenderPrimitives": 28,
+    "maximumRuntimeBytes": 3145728
+  },
+  "metrics": {
+    "preview": {
+      "width": 1280,
+      "height": 900,
+      "bitDepth": 8,
+      "colorType": 6
+    },
+    "previewContactSheet": {
+      "width": 1280,
+      "height": 900,
+      "bitDepth": 8,
+      "colorType": 6
+    },
+    "reference": {
+      "width": 1672,
+      "height": 941,
+      "bitDepth": 8,
+      "colorType": 2
+    },
+    "sourceBounds": {
+      "min": [
+        -0.699999988079071,
+        0,
+        -1.8091378211975098
+      ],
+      "max": [
+        0.699999988079071,
+        2.57999986410141,
+        1.8769999742507935
+      ],
+      "size": [
+        1.399999976158142,
+        2.57999986410141,
+        3.6861377954483032
+      ]
+    },
+    "productionBounds": {
+      "min": [
+        -0.699999988079071,
+        0,
+        -1.809154088912559
+      ],
+      "max": [
+        0.699999988079071,
+        2.5800116067400882,
+        1.8769999742507935
+      ],
+      "size": [
+        1.399999976158142,
+        2.5800116067400882,
+        3.6861540631633525
+      ]
+    },
+    "source": {
+      "nodes": 88,
+      "meshBearingNodes": 28,
+      "meshes": 28,
+      "renderPrimitives": 28,
+      "materials": 10,
+      "textures": 0,
+      "cameras": 0,
+      "skins": 0,
+      "animations": 0,
+      "triangles": 49780,
+      "trianglesByRegion": {
+        "bikeIncludingWheels": 39912,
+        "rider": 9868,
+        "wheelsCombined": 14284
+      }
+    },
+    "production": {
+      "nodes": 88,
+      "meshBearingNodes": 28,
+      "meshes": 27,
+      "renderPrimitives": 28,
+      "materials": 10,
+      "textures": 0,
+      "cameras": 0,
+      "skins": 0,
+      "animations": 0,
+      "triangles": 49780,
+      "trianglesByRegion": {
+        "bikeIncludingWheels": 39912,
+        "rider": 9868,
+        "wheelsCombined": 14284
+      }
+    },
+    "productionMaterials": [
+      "RRR_PlasticTeal",
+      "RRR_PlateCream",
+      "RRR_PlasticCoral",
+      "RRR_Visor",
+      "RRR_RiderArmor",
+      "RRR_NumberCream",
+      "RRR_RiderFabric",
+      "RRR_MetalBright",
+      "RRR_Rubber",
+      "RRR_MetalDark"
+    ]
   },
   "dependencies": [
     {
       "package": "@gltf-transform/core",
       "version": "4.4.1",
       "license": "MIT",
-      "use": "GLB authoring"
+      "use": "glTF I/O and structural inspection"
     },
     {
       "package": "@gltf-transform/extensions",
       "version": "4.4.1",
       "license": "MIT",
-      "use": "glTF extension I/O"
+      "use": "Meshopt and quantization extension I/O"
     },
     {
       "package": "@gltf-transform/functions",
       "version": "4.4.1",
       "license": "MIT",
-      "use": "Meshopt transform"
-    },
-    {
-      "package": "ktx2-encoder",
-      "version": "0.5.3",
-      "license": "MIT",
-      "use": "Build-time Basis encoder wrapper"
-    },
-    {
-      "component": "Basis Universal encoder WASM",
-      "source": "ktx2-encoder@0.5.3",
-      "license": "Apache-2.0",
-      "use": "Build-time ETC1S encoding"
+      "use": "deduplication, draw joining, pruning, and Meshopt transform"
     },
     {
       "package": "meshoptimizer",
       "version": "1.2.0",
       "license": "MIT",
-      "use": "Build-time geometry encoder"
-    },
-    {
-      "package": "gltf-validator",
-      "version": "2.0.0-dev.3.10",
-      "license": "Apache-2.0",
-      "use": "Build-time verification"
-    },
-    {
-      "package": "three",
-      "version": "0.185.1",
-      "license": "MIT",
-      "use": "Primitive geometry generation and runtime loaders"
-    },
-    {
-      "component": "Basis Universal transcoder",
-      "source": "three@0.185.1/examples/jsm/libs/basis",
-      "license": "Apache-2.0",
-      "use": "Runtime KTX2 transcoding"
+      "use": "build-time geometry encoder and round-trip decoder"
     }
   ],
-  "files": [
-    {
-      "path": "public/assets/3d/festival-trail-bike.glb",
-      "bytes": 29132,
-      "sha256": "8668d05f42f3b8303c0825b8d4aa4b9c66a8ef64acba18f2df70b69f9a8f595b"
+  "pipeline": {
+    "optimizer": {
+      "path": "scripts/build-hero-bike-rider-assets.mjs",
+      "bytes": 54336,
+      "sha256": "72be56d9d08475f4e4230f6fe0303346287da6967546f2f98e0f7e997df0dbd8"
     },
-    {
-      "path": "public/assets/3d/festival-bike-albedo.ktx2",
-      "bytes": 2236,
-      "sha256": "a86588924b53fd51915d505d0ba23e343ac3e84a5139c687845a49f8ad8a1ba2"
+    "independentVerifier": {
+      "path": "scripts/verify-hero-bike-rider-assets.mjs",
+      "bytes": 52379,
+      "sha256": "10ec474b6c68d0441f401cfbd7d9b5088ac74402a8363a55bea75f6687080e80"
     },
-    {
-      "path": "public/assets/transcoders/basis/basis_transcoder.js",
-      "bytes": 57529,
-      "sha256": "8478b5b6d6b74e7d3082b89f6417321d8d1dc0307f2b30d4484bb11b441696a1"
+    "pngIntegrityInspector": {
+      "path": "scripts/lib/png-integrity.mjs",
+      "bytes": 4876,
+      "sha256": "215ee9f81a8025bea13cc05d6b4272e7869980daf19b77a907309bcbd9df85ca"
     },
-    {
-      "path": "public/assets/transcoders/basis/basis_transcoder.wasm",
-      "bytes": 527333,
-      "sha256": "6cf17dc889352c42e9acf8897107978d127005fe3386c36a0e3845e27967630a"
-    },
-    {
-      "path": "public/assets/transcoders/basis/README.md",
-      "bytes": 1388,
-      "sha256": "a578df416c1e0852e9c36a1cf91b4d28d91a251294f87ce610a3bc7ca4df15e0"
-    },
-    {
-      "path": "public/assets/transcoders/basis/LICENSE.txt",
-      "bytes": 9197,
-      "sha256": "a7d00bfd54525bc694b6e32f64c7ebcf5e6b7ae3657be5cc12767bce74654a47"
-    },
-    {
-      "path": "public/assets/transcoders/basis/NOTICE.txt",
-      "bytes": 917,
-      "sha256": "42beeb6710c933778e30f62886e0790ebba120debbb0545ab46c7292d3e5a061"
+    "packageManifest": {
+      "path": "package.json",
+      "bytes": 3401,
+      "sha256": "a1d2a28d4a167ee40c864f43f4185c46df085a4b75f6a3b7484f1a3edcd49325"
     }
-  ]
+  },
+  "runtimeSupport": {
+    "basisTranscoderPath": "/assets/transcoders/basis/",
+    "usage": "Pinned Three.js KTX2 runtime transcoder distribution; retained for compressed environment assets, while this solid-color hero GLB contains no textures",
+    "requiredByHeroAsset": false,
+    "basisFiles": [
+      {
+        "path": "public/assets/transcoders/basis/basis_transcoder.js",
+        "bytes": 57529,
+        "sha256": "8478b5b6d6b74e7d3082b89f6417321d8d1dc0307f2b30d4484bb11b441696a1"
+      },
+      {
+        "path": "public/assets/transcoders/basis/basis_transcoder.wasm",
+        "bytes": 527333,
+        "sha256": "6cf17dc889352c42e9acf8897107978d127005fe3386c36a0e3845e27967630a"
+      },
+      {
+        "path": "public/assets/transcoders/basis/README.md",
+        "bytes": 1388,
+        "sha256": "a578df416c1e0852e9c36a1cf91b4d28d91a251294f87ce610a3bc7ca4df15e0"
+      },
+      {
+        "path": "public/assets/transcoders/basis/LICENSE.txt",
+        "bytes": 9197,
+        "sha256": "a7d00bfd54525bc694b6e32f64c7ebcf5e6b7ae3657be5cc12767bce74654a47"
+      },
+      {
+        "path": "public/assets/transcoders/basis/NOTICE.txt",
+        "bytes": 917,
+        "sha256": "42beeb6710c933778e30f62886e0790ebba120debbb0545ab46c7292d3e5a061"
+      }
+    ]
+  },
+  "files": {
+    "referenceConcept": {
+      "path": "docs/design/concepts/hero-bike-rider-production-reference.png",
+      "bytes": 2144981,
+      "sha256": "343bf010c320dcd64ccb9bb81ca70e0996337a31a97752ce802fa0d92d5aad96",
+      "width": 1672,
+      "height": 941,
+      "bitDepth": 8,
+      "colorType": 2
+    },
+    "authoringProcedure": {
+      "path": "art-source/blender/hero-bike-rider/build_hero_bike_rider.py",
+      "bytes": 81039,
+      "sha256": "ff87ffba7c4b0e60c32e5f9c4395dcb7f578ccc463dcab3581f9972d3940d00a"
+    },
+    "sourceReadme": {
+      "path": "art-source/blender/hero-bike-rider/README.md",
+      "bytes": 8152,
+      "sha256": "8ea49b213734573078ac3559e5eb075297c465447d835a5be056c0e4820c8da3"
+    },
+    "contract": {
+      "path": "docs/design/HERO_BIKE_RIDER_VERTICAL_SLICE.md",
+      "bytes": 25595,
+      "sha256": "619e905a8a2696126156c14dc95fa9598a847d604593d78d3e0c7557bbdd6788"
+    },
+    "editableSource": {
+      "path": "art-source/blender/hero-bike-rider/generated/hero-bike-rider-source.blend",
+      "bytes": 2532859,
+      "sha256": "423324a558e6e8bf912549961f244db56e36e1175326cd11e97eac089ba4906a"
+    },
+    "rawInterchange": {
+      "path": "art-source/blender/hero-bike-rider/generated/hero-bike-rider-raw.glb",
+      "bytes": 2379208,
+      "sha256": "f36e4ee94796f6cf4f8ac4875afdfc82f5cbc3a11a5e3badb37b96d7e406ed7b"
+    },
+    "sourcePreview": {
+      "path": "art-source/blender/hero-bike-rider/generated/hero-bike-rider-preview.png",
+      "bytes": 1296677,
+      "sha256": "4caad6de5455ef7cc7f209decf6ddaf5bfdbc90560186f8450ede61330aab047",
+      "width": 1280,
+      "height": 900,
+      "bitDepth": 8,
+      "colorType": 6
+    },
+    "sourcePreviewContactSheet": {
+      "path": "art-source/blender/hero-bike-rider/generated/hero-bike-rider-preview-contact-sheet.png",
+      "bytes": 1512358,
+      "sha256": "f7bbfa9147b0a9ae805a1d9d0345bc8ba90980fd21022ffd1226f90d5ff341eb",
+      "width": 1280,
+      "height": 900,
+      "bitDepth": 8,
+      "colorType": 6
+    },
+    "sourcePreviewPanels": [
+      {
+        "path": "art-source/blender/hero-bike-rider/generated/hero-bike-rider-preview-rear-right.png",
+        "bytes": 355438,
+        "sha256": "bcd40cad187ba85a016eb8da0c6db7e7c3ffffa8271d92d3903f407c949e2be4",
+        "angle": "rear-right",
+        "width": 640,
+        "height": 450,
+        "bitDepth": 8,
+        "colorType": 6
+      },
+      {
+        "path": "art-source/blender/hero-bike-rider/generated/hero-bike-rider-preview-right-profile.png",
+        "bytes": 393157,
+        "sha256": "3fcc54ba573a57db1f05d521a00f403ce2d1bce0ef44541988c4a9466c88923f",
+        "angle": "right-profile",
+        "width": 640,
+        "height": 450,
+        "bitDepth": 8,
+        "colorType": 6
+      },
+      {
+        "path": "art-source/blender/hero-bike-rider/generated/hero-bike-rider-preview-left-profile.png",
+        "bytes": 385105,
+        "sha256": "6763a7d6a1b513eb1cdf3c3031166493ac78069797930d9bdbe2ca0beecc9bfc",
+        "angle": "left-profile",
+        "width": 640,
+        "height": 450,
+        "bitDepth": 8,
+        "colorType": 6
+      },
+      {
+        "path": "art-source/blender/hero-bike-rider/generated/hero-bike-rider-preview-front-left.png",
+        "bytes": 374612,
+        "sha256": "d63013a2899f4529968dc11205ed06b091b5faa1f5e3fcc640922fb5078b2e46",
+        "angle": "front-left",
+        "width": 640,
+        "height": 450,
+        "bitDepth": 8,
+        "colorType": 6
+      }
+    ],
+    "runtime": {
+      "path": "public/assets/3d/hero-bike-rider.glb",
+      "bytes": 517664,
+      "sha256": "538be4269927544fa91cfc405742523a60422d77d546ce9c8859f407deb2e6e8"
+    }
+  }
 }

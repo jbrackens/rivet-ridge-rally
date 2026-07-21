@@ -2,14 +2,16 @@ import {
   useCallback,
   useEffect,
   useLayoutEffect,
+  useMemo,
   useRef,
   useState,
   type KeyboardEvent as ReactKeyboardEvent,
+  type CSSProperties,
   type ReactNode,
 } from "react";
 
 import { useAppStore } from "../../app/store";
-import { GameEngine, type EngineHudState } from "../../game/engine/GameEngine";
+import { CRITICAL_HEAT_WARNING, GameEngine, type EngineHudState } from "../../game/engine/GameEngine";
 import type { LaneChange } from "../../game/simulation";
 import { getTrack } from "../../game/content/tracks";
 import { customTrackToDefinition } from "../../game/editor/toTrackDefinition";
@@ -22,8 +24,10 @@ import {
   stopLifecycleResource,
 } from "../../game/qa/lifecycleDiagnostics";
 import { formatTime } from "../format";
+import { RallyIcon } from "../icons/RallyIcon";
 import { TouchControlIcon, type TouchControlIconKind } from "./TouchControlIcon";
 import {
+  TUTORIAL_COLLISION_DRILL_COUNT,
   TUTORIAL_LESSON_COUNT,
   formatTutorialHoldControl,
   getInitialTutorialInputDevice,
@@ -92,7 +96,9 @@ const INITIAL_HUD: EngineHudState = {
   },
 };
 
-type RaceGatePhase = "loading" | "countdown" | "racing";
+type RaceGatePhase = "loading" | "countdown" | "racing" | "finishing";
+const RACE_LOADING_REVEAL_MS = 150;
+const RACE_LOADING_MINIMUM_VISIBLE_MS = 400;
 
 interface TutorialStep {
   title: string;
@@ -175,9 +181,9 @@ function getTutorialSteps(hud: EngineHudState, bindings: Record<string, string>)
       control: "Level the bike before touchdown",
     },
     {
-      title: "Read the barrier",
-      copy: "Striped barriers are hard hazards. Move into an open lane before the barrier reaches the rider.",
-      control: controls.lane,
+      title: "Read or clear the barrier",
+      copy: "Move into an open lane to keep full speed. If trapped, raise the front wheel before contact to clear the striped barrier with a heavy speed loss.",
+      control: `${controls.lane} or ${controls.pitch.split(" / ")[0] ?? controls.pitch}`,
     },
     {
       title: "Mud slowdown",
@@ -191,17 +197,54 @@ function getTutorialSteps(hud: EngineHudState, bindings: Record<string, string>)
     },
     {
       title: "Crash and recover",
-      copy: "The training barrier will stop the bike. Hold Recover until the meter fills; tapping is optional in Settings.",
+      copy: "For this drill, lower the front wheel and hit the full-width training barrier. Hold Recover until the meter fills; tapping is optional in Settings.",
       control: formatTutorialHoldControl(controls.recover),
     },
   ];
 }
 
-function HeatMeter({ heat, overheated }: { heat: number; overheated: boolean }) {
+function ContactDrillProgress({ completedDrills }: { completedDrills: number }) {
+  return (
+    <div
+      className="contact-drill-progress"
+      role="list"
+      aria-label={`Contact rule progress: drill ${Math.min(completedDrills + 1, TUTORIAL_COLLISION_DRILL_COUNT)} of ${TUTORIAL_COLLISION_DRILL_COUNT}`}
+    >
+      {Array.from({ length: TUTORIAL_COLLISION_DRILL_COUNT }, (_, index) => {
+        const markerState = index < completedDrills
+          ? "complete"
+          : index === completedDrills
+            ? "active"
+            : "future";
+        const markerLabel = markerState === "complete"
+          ? "completed"
+          : markerState === "active"
+            ? "current"
+            : "not started";
+        return (
+          <span
+            key={`contact-drill-${index + 1}`}
+            role="listitem"
+            data-state={markerState}
+            aria-label={`Contact drill ${index + 1}: ${markerLabel}`}
+          >
+            {markerState === "complete" ? "✓" : markerState === "active" ? <RallyIcon kind="play" className="progress-icon" /> : index + 1}
+          </span>
+        );
+      })}
+    </div>
+  );
+}
+
+const HEAT_WARNING_STYLE = {
+  "--heat-warning-threshold": `${CRITICAL_HEAT_WARNING}%`,
+} as CSSProperties;
+
+export function HeatMeter({ heat, overheated }: { heat: number; overheated: boolean }) {
   return (
     <div className={`heat-meter ${overheated ? "overheated" : ""}`} aria-label={`Heat ${Math.round(heat)} percent${overheated ? ", overheated" : ""}`} role="meter" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(heat)}>
       <strong>Heat</strong>
-      <div className="heat-track"><span style={{ width: `${heat}%` }} /><i className="heat-warning" aria-hidden="true" /></div>
+      <div className="heat-track" style={HEAT_WARNING_STYLE}><span style={{ width: `${heat}%` }} /><i className="heat-warning" aria-hidden="true" /></div>
       {overheated ? <b aria-hidden="true"><span>!</span></b> : null}
     </div>
   );
@@ -232,7 +275,10 @@ export function TouchButton({
   const pointerClickPendingRef = useRef(false);
   const pointerClickTimerRef = useRef(0);
   const pulseFrameRef = useRef(0);
-  onChangeRef.current = onChange;
+
+  useLayoutEffect(() => {
+    onChangeRef.current = onChange;
+  }, [onChange]);
 
   const setControlPressed = useCallback((nextPressed: boolean) => {
     if (pressedRef.current === nextPressed) return;
@@ -352,7 +398,10 @@ export function PitchTouchControls({
   const [direction, setDirection] = useState<LaneChange>(0);
   const directionRef = useRef<LaneChange>(0);
   const onChangeRef = useRef(onChange);
-  onChangeRef.current = onChange;
+
+  useLayoutEffect(() => {
+    onChangeRef.current = onChange;
+  }, [onChange]);
 
   const setPitchDirection = useCallback((nextDirection: LaneChange) => {
     if (directionRef.current === nextDirection) return;
@@ -431,15 +480,18 @@ function containDialogFocus(event: ReactKeyboardEvent<HTMLElement>): void {
 export function GameView({ tutorial = false }: { tutorial?: boolean }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const engineRef = useRef<GameEngine | null>(null);
+  const finishingGateRef = useRef<HTMLElement>(null);
   const pauseDialogRef = useRef<HTMLElement>(null);
   const pauseReturnFocusRef = useRef<HTMLElement | null>(null);
   const tutorialSettingsButtonRef = useRef<HTMLButtonElement>(null);
   const wasPauseDialogOpenRef = useRef(false);
-  const initialInputDeviceRef = useRef<InputDevice>(tutorial && typeof window !== "undefined"
-    ? getInitialTutorialInputDevice(
-        typeof window.matchMedia === "function" && window.matchMedia("(pointer: coarse)").matches,
-      )
-    : "keyboard");
+  const [initialInputDevice] = useState<InputDevice>(() => (
+    tutorial && typeof window !== "undefined"
+      ? getInitialTutorialInputDevice(
+          typeof window.matchMedia === "function" && window.matchMedia("(pointer: coarse)").matches,
+        )
+      : "keyboard"
+  ));
   const screen = useAppStore((state) => state.screen);
   const returnScreen = useAppStore((state) => state.returnScreen);
   const settings = useAppStore((state) => state.settings);
@@ -458,7 +510,7 @@ export function GameView({ tutorial = false }: { tutorial?: boolean }) {
   const navigate = useAppStore((state) => state.navigate);
   const [hud, setHud] = useState<EngineHudState>(() => (
     tutorial
-      ? { ...INITIAL_HUD, totalLaps: 1, inputDevice: initialInputDeviceRef.current }
+      ? { ...INITIAL_HUD, totalLaps: 1, inputDevice: initialInputDevice }
       : INITIAL_HUD
   ));
   const [fatal, setFatal] = useState<string | null>(null);
@@ -470,8 +522,10 @@ export function GameView({ tutorial = false }: { tutorial?: boolean }) {
   const [collisionQuizError, setCollisionQuizError] = useState("");
   const [tutorialNotice, setTutorialNotice] = useState("");
   const [raceGatePhase, setRaceGatePhase] = useState<RaceGatePhase>(tutorial ? "racing" : "loading");
+  const [showLoadingGate, setShowLoadingGate] = useState(false);
   const [countdownLabel, setCountdownLabel] = useState("3");
   const [showGoSignal, setShowGoSignal] = useState(false);
+  const finishingRef = useRef(false);
   const tutorialProgressRef = useRef({ completedLessons: 0, completedDrills: 0 });
   const settingsRef = useRef(settings);
   const trackId = tutorial ? "canyon-kickoff" : (activeRace?.trackId ?? progress.selectedTrackId);
@@ -481,13 +535,28 @@ export function GameView({ tutorial = false }: { tutorial?: boolean }) {
     ? customTrackToDefinition(customTrack)
     : getTrack(trackId);
   const appPaused = screen === "paused" || (screen === "settings" && returnScreen === "paused");
-  const tutorialSteps = tutorial
-    ? getTutorialSteps(hud, settings.controls.keyBindings)
-    : [];
+  const tutorialSteps = useMemo(() => (
+    tutorial
+      ? getTutorialSteps(hud, settings.controls.keyBindings)
+      : []
+  ), [hud, settings.controls.keyBindings, tutorial]);
   const tutorialControls = getTutorialControls(hud, settings.controls.keyBindings);
   const tutorialStepComplete = tutorial
     ? Boolean(tutorialStarted && isTutorialLessonComplete(tutorialStep, hud))
     : false;
+  const tutorialAnnouncement = useMemo(() => {
+    if (!tutorial) return "";
+    if (!tutorialStarted) return "Rider School intro. Twelve lessons and two contact drills.";
+    if (tutorialStep < tutorialSteps.length) {
+      const step = tutorialSteps[tutorialStep];
+      const state = tutorialStepComplete ? "cleared" : "active";
+      return `Lesson ${tutorialStep + 1} of ${tutorialSteps.length}: ${step?.title ?? "Rider School"}. ${state}. ${step?.control ?? ""}`.trim();
+    }
+    if (collisionQuizStep < TUTORIAL_COLLISION_DRILL_COUNT) {
+      return `Contact drill ${collisionQuizStep + 1} of ${TUTORIAL_COLLISION_DRILL_COUNT}: ${collisionQuizStep === 0 ? "Rival contact" : "Rear-wheel defense"}.`;
+    }
+    return "Training cleared. Enter the festival when ready.";
+  }, [collisionQuizStep, tutorial, tutorialStarted, tutorialStep, tutorialStepComplete, tutorialSteps]);
   const tutorialLessonSynchronized = !tutorial
     || tutorialStep >= TUTORIAL_LESSON_COUNT
     || hud.tutorialLesson.activeLessonIndex === tutorialStep;
@@ -499,9 +568,11 @@ export function GameView({ tutorial = false }: { tutorial?: boolean }) {
   const tutorialPostRide = tutorial
     && tutorialStarted
     && isTutorialPostRidePhase(tutorialStep);
+  const finishing = !tutorial && raceGatePhase === "finishing";
+  const waitingAtRaceGate = raceGatePhase === "loading" || raceGatePhase === "countdown";
   const paused = tutorial
     ? !tutorialStarted || tutorialPaused || !tutorialLessonSynchronized || tutorialHandoff || tutorialPostRide
-    : appPaused || raceGatePhase !== "racing";
+    : appPaused || waitingAtRaceGate;
   const visuallyPaused = tutorial ? tutorialPaused : appPaused || raceGatePhase !== "racing";
   const resetTouchControls = visuallyPaused || tutorialPostRide;
   const pauseDialogOpen = tutorial
@@ -513,7 +584,7 @@ export function GameView({ tutorial = false }: { tutorial?: boolean }) {
     setHud({
       ...INITIAL_HUD,
       totalLaps: 1,
-      inputDevice: initialInputDeviceRef.current,
+      inputDevice: initialInputDevice,
     });
     setTutorialStep(0);
     setCollisionQuizStep(0);
@@ -522,7 +593,7 @@ export function GameView({ tutorial = false }: { tutorial?: boolean }) {
     setTutorialPaused(false);
     setTutorialStarted(true);
     setTutorialAttempt((value) => value + 1);
-  }, []);
+  }, [initialInputDevice]);
   const exitTutorial = useCallback((source: TutorialExitSource) => {
     const { completedLessons, completedDrills } = tutorialProgressRef.current;
     const decision = getTutorialExitDecision(source, completedLessons, completedDrills);
@@ -553,11 +624,10 @@ export function GameView({ tutorial = false }: { tutorial?: boolean }) {
     let cancelled = false;
     const raceGateTimers: number[] = [];
     const raceGateAnimationFrames: number[] = [];
+    let loadingGateShownAt: number | null = null;
     let finishPresentationTimer = 0;
     if (!tutorial) {
-      setRaceGatePhase("loading");
-      setCountdownLabel("3");
-      setShowGoSignal(false);
+      finishingRef.current = false;
     }
     try {
       const attemptProgress = useAppStore.getState().progress.tracks[trackId];
@@ -566,18 +636,36 @@ export function GameView({ tutorial = false }: { tutorial?: boolean }) {
         trackId,
         mode,
         settings: settingsRef.current,
-        initialInputDevice: initialInputDeviceRef.current,
+        initialInputDevice,
         customTrack,
         existingBestMs: attemptProgress.bestSoloMs,
         masteryLevel: attemptProgress.masteryLevel,
         onHud: setHud,
-        onFinish: (result, replaySamples) => {
+        onFinishStart: () => {
+          if (tutorial) return;
+          finishingRef.current = true;
+          setShowGoSignal(false);
+          setRaceGatePhase("finishing");
+        },
+        onFinish: (result, replay) => {
           if (tutorial) {
             exitTutorial("race-finish");
             return;
           }
-          void saveReplay(result, replaySamples).catch(() => undefined);
-          finishRace(result, { raceAttempt, presentResults: false });
+          finishRace(result, {
+            raceAttempt,
+            presentResults: false,
+            ...(replay.status === "unavailable"
+              ? { replayFailureReason: replay.reason }
+              : {}),
+          });
+          if (replay.status === "complete") {
+            const latestRaceState = useAppStore.getState();
+            const replayCustomTrack = latestRaceState.raceAttempt === raceAttempt
+              ? (latestRaceState.activeRace?.savedCustomTrack ?? customTrack)
+              : customTrack;
+            void saveReplay(result, replay.samples, replayCustomTrack).catch(() => undefined);
+          }
           finishPresentationTimer = window.setTimeout(() => {
             finishPresentationTimer = 0;
             presentRaceResult(raceAttempt);
@@ -595,14 +683,16 @@ export function GameView({ tutorial = false }: { tutorial?: boolean }) {
     engine.setPaused(tutorial ? pausedRef.current : true);
     engine.start();
     if (!tutorial) {
-      void engine.whenReady().then(() => {
+      const loadingStartedAt = performance.now();
+      const schedule = (delay: number, action: () => void) => {
+        raceGateTimers.push(window.setTimeout(() => {
+          if (!cancelled) action();
+        }, delay));
+      };
+      const startCountdown = () => {
         if (cancelled) return;
+        setShowLoadingGate(false);
         setRaceGatePhase("countdown");
-        const schedule = (delay: number, action: () => void) => {
-          raceGateTimers.push(window.setTimeout(() => {
-            if (!cancelled) action();
-          }, delay));
-        };
         schedule(1_000, () => setCountdownLabel("2"));
         schedule(2_000, () => setCountdownLabel("1"));
         schedule(3_000, () => {
@@ -618,6 +708,21 @@ export function GameView({ tutorial = false }: { tutorial?: boolean }) {
           raceGateAnimationFrames.push(beforeGoPaint);
         });
         schedule(3_450, () => setShowGoSignal(false));
+      };
+      schedule(RACE_LOADING_REVEAL_MS, () => {
+        loadingGateShownAt = performance.now();
+        setShowLoadingGate(true);
+      });
+      void engine.whenReady().then(() => {
+        if (cancelled) return;
+        const readyAt = performance.now();
+        if (readyAt - loadingStartedAt < RACE_LOADING_REVEAL_MS) {
+          startCountdown();
+          return;
+        }
+        const visibleSince = loadingGateShownAt ?? readyAt;
+        const remainingVisibleMs = Math.max(0, RACE_LOADING_MINIMUM_VISIBLE_MS - (readyAt - visibleSince));
+        schedule(remainingVisibleMs, startCountdown);
       });
     }
     return () => {
@@ -636,7 +741,7 @@ export function GameView({ tutorial = false }: { tutorial?: boolean }) {
       engine.dispose({ retainRenderer });
       engineRef.current = null;
     };
-  }, [customTrack, exitTutorial, finishRace, mode, presentRaceResult, raceAttempt, trackId, tutorial, tutorialAttempt]);
+  }, [customTrack, exitTutorial, finishRace, initialInputDevice, mode, presentRaceResult, raceAttempt, trackId, tutorial, tutorialAttempt]);
 
   useLayoutEffect(() => {
     if (!tutorial) return;
@@ -661,6 +766,10 @@ export function GameView({ tutorial = false }: { tutorial?: boolean }) {
     engineRef.current?.setPaused(paused);
     pausedRef.current = paused;
   }, [paused]);
+
+  useLayoutEffect(() => {
+    if (finishing) finishingGateRef.current?.focus({ preventScroll: true });
+  }, [finishing]);
 
   useLayoutEffect(() => {
     const wasPauseDialogOpen = wasPauseDialogOpenRef.current;
@@ -693,7 +802,7 @@ export function GameView({ tutorial = false }: { tutorial?: boolean }) {
     previousScreenRef.current = screen;
   }, [pauseDialogOpen, screen, tutorial, tutorialStarted]);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.code !== (settings.controls.keyBindings.pause ?? "Escape")) return;
       if (screen === "settings") return;
@@ -703,6 +812,7 @@ export function GameView({ tutorial = false }: { tutorial?: boolean }) {
       ) return;
       event.preventDefault();
       if (event.repeat) return;
+      if (finishingRef.current) return;
       if (tutorial) {
         if (tutorialStarted) setTutorialPaused((value) => !value);
         return;
@@ -716,6 +826,7 @@ export function GameView({ tutorial = false }: { tutorial?: boolean }) {
         if (tutorialStarted) setTutorialPaused(true);
         return;
       }
+      if (finishingRef.current || raceGatePhase === "finishing") return;
       if (raceGatePhase !== "racing" || !paused) pauseRace();
     };
     window.addEventListener("keydown", onKeyDown);
@@ -733,7 +844,12 @@ export function GameView({ tutorial = false }: { tutorial?: boolean }) {
     let startWasPressed = false;
     const pollPause = () => {
       const pressed = Boolean(firstConnectedGamepad()?.buttons[9]?.pressed);
-      if (pressed && !startWasPressed && useAppStore.getState().screen !== "settings") {
+      if (
+        pressed
+        && !startWasPressed
+        && !finishingRef.current
+        && useAppStore.getState().screen !== "settings"
+      ) {
         engineRef.current?.input.markGamepadCommand();
         if (tutorial) {
           if (tutorialStarted) setTutorialPaused((value) => !value);
@@ -761,6 +877,14 @@ export function GameView({ tutorial = false }: { tutorial?: boolean }) {
     return () => window.clearTimeout(timer);
   }, [tutorial, tutorialPaused, tutorialStep, tutorialStepComplete, tutorialSteps.length]);
 
+  const restartRace = useCallback(() => {
+    finishingRef.current = false;
+    setRaceGatePhase("loading");
+    setShowLoadingGate(false);
+    setCountdownLabel("3");
+    setShowGoSignal(false);
+    retryRace();
+  }, [retryRace]);
   const setTouch = (control: "throttle" | "turbo" | "laneChange" | "pitch" | "recover", value: boolean | number) => engineRef.current?.input.setTouchControl(control, value);
   const mirrored = settings.controls.mirroredTouch;
   const laneControl = (direction: LaneChange) => setTouch("laneChange", direction);
@@ -768,7 +892,7 @@ export function GameView({ tutorial = false }: { tutorial?: boolean }) {
   const showCaption = settings.accessibility.captions && Boolean(hud.caption);
 
   if (fatal) {
-    return <main className="fatal-screen"><div><span>Graphics recovery</span><h1>Race paused at the gate</h1><p>{fatal}</p><button className="button-primary" onClick={() => window.location.reload()}>Retry loading</button><button onClick={() => navigate("title")}>Return to menu</button></div></main>;
+    return <main className="fatal-screen"><div><span>Race recovery</span><h1>Race interrupted</h1><p>{fatal}</p><button className="button-primary" onClick={() => window.location.reload()}>Reload race</button><button onClick={() => navigate("title")}>Return to menu</button></div></main>;
   }
 
   return (
@@ -782,11 +906,17 @@ export function GameView({ tutorial = false }: { tutorial?: boolean }) {
     >
       <div
         className="game-surface"
-        inert={pauseDialogOpen ? true : undefined}
-        aria-hidden={pauseDialogOpen ? true : undefined}
+        inert={pauseDialogOpen || finishing ? true : undefined}
+        aria-hidden={pauseDialogOpen || finishing ? true : undefined}
       >
       <h1 className="sr-only">{tutorial ? `${track.name} training` : `${track.name} ${runLabel ?? mode} race`}</h1>
-      <canvas ref={canvasRef} className="game-canvas" tabIndex={0} aria-label={`Live 3D race on ${track.name}`} />
+      <canvas
+        key={raceAttempt}
+        ref={canvasRef}
+        className="game-canvas"
+        tabIndex={0}
+        aria-label={`Live 3D race on ${track.name}`}
+      />
       <div className="race-vignette" aria-hidden="true" />
       <header className="race-hud">
         <div className={`position-block ${runLabel ? "run-label" : ""}`}><span>{runLabel ? "Run" : "Position"}</span><strong>{runLabel ?? `${hud.position} / ${hud.fieldSize}`}</strong></div>
@@ -806,7 +936,7 @@ export function GameView({ tutorial = false }: { tutorial?: boolean }) {
               else pauseRace();
             }}
           >
-            {visuallyPaused ? "▶" : "Ⅱ"}
+            <RallyIcon kind={visuallyPaused ? "play" : "pause"} />
           </button>
         ) : null}
       </header>
@@ -814,12 +944,13 @@ export function GameView({ tutorial = false }: { tutorial?: boolean }) {
         <HeatMeter heat={hud.heat} overheated={hud.overheated} />
         <p className="race-hint">{hud.hint}</p>
       </div>
-      {!tutorial && (raceGatePhase !== "racing" || showGoSignal) ? (
+      {!tutorial && ((raceGatePhase === "loading" && showLoadingGate) || raceGatePhase === "countdown" || showGoSignal) ? (
         <section
-          className={`race-start-gate${showGoSignal ? " go-signal" : ""}`}
+          className={`race-start-gate${raceGatePhase === "loading" ? " loading-gate" : ""}${showGoSignal ? " go-signal" : ""}`}
           role="status"
           aria-live={raceGatePhase === "loading" ? "polite" : "assertive"}
           aria-atomic="true"
+          data-gate-mode={raceGatePhase === "loading" ? "loading" : countdownLabel === "GO" ? "go" : "countdown"}
           aria-label={raceGatePhase === "loading"
             ? `Loading ${track.name} race`
             : countdownLabel === "GO"
@@ -830,6 +961,7 @@ export function GameView({ tutorial = false }: { tutorial?: boolean }) {
             <>
               <span>Preparing the ridge</span>
               <h2>{track.name}</h2>
+              <div className="loading-track race-loading-track" aria-hidden="true"><span /></div>
               <p>Loading rider, course, and race systems…</p>
             </>
           ) : (
@@ -865,11 +997,12 @@ export function GameView({ tutorial = false }: { tutorial?: boolean }) {
         </div>
       </div>
       {tutorial && !tutorialPaused ? (
-        <aside className={`tutorial-card ${!tutorialStarted ? "tutorial-intro" : ""}`} aria-label="Rider school lesson" aria-live="polite">
+        <aside className={`tutorial-card ${!tutorialStarted ? "tutorial-intro" : ""}`} aria-label="Rider school lesson">
+          <p className="sr-only" role="status" aria-live="polite" aria-atomic="true">{tutorialAnnouncement}</p>
           {showCaption ? <p className="tutorial-caption-cue" aria-atomic="true"><span aria-hidden="true">!</span>{hud.caption}</p> : null}
           {!tutorialStarted ? (
             <>
-              <span>First ride · 12 guided lessons</span>
+              <span>First ride · 12 lessons + 2 contact drills</span>
               <h2>Rider school</h2>
               {persistenceStatus.mode === "session" ? (
                 <div className="tutorial-session-notice" role="alert">
@@ -913,7 +1046,7 @@ export function GameView({ tutorial = false }: { tutorial?: boolean }) {
                       data-state={markerState}
                       aria-label={`Lesson ${index + 1}: ${markerLabel}`}
                     >
-                      {markerState === "complete" ? "✓" : markerState === "active" ? "▶" : index + 1}
+                      {markerState === "complete" ? "✓" : markerState === "active" ? <RallyIcon kind="play" className="progress-icon" /> : index + 1}
                     </span>
                   );
                 })}
@@ -936,6 +1069,7 @@ export function GameView({ tutorial = false }: { tutorial?: boolean }) {
             </>
           ) : collisionQuizStep === 0 ? (
             <>
+              <ContactDrillProgress completedDrills={collisionQuizStep} />
               <span>Contact drill · 1 / 2</span><h2>Rival contact</h2>
               <p>You catch a slower rider and hit their rear wheel. Who crashes?</p>
               <div className="tutorial-answers"><button className="button-primary" onClick={() => { setCollisionQuizError(""); setCollisionQuizStep(1); }}>I crash</button><button onClick={() => setCollisionQuizError("Not quite — the rider who hits from behind crashes.")}>Rider ahead crashes</button></div>
@@ -943,6 +1077,7 @@ export function GameView({ tutorial = false }: { tutorial?: boolean }) {
             </>
           ) : collisionQuizStep === 1 ? (
             <>
+              <ContactDrillProgress completedDrills={collisionQuizStep} />
               <span>Contact drill · 2 / 2</span><h2>Rear-wheel defense</h2>
               <p>A pursuing rider clips your rear wheel from behind. Who crashes?</p>
               <div className="tutorial-answers"><button className="button-primary" onClick={() => { setCollisionQuizError(""); setCollisionQuizStep(2); }}>Pursuer crashes</button><button onClick={() => setCollisionQuizError("Protect your line — the pursuer who clips you from behind crashes.")}>I crash</button></div>
@@ -950,6 +1085,7 @@ export function GameView({ tutorial = false }: { tutorial?: boolean }) {
             </>
           ) : (
             <>
+              <ContactDrillProgress completedDrills={collisionQuizStep} />
               <span>Training cleared</span><h2>Race fair, ride bold</h2>
               <p>You rode, coasted, managed heat, cooled, changed lanes, shaped and landed a jump, read hazards, handled slow terrain, recovered from a crash, and learned both contact rules.</p>
               <div className="tutorial-control-map tutorial-control-map-compact" aria-label="Control recap">
@@ -967,7 +1103,21 @@ export function GameView({ tutorial = false }: { tutorial?: boolean }) {
       ) : null}
       <output className="performance-hud" aria-label="Performance metrics">{hud.fps || "--"} FPS · {hud.frameTimeMs || "--"} ms · {hud.drawCalls} draws · {Math.round(hud.droppedSimulationMs)} ms dropped</output>
       </div>
-      {tutorial && tutorialPaused ? (
+      {finishing ? (
+        <section
+          ref={finishingGateRef}
+          className="race-start-gate finish-classification-gate"
+          role="status"
+          tabIndex={-1}
+          aria-live="assertive"
+          aria-atomic="true"
+          aria-label={`Finish confirmed on ${track.name}. Finalizing official field results.`}
+        >
+          <span>Finish confirmed</span>
+          <h2>Finalizing results</h2>
+          <p>Calculating the official field order…</p>
+        </section>
+      ) : tutorial && tutorialPaused ? (
         <section ref={pauseDialogRef} className="pause-overlay" role="dialog" aria-modal="true" aria-label="Training paused" onKeyDown={containDialogFocus}>
           <p>Training paused</p><h1>{track.name}</h1>
           <small>The clock and rider input are frozen. Resume this lesson or reset the complete training route.</small>
@@ -981,7 +1131,7 @@ export function GameView({ tutorial = false }: { tutorial?: boolean }) {
           <p>Race paused</p><h1>{track.name}</h1>
           <button className="button-primary" onClick={resumeRace}>Resume</button>
           <button onClick={openSettings}>Settings</button>
-          <button onClick={retryRace}>Restart now</button>
+          <button onClick={restartRace}>Restart now</button>
           {mode === "custom"
             ? <button onClick={() => navigate("editor")}>Return to Track Builder</button>
             : <button onClick={() => navigate("mode-select")}>Change mode</button>}

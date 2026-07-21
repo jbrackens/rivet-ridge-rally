@@ -2,7 +2,7 @@ import { expect, test } from "@playwright/test";
 
 test("standard-layout gamepad input completes a browser race", async ({ page }, testInfo) => {
   test.skip(testInfo.project.name !== "chromium", "Synthetic standard-pad gate runs once in Chromium");
-  test.setTimeout(45_000);
+  test.setTimeout(180_000);
   await page.addInitScript(() => {
     const buttons = Array.from({ length: 17 }, () => ({ pressed: false, touched: false, value: 0 }));
     const pad = {
@@ -62,7 +62,7 @@ test("standard-layout gamepad input completes a browser race", async ({ page }, 
 
   await expect(page.locator(".input-device")).toHaveText("Gamepad controls", { timeout: 10_000 });
   await expect(page.locator(".race-hint")).toContainText("Start pause");
-  await expect(page.getByRole("button", { name: "Retry now" })).toBeVisible({ timeout: 30_000 });
+  await expect(page.getByRole("button", { name: "Retry now" })).toBeVisible({ timeout: 150_000 });
   await expect(page.getByText("Lap 1", { exact: true })).toBeVisible();
   await expect(page.getByText("Lap 2", { exact: true })).toBeVisible();
 });

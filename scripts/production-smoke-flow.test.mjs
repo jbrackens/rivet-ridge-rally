@@ -174,6 +174,7 @@ test("reverifies served release bytes after the journey and rejects identity dri
     aggregateSha256: "a".repeat(64),
     fileCount: 4,
     totalBytes: 123,
+    totalGzipBytes: 87,
     entrypoint: { sha256: "b".repeat(64) },
   };
   let calls = 0;

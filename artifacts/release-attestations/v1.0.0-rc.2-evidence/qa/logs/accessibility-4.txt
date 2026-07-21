@@ -1,0 +1,183 @@
+[WebServer] (node:33963) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[WebServer] (Use `node --trace-warnings ...` to show where the warning was created)
+[WebServer] (node:33964) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[WebServer] (Use `node --trace-warnings ...` to show where the warning was created)
+[WebServer] (node:33965) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[WebServer] (Use `node --trace-warnings ...` to show where the warning was created)
+[WebServer] (node:33966) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[WebServer] (Use `node --trace-warnings ...` to show where the warning was created)
+[WebServer] (node:34008) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[WebServer] (Use `node --trace-warnings ...` to show where the warning was created)
+[WebServer] (node:34105) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[WebServer] (Use `node --trace-warnings ...` to show where the warning was created)
+
+Running 150 tests using 1 worker
+
+(node:34146) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✓    1 [chromium] › e2e/accessibility-controls.spec.ts:128:1 › keyboard-only menus reach a race and Escape freezes then resumes it (1.2m)
+  ✓    2 [chromium] › e2e/accessibility-controls.spec.ts:221:1 › keyboard remapping rejects conflicts and the accepted binding completes a race (1.6m)
+  ✓    3 [chromium] › e2e/accessibility-controls.spec.ts:281:1 › accessibility and volume controls apply immediately and persist (15.5s)
+  ✓    4 [chromium] › e2e/accessibility-controls.spec.ts:343:1 › locked progression instructions remain readable instead of globally dimmed (14.8s)
+  ✓    5 [chromium] › e2e/accessibility-controls.spec.ts:368:1 › captions and critical race state have visible non-color labels (42.8s)
+  ✓    6 [chromium] › e2e/accessibility-controls.spec.ts:407:1 › renderer accessibility cues toggle live and fixed-step caps report dropped time (1.1m)
+  -    7 [chromium] › e2e/accessibility-controls.spec.ts:453:1 › mirrored touch controls swap sides without losing accessible labels
+  ✓    8 [chromium] › e2e/accessibility-controls.spec.ts:489:1 › 320px through 780px race HUD and controls remain separated at 140% UI scale (1.2m)
+  ✓    9 [chromium] › e2e/accessibility-controls.spec.ts:589:1 › short-phone pause dialog stays safe, scrollable, and touch operable at 140% UI scale (39.7s)
+  ✓   10 [chromium] › e2e/accessibility-controls.spec.ts:628:1 › short-phone tutorial retains a touch-scrollable action area at 140% UI scale (54.0s)
+  ✓   11 [chromium] › e2e/accessibility-controls.spec.ts:693:1 › tutorial lesson updates use one concise live status region (22.0s)
+  ✓   12 [chromium] › e2e/accessibility-controls.spec.ts:711:1 › settings and editor selector buttons expose their selected state (17.6s)
+  ✓   13 [chromium] › e2e/accessibility-controls.spec.ts:746:1 › chunk loading screens announce the destination instead of stale boot status (15.9s)
+  ✓   14 [chromium] › e2e/accessibility-controls.spec.ts:763:1 › icon-only controls use authored SVG icons instead of platform text glyphs (46.1s)
+  ✓   15 [chromium] › e2e/accessibility-controls.spec.ts:799:1 › screen swaps and race settings overlay use reduced-motion-safe transitions (1.0m)
+  ✓   16 [chromium] › e2e/accessibility-controls.spec.ts:832:1 › campaign taglines stay readable on touch tablets without hover (15.8s)
+  ✓   17 [chromium] › e2e/accessibility-controls.spec.ts:864:1 › primary menus fit 16:9, ultrawide, tablet, and narrow viewports (18.7s)
+  ✓   18 [chromium] › e2e/accessibility-controls.spec.ts:995:1 › race, results, and editor controls fit every required responsive layout (7.0m)
+  ✓   19 [chromium] › e2e/core-flow.spec.ts:269:1 › slow race prep shows an animated loading gate before countdown (37.4s)
+  ✓   20 [chromium] › e2e/core-flow.spec.ts:292:1 › fresh load completes a keyboard race, saves onboarding, and retries (2.8m)
+  -   21 [chromium] › e2e/core-flow.spec.ts:377:1 › title screen matches the approved visual baseline
+  ✓   22 [chromium] › e2e/core-flow.spec.ts:390:1 › track builder places, validates, saves, reloads, and test-rides a local track (27.8s)
+  -   23 [chromium] › e2e/core-flow.spec.ts:414:1 › phone and tablet layouts complete a race with labeled touch controls
+  ✓   24 [chromium] › e2e/core-flow.spec.ts:447:1 › all five launch tracks load and complete two fast QA laps (7.4m)
+  ✓   25 [chromium] › e2e/core-flow.spec.ts:474:1 › production shell reloads from its service-worker cache while offline (37.1s)
+(node:38496) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✓   26 [firefox] › e2e/accessibility-controls.spec.ts:128:1 › keyboard-only menus reach a race and Escape freezes then resumes it (7.7s)
+  -   27 [firefox] › e2e/accessibility-controls.spec.ts:221:1 › keyboard remapping rejects conflicts and the accepted binding completes a race
+  ✓   28 [firefox] › e2e/accessibility-controls.spec.ts:281:1 › accessibility and volume controls apply immediately and persist (2.6s)
+  -   29 [firefox] › e2e/accessibility-controls.spec.ts:343:1 › locked progression instructions remain readable instead of globally dimmed
+  -   30 [firefox] › e2e/accessibility-controls.spec.ts:368:1 › captions and critical race state have visible non-color labels
+  -   31 [firefox] › e2e/accessibility-controls.spec.ts:407:1 › renderer accessibility cues toggle live and fixed-step caps report dropped time
+  -   32 [firefox] › e2e/accessibility-controls.spec.ts:453:1 › mirrored touch controls swap sides without losing accessible labels
+  -   33 [firefox] › e2e/accessibility-controls.spec.ts:489:1 › 320px through 780px race HUD and controls remain separated at 140% UI scale
+  -   34 [firefox] › e2e/accessibility-controls.spec.ts:589:1 › short-phone pause dialog stays safe, scrollable, and touch operable at 140% UI scale
+  -   35 [firefox] › e2e/accessibility-controls.spec.ts:628:1 › short-phone tutorial retains a touch-scrollable action area at 140% UI scale
+  -   36 [firefox] › e2e/accessibility-controls.spec.ts:693:1 › tutorial lesson updates use one concise live status region
+  -   37 [firefox] › e2e/accessibility-controls.spec.ts:711:1 › settings and editor selector buttons expose their selected state
+  -   38 [firefox] › e2e/accessibility-controls.spec.ts:746:1 › chunk loading screens announce the destination instead of stale boot status
+  -   39 [firefox] › e2e/accessibility-controls.spec.ts:763:1 › icon-only controls use authored SVG icons instead of platform text glyphs
+  -   40 [firefox] › e2e/accessibility-controls.spec.ts:799:1 › screen swaps and race settings overlay use reduced-motion-safe transitions
+  -   41 [firefox] › e2e/accessibility-controls.spec.ts:832:1 › campaign taglines stay readable on touch tablets without hover
+  -   42 [firefox] › e2e/accessibility-controls.spec.ts:864:1 › primary menus fit 16:9, ultrawide, tablet, and narrow viewports
+  -   43 [firefox] › e2e/accessibility-controls.spec.ts:995:1 › race, results, and editor controls fit every required responsive layout
+  -   44 [firefox] › e2e/core-flow.spec.ts:269:1 › slow race prep shows an animated loading gate before countdown
+  ✓   45 [firefox] › e2e/core-flow.spec.ts:292:1 › fresh load completes a keyboard race, saves onboarding, and retries (22.9s)
+  -   46 [firefox] › e2e/core-flow.spec.ts:377:1 › title screen matches the approved visual baseline
+  ✓   47 [firefox] › e2e/core-flow.spec.ts:390:1 › track builder places, validates, saves, reloads, and test-rides a local track (3.1s)
+  -   48 [firefox] › e2e/core-flow.spec.ts:414:1 › phone and tablet layouts complete a race with labeled touch controls
+  -   49 [firefox] › e2e/core-flow.spec.ts:447:1 › all five launch tracks load and complete two fast QA laps
+  -   50 [firefox] › e2e/core-flow.spec.ts:474:1 › production shell reloads from its service-worker cache while offline
+(node:38853) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✓   51 [webkit] › e2e/accessibility-controls.spec.ts:128:1 › keyboard-only menus reach a race and Escape freezes then resumes it (8.0s)
+  -   52 [webkit] › e2e/accessibility-controls.spec.ts:221:1 › keyboard remapping rejects conflicts and the accepted binding completes a race
+  ✓   53 [webkit] › e2e/accessibility-controls.spec.ts:281:1 › accessibility and volume controls apply immediately and persist (2.9s)
+  -   54 [webkit] › e2e/accessibility-controls.spec.ts:343:1 › locked progression instructions remain readable instead of globally dimmed
+  -   55 [webkit] › e2e/accessibility-controls.spec.ts:368:1 › captions and critical race state have visible non-color labels
+  -   56 [webkit] › e2e/accessibility-controls.spec.ts:407:1 › renderer accessibility cues toggle live and fixed-step caps report dropped time
+  -   57 [webkit] › e2e/accessibility-controls.spec.ts:453:1 › mirrored touch controls swap sides without losing accessible labels
+  -   58 [webkit] › e2e/accessibility-controls.spec.ts:489:1 › 320px through 780px race HUD and controls remain separated at 140% UI scale
+  -   59 [webkit] › e2e/accessibility-controls.spec.ts:589:1 › short-phone pause dialog stays safe, scrollable, and touch operable at 140% UI scale
+  -   60 [webkit] › e2e/accessibility-controls.spec.ts:628:1 › short-phone tutorial retains a touch-scrollable action area at 140% UI scale
+  -   61 [webkit] › e2e/accessibility-controls.spec.ts:693:1 › tutorial lesson updates use one concise live status region
+  -   62 [webkit] › e2e/accessibility-controls.spec.ts:711:1 › settings and editor selector buttons expose their selected state
+  -   63 [webkit] › e2e/accessibility-controls.spec.ts:746:1 › chunk loading screens announce the destination instead of stale boot status
+  -   64 [webkit] › e2e/accessibility-controls.spec.ts:763:1 › icon-only controls use authored SVG icons instead of platform text glyphs
+  -   65 [webkit] › e2e/accessibility-controls.spec.ts:799:1 › screen swaps and race settings overlay use reduced-motion-safe transitions
+  -   66 [webkit] › e2e/accessibility-controls.spec.ts:832:1 › campaign taglines stay readable on touch tablets without hover
+  -   67 [webkit] › e2e/accessibility-controls.spec.ts:864:1 › primary menus fit 16:9, ultrawide, tablet, and narrow viewports
+  -   68 [webkit] › e2e/accessibility-controls.spec.ts:995:1 › race, results, and editor controls fit every required responsive layout
+  -   69 [webkit] › e2e/core-flow.spec.ts:269:1 › slow race prep shows an animated loading gate before countdown
+  ✓   70 [webkit] › e2e/core-flow.spec.ts:292:1 › fresh load completes a keyboard race, saves onboarding, and retries (22.5s)
+  -   71 [webkit] › e2e/core-flow.spec.ts:377:1 › title screen matches the approved visual baseline
+  ✓   72 [webkit] › e2e/core-flow.spec.ts:390:1 › track builder places, validates, saves, reloads, and test-rides a local track (3.0s)
+  -   73 [webkit] › e2e/core-flow.spec.ts:414:1 › phone and tablet layouts complete a race with labeled touch controls
+  -   74 [webkit] › e2e/core-flow.spec.ts:447:1 › all five launch tracks load and complete two fast QA laps
+  -   75 [webkit] › e2e/core-flow.spec.ts:474:1 › production shell reloads from its service-worker cache while offline
+(node:39017) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  -   76 [mobile-chrome] › e2e/accessibility-controls.spec.ts:128:1 › keyboard-only menus reach a race and Escape freezes then resumes it
+  -   77 [mobile-chrome] › e2e/accessibility-controls.spec.ts:221:1 › keyboard remapping rejects conflicts and the accepted binding completes a race
+  -   78 [mobile-chrome] › e2e/accessibility-controls.spec.ts:281:1 › accessibility and volume controls apply immediately and persist
+  -   79 [mobile-chrome] › e2e/accessibility-controls.spec.ts:343:1 › locked progression instructions remain readable instead of globally dimmed
+  -   80 [mobile-chrome] › e2e/accessibility-controls.spec.ts:368:1 › captions and critical race state have visible non-color labels
+  -   81 [mobile-chrome] › e2e/accessibility-controls.spec.ts:407:1 › renderer accessibility cues toggle live and fixed-step caps report dropped time
+  ✓   82 [mobile-chrome] › e2e/accessibility-controls.spec.ts:453:1 › mirrored touch controls swap sides without losing accessible labels (20.0s)
+  -   83 [mobile-chrome] › e2e/accessibility-controls.spec.ts:489:1 › 320px through 780px race HUD and controls remain separated at 140% UI scale
+  -   84 [mobile-chrome] › e2e/accessibility-controls.spec.ts:589:1 › short-phone pause dialog stays safe, scrollable, and touch operable at 140% UI scale
+  -   85 [mobile-chrome] › e2e/accessibility-controls.spec.ts:628:1 › short-phone tutorial retains a touch-scrollable action area at 140% UI scale
+  -   86 [mobile-chrome] › e2e/accessibility-controls.spec.ts:693:1 › tutorial lesson updates use one concise live status region
+  -   87 [mobile-chrome] › e2e/accessibility-controls.spec.ts:711:1 › settings and editor selector buttons expose their selected state
+  -   88 [mobile-chrome] › e2e/accessibility-controls.spec.ts:746:1 › chunk loading screens announce the destination instead of stale boot status
+  -   89 [mobile-chrome] › e2e/accessibility-controls.spec.ts:763:1 › icon-only controls use authored SVG icons instead of platform text glyphs
+  -   90 [mobile-chrome] › e2e/accessibility-controls.spec.ts:799:1 › screen swaps and race settings overlay use reduced-motion-safe transitions
+  -   91 [mobile-chrome] › e2e/accessibility-controls.spec.ts:832:1 › campaign taglines stay readable on touch tablets without hover
+  -   92 [mobile-chrome] › e2e/accessibility-controls.spec.ts:864:1 › primary menus fit 16:9, ultrawide, tablet, and narrow viewports
+  -   93 [mobile-chrome] › e2e/accessibility-controls.spec.ts:995:1 › race, results, and editor controls fit every required responsive layout
+  -   94 [mobile-chrome] › e2e/core-flow.spec.ts:269:1 › slow race prep shows an animated loading gate before countdown
+  -   95 [mobile-chrome] › e2e/core-flow.spec.ts:292:1 › fresh load completes a keyboard race, saves onboarding, and retries
+  -   96 [mobile-chrome] › e2e/core-flow.spec.ts:377:1 › title screen matches the approved visual baseline
+  -   97 [mobile-chrome] › e2e/core-flow.spec.ts:390:1 › track builder places, validates, saves, reloads, and test-rides a local track
+  ✓   98 [mobile-chrome] › e2e/core-flow.spec.ts:414:1 › phone and tablet layouts complete a race with labeled touch controls (34.8s)
+  -   99 [mobile-chrome] › e2e/core-flow.spec.ts:447:1 › all five launch tracks load and complete two fast QA laps
+  -  100 [mobile-chrome] › e2e/core-flow.spec.ts:474:1 › production shell reloads from its service-worker cache while offline
+(node:39211) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  -  101 [mobile-safari] › e2e/accessibility-controls.spec.ts:128:1 › keyboard-only menus reach a race and Escape freezes then resumes it
+  -  102 [mobile-safari] › e2e/accessibility-controls.spec.ts:221:1 › keyboard remapping rejects conflicts and the accepted binding completes a race
+  -  103 [mobile-safari] › e2e/accessibility-controls.spec.ts:281:1 › accessibility and volume controls apply immediately and persist
+  -  104 [mobile-safari] › e2e/accessibility-controls.spec.ts:343:1 › locked progression instructions remain readable instead of globally dimmed
+  -  105 [mobile-safari] › e2e/accessibility-controls.spec.ts:368:1 › captions and critical race state have visible non-color labels
+  -  106 [mobile-safari] › e2e/accessibility-controls.spec.ts:407:1 › renderer accessibility cues toggle live and fixed-step caps report dropped time
+  ✓  107 [mobile-safari] › e2e/accessibility-controls.spec.ts:453:1 › mirrored touch controls swap sides without losing accessible labels (3.5s)
+  -  108 [mobile-safari] › e2e/accessibility-controls.spec.ts:489:1 › 320px through 780px race HUD and controls remain separated at 140% UI scale
+  -  109 [mobile-safari] › e2e/accessibility-controls.spec.ts:589:1 › short-phone pause dialog stays safe, scrollable, and touch operable at 140% UI scale
+  -  110 [mobile-safari] › e2e/accessibility-controls.spec.ts:628:1 › short-phone tutorial retains a touch-scrollable action area at 140% UI scale
+  -  111 [mobile-safari] › e2e/accessibility-controls.spec.ts:693:1 › tutorial lesson updates use one concise live status region
+  -  112 [mobile-safari] › e2e/accessibility-controls.spec.ts:711:1 › settings and editor selector buttons expose their selected state
+  -  113 [mobile-safari] › e2e/accessibility-controls.spec.ts:746:1 › chunk loading screens announce the destination instead of stale boot status
+  -  114 [mobile-safari] › e2e/accessibility-controls.spec.ts:763:1 › icon-only controls use authored SVG icons instead of platform text glyphs
+  -  115 [mobile-safari] › e2e/accessibility-controls.spec.ts:799:1 › screen swaps and race settings overlay use reduced-motion-safe transitions
+  -  116 [mobile-safari] › e2e/accessibility-controls.spec.ts:832:1 › campaign taglines stay readable on touch tablets without hover
+  -  117 [mobile-safari] › e2e/accessibility-controls.spec.ts:864:1 › primary menus fit 16:9, ultrawide, tablet, and narrow viewports
+  -  118 [mobile-safari] › e2e/accessibility-controls.spec.ts:995:1 › race, results, and editor controls fit every required responsive layout
+  -  119 [mobile-safari] › e2e/core-flow.spec.ts:269:1 › slow race prep shows an animated loading gate before countdown
+  -  120 [mobile-safari] › e2e/core-flow.spec.ts:292:1 › fresh load completes a keyboard race, saves onboarding, and retries
+  -  121 [mobile-safari] › e2e/core-flow.spec.ts:377:1 › title screen matches the approved visual baseline
+  -  122 [mobile-safari] › e2e/core-flow.spec.ts:390:1 › track builder places, validates, saves, reloads, and test-rides a local track
+  ✓  123 [mobile-safari] › e2e/core-flow.spec.ts:414:1 › phone and tablet layouts complete a race with labeled touch controls (17.0s)
+  -  124 [mobile-safari] › e2e/core-flow.spec.ts:447:1 › all five launch tracks load and complete two fast QA laps
+  -  125 [mobile-safari] › e2e/core-flow.spec.ts:474:1 › production shell reloads from its service-worker cache while offline
+(node:39341) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  -  126 [tablet-chrome] › e2e/accessibility-controls.spec.ts:128:1 › keyboard-only menus reach a race and Escape freezes then resumes it
+  -  127 [tablet-chrome] › e2e/accessibility-controls.spec.ts:221:1 › keyboard remapping rejects conflicts and the accepted binding completes a race
+  -  128 [tablet-chrome] › e2e/accessibility-controls.spec.ts:281:1 › accessibility and volume controls apply immediately and persist
+  -  129 [tablet-chrome] › e2e/accessibility-controls.spec.ts:343:1 › locked progression instructions remain readable instead of globally dimmed
+  -  130 [tablet-chrome] › e2e/accessibility-controls.spec.ts:368:1 › captions and critical race state have visible non-color labels
+  -  131 [tablet-chrome] › e2e/accessibility-controls.spec.ts:407:1 › renderer accessibility cues toggle live and fixed-step caps report dropped time
+  ✓  132 [tablet-chrome] › e2e/accessibility-controls.spec.ts:453:1 › mirrored touch controls swap sides without losing accessible labels (25.3s)
+  -  133 [tablet-chrome] › e2e/accessibility-controls.spec.ts:489:1 › 320px through 780px race HUD and controls remain separated at 140% UI scale
+  -  134 [tablet-chrome] › e2e/accessibility-controls.spec.ts:589:1 › short-phone pause dialog stays safe, scrollable, and touch operable at 140% UI scale
+  -  135 [tablet-chrome] › e2e/accessibility-controls.spec.ts:628:1 › short-phone tutorial retains a touch-scrollable action area at 140% UI scale
+  -  136 [tablet-chrome] › e2e/accessibility-controls.spec.ts:693:1 › tutorial lesson updates use one concise live status region
+  -  137 [tablet-chrome] › e2e/accessibility-controls.spec.ts:711:1 › settings and editor selector buttons expose their selected state
+  -  138 [tablet-chrome] › e2e/accessibility-controls.spec.ts:746:1 › chunk loading screens announce the destination instead of stale boot status
+  -  139 [tablet-chrome] › e2e/accessibility-controls.spec.ts:763:1 › icon-only controls use authored SVG icons instead of platform text glyphs
+  -  140 [tablet-chrome] › e2e/accessibility-controls.spec.ts:799:1 › screen swaps and race settings overlay use reduced-motion-safe transitions
+  ✓  141 [tablet-chrome] › e2e/accessibility-controls.spec.ts:832:1 › campaign taglines stay readable on touch tablets without hover (8.2s)
+  -  142 [tablet-chrome] › e2e/accessibility-controls.spec.ts:864:1 › primary menus fit 16:9, ultrawide, tablet, and narrow viewports
+  -  143 [tablet-chrome] › e2e/accessibility-controls.spec.ts:995:1 › race, results, and editor controls fit every required responsive layout
+  -  144 [tablet-chrome] › e2e/core-flow.spec.ts:269:1 › slow race prep shows an animated loading gate before countdown
+  -  145 [tablet-chrome] › e2e/core-flow.spec.ts:292:1 › fresh load completes a keyboard race, saves onboarding, and retries
+  -  146 [tablet-chrome] › e2e/core-flow.spec.ts:377:1 › title screen matches the approved visual baseline
+  -  147 [tablet-chrome] › e2e/core-flow.spec.ts:390:1 › track builder places, validates, saves, reloads, and test-rides a local track
+  ✓  148 [tablet-chrome] › e2e/core-flow.spec.ts:414:1 › phone and tablet layouts complete a race with labeled touch controls (42.3s)
+  -  149 [tablet-chrome] › e2e/core-flow.spec.ts:447:1 › all five launch tracks load and complete two fast QA laps
+  -  150 [tablet-chrome] › e2e/core-flow.spec.ts:474:1 › production shell reloads from its service-worker cache while offline
+
+  Slow test file: [chromium] › e2e/accessibility-controls.spec.ts (18.1m)
+  Slow test file: [chromium] › e2e/core-flow.spec.ts (11.9m)
+  Consider running tests from slow files in parallel. See: https://playwright.dev/docs/test-parallel
+  113 skipped
+  37 passed (34.3m)

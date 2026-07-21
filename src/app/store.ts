@@ -6,13 +6,22 @@ import type {
   GameSettings,
   MasteryGoal,
   RaceMode,
+  RaceReplayFailureReason,
   RaceResult,
 } from "./types";
-import { TRACKS, type TrackId } from "../game/content/tracks";
+import {
+  getMasteryTargetMs,
+  MASTERY_TARGET_TIER_COUNT,
+  TRACKS,
+  type TrackId,
+} from "../game/content/tracks";
 import {
   DEFAULT_SETTINGS,
   createDefaultProgress,
   loadGameData,
+  mergeProgressChanges,
+  mergeSettingsChanges,
+  resetProgress as resetDatabaseProgress,
   retryPersistence as retryDatabasePersistence,
   saveCustomTrack,
   saveProgress,
@@ -27,20 +36,28 @@ interface ActiveRace {
   mode: RaceMode;
   trackId: TrackId;
   customTrack?: CustomTrackData | undefined;
+  savedCustomTrack?: CustomTrackData | undefined;
 }
 
 interface FinishRaceOptions {
   raceAttempt?: number;
   presentResults?: boolean;
+  replayFailureReason?: RaceReplayFailureReason;
 }
 
 export interface EditorSessionState {
   track: CustomTrackData;
+  persistedBase: CustomTrackData | null;
   past: CustomTrackData[];
   future: CustomTrackData[];
   category: EditorModuleCategory;
   selectedModuleId: string;
   selectedPlacementId: string | null;
+}
+
+export interface PendingTestRideSave {
+  track: CustomTrackData;
+  persistedBase: CustomTrackData | null;
 }
 
 export type PersistenceStatus =
@@ -57,9 +74,10 @@ interface AppState {
   progress: CampaignProgress;
   activeRace: ActiveRace | null;
   editorSession: EditorSessionState | null;
-  pendingTestRideSave: CustomTrackData | null;
+  pendingTestRideSave: PendingTestRideSave | null;
   latestResult: RaceResult | null;
   latestResultAttempt: number | null;
+  latestReplayFailureReason: RaceReplayFailureReason | null;
   raceAttempt: number;
   hydrate: () => Promise<void>;
   navigate: (screen: AppScreen) => void;
@@ -70,7 +88,10 @@ interface AppState {
   startRace: (mode: RaceMode, trackId?: TrackId) => void;
   startCustomRace: (track: CustomTrackData) => void;
   setEditorSession: (session: EditorSessionState) => void;
-  saveTestRideTrack: (track: CustomTrackData) => Promise<void>;
+  saveTestRideTrack: (
+    track: CustomTrackData,
+    persistedBase: CustomTrackData | null,
+  ) => Promise<CustomTrackData>;
   clearPendingTestRideSave: (trackId: string) => void;
   pauseRace: () => void;
   resumeRace: () => void;
@@ -86,18 +107,126 @@ interface AppState {
 
 let hydrationStarted = false;
 let profileLoadedFromPersistence = false;
+let profileWritesBlocked = false;
+let persistenceRetryInFlight = false;
+let persistenceFailureRevision = 0;
+let progressResetRevision = 0;
+let pendingProgressReplacementRevision: number | null = null;
+let lastAppliedSettingsSnapshot = structuredClone(DEFAULT_SETTINGS);
+let lastAppliedProgressSnapshot = createDefaultProgress();
+let settingsWriteQueue: Promise<void> = Promise.resolve();
+let progressWriteQueue: Promise<void> = Promise.resolve();
 
 export const MASTERY_TRACK_ID = "summit-showdown" satisfies TrackId;
-export const MASTERY_TIER_COUNT = 7;
+export const MASTERY_TIER_COUNT = MASTERY_TARGET_TIER_COUNT;
 
 function copyProgress(progress: CampaignProgress): CampaignProgress {
   return structuredClone(progress);
 }
 
-function persistInBackground(operation: () => Promise<unknown>): void {
-  if (!profileLoadedFromPersistence) return;
-  void operation().catch(() => {
-    // The database publishes failures to the shared session-mode notice before rejecting.
+function sameTrackSnapshot(left: CustomTrackData, right: CustomTrackData): boolean {
+  return JSON.stringify(left) === JSON.stringify(right);
+}
+
+function reconcileEditorSessionAfterTrackSave(
+  editorSession: EditorSessionState | null,
+  attempted: CustomTrackData,
+  saved: CustomTrackData,
+): EditorSessionState | null {
+  if (!editorSession || editorSession.track.id !== attempted.id) return editorSession;
+  if (!sameTrackSnapshot(editorSession.track, attempted)) {
+    return saved.id === attempted.id
+      ? { ...editorSession, persistedBase: structuredClone(saved) }
+      : editorSession;
+  }
+  const identityChanged = saved.id !== attempted.id;
+  return {
+    ...editorSession,
+    track: structuredClone(saved),
+    persistedBase: structuredClone(saved),
+    ...(identityChanged ? { past: [], future: [] } : {}),
+  };
+}
+
+function reconcileActiveRaceAfterTrackSave(
+  activeRace: ActiveRace | null,
+  attempted: CustomTrackData,
+  saved: CustomTrackData,
+): ActiveRace | null {
+  if (
+    activeRace?.mode !== "custom"
+    || !activeRace.customTrack
+    || !sameTrackSnapshot(activeRace.customTrack, attempted)
+  ) return activeRace;
+  return { ...activeRace, savedCustomTrack: structuredClone(saved) };
+}
+
+function promoteSavedCustomTrack(activeRace: ActiveRace): ActiveRace {
+  if (activeRace.mode !== "custom" || !activeRace.savedCustomTrack) return activeRace;
+  const { savedCustomTrack, ...attempt } = activeRace;
+  return { ...attempt, customTrack: structuredClone(savedCustomTrack) };
+}
+
+async function waitForProfileWritesToSettle(): Promise<void> {
+  while (true) {
+    const settingsBarrier = settingsWriteQueue;
+    const progressBarrier = progressWriteQueue;
+    await Promise.all([settingsBarrier, progressBarrier]);
+    if (settingsBarrier === settingsWriteQueue && progressBarrier === progressWriteQueue) return;
+  }
+}
+
+function persistSettingsInBackground(base: GameSettings, next: GameSettings): void {
+  if (!profileLoadedFromPersistence || profileWritesBlocked) return;
+  const baseSnapshot = structuredClone(base);
+  const nextSnapshot = structuredClone(next);
+  settingsWriteQueue = settingsWriteQueue.then(async () => {
+    if (profileWritesBlocked) return;
+    try {
+      const merged = await saveSettings(baseSnapshot, nextSnapshot);
+      lastAppliedSettingsSnapshot = structuredClone(merged);
+      useAppStore.setState((state) => ({
+        settings: mergeSettingsChanges(nextSnapshot, merged, state.settings),
+      }));
+    } catch {
+      profileWritesBlocked = true;
+      // The database publishes the failure before rejecting.
+    }
+  });
+}
+
+function persistProgressInBackground(
+  base: CampaignProgress,
+  next: CampaignProgress,
+  replace = false,
+): void {
+  if (!profileLoadedFromPersistence || profileWritesBlocked) return;
+  const baseSnapshot = structuredClone(base);
+  const nextSnapshot = structuredClone(next);
+  const resetRevisionSnapshot = progressResetRevision;
+  const replacementRevision = replace ? pendingProgressReplacementRevision : null;
+  progressWriteQueue = progressWriteQueue.then(async () => {
+    if (profileWritesBlocked) return;
+    try {
+      const merged = replace
+        ? await resetDatabaseProgress(nextSnapshot)
+        : await saveProgress(baseSnapshot, nextSnapshot);
+      lastAppliedProgressSnapshot = structuredClone(merged);
+      if (progressResetRevision === resetRevisionSnapshot) {
+        useAppStore.setState((state) => ({
+          progress: mergeProgressChanges(nextSnapshot, merged, state.progress),
+        }));
+      }
+      if (
+        replacementRevision !== null
+        && pendingProgressReplacementRevision === replacementRevision
+      ) {
+        pendingProgressReplacementRevision = null;
+      }
+    } catch {
+      profileWritesBlocked = true;
+      // The database publishes the failure before rejecting.
+    }
   });
 }
 
@@ -122,9 +251,7 @@ export function getMasteryGoal(completedTiers: number): MasteryGoal {
   return {
     tier: Math.min(masteryLevel + 1, MASTERY_TIER_COUNT),
     tierCount: MASTERY_TIER_COUNT,
-    targetMs: Math.round(
-      track.soloTargetMs * Math.max(0.8, 0.94 - masteryLevel * 0.025),
-    ),
+    targetMs: getMasteryTargetMs(track.soloTargetMs, masteryLevel),
     modifier: "Hot start",
     startingHeat: Math.min(65, 35 + masteryLevel * 5),
     isMaxTierReplay: masteryLevel >= MASTERY_TIER_COUNT,
@@ -227,6 +354,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   pendingTestRideSave: null,
   latestResult: null,
   latestResultAttempt: null,
+  latestReplayFailureReason: null,
   raceAttempt: 0,
 
   hydrate: async () => {
@@ -236,6 +364,10 @@ export const useAppStore = create<AppState>((set, get) => ({
     try {
       const { settings, progress, recovered } = await loadGameData();
       profileLoadedFromPersistence = true;
+      profileWritesBlocked = false;
+      pendingProgressReplacementRevision = null;
+      lastAppliedSettingsSnapshot = structuredClone(settings);
+      lastAppliedProgressSnapshot = structuredClone(progress);
       set({
         settings,
         progress,
@@ -260,15 +392,17 @@ export const useAppStore = create<AppState>((set, get) => ({
   closeOverlay: () => set((state) => ({ screen: state.returnScreen })),
 
   updateSettings: (settings) => {
+    const base = get().settings;
     set({ settings });
-    persistInBackground(() => saveSettings(settings));
+    persistSettingsInBackground(base, settings);
   },
 
   selectTrack: (trackId) => {
-    const progress = copyProgress(get().progress);
+    const base = get().progress;
+    const progress = copyProgress(base);
     progress.selectedTrackId = trackId;
     set({ progress });
-    persistInBackground(() => saveProgress(progress));
+    persistProgressInBackground(base, progress);
   },
 
   startRace: (mode, trackId) => {
@@ -283,6 +417,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       activeRace: { mode, trackId: selectedTrackId },
       latestResult: null,
       latestResultAttempt: null,
+      latestReplayFailureReason: null,
       raceAttempt: get().raceAttempt + 1,
       screen: mode === "tutorial" ? "tutorial" : "race",
     });
@@ -292,23 +427,36 @@ export const useAppStore = create<AppState>((set, get) => ({
     activeRace: { mode: "custom", trackId: "canyon-kickoff", customTrack },
     latestResult: null,
     latestResultAttempt: null,
+    latestReplayFailureReason: null,
     raceAttempt: get().raceAttempt + 1,
     screen: "race",
   }),
 
   setEditorSession: (editorSession) => set({ editorSession }),
 
-  saveTestRideTrack: async (track) => {
+  saveTestRideTrack: async (track, persistedBase) => {
     const snapshot = structuredClone(track);
-    set({ pendingTestRideSave: snapshot });
-    await saveCustomTrack(snapshot);
-    set((state) => state.pendingTestRideSave === snapshot
-      ? { pendingTestRideSave: null }
+    const pending: PendingTestRideSave = {
+      track: snapshot,
+      persistedBase: structuredClone(persistedBase),
+    };
+    set({ pendingTestRideSave: pending });
+    const saved = await saveCustomTrack(snapshot, pending.persistedBase);
+    set((state) => state.pendingTestRideSave === pending
+      ? {
+          pendingTestRideSave: null,
+          editorSession: reconcileEditorSessionAfterTrackSave(
+            state.editorSession,
+            snapshot,
+            saved.track,
+          ),
+        }
       : state);
+    return saved.track;
   },
 
   clearPendingTestRideSave: (trackId) => set((state) => (
-    state.pendingTestRideSave?.id === trackId
+    state.pendingTestRideSave?.track.id === trackId
       ? { pendingTestRideSave: null }
       : state
   )),
@@ -342,9 +490,10 @@ export const useAppStore = create<AppState>((set, get) => ({
       progress,
       latestResult,
       latestResultAttempt: resultAttempt,
+      latestReplayFailureReason: options?.replayFailureReason ?? null,
       ...(options?.presentResults === false ? {} : { screen: "results" as const }),
     });
-    persistInBackground(() => saveProgress(progress));
+    persistProgressInBackground(currentProgress, progress);
   },
 
   presentRaceResult: (raceAttempt) => set((state) => {
@@ -361,24 +510,30 @@ export const useAppStore = create<AppState>((set, get) => ({
   }),
 
   completeTutorial: () => {
-    const progress = copyProgress(get().progress);
+    const base = get().progress;
+    const progress = copyProgress(base);
     progress.tutorialComplete = true;
     set({ progress, screen: "title" });
-    persistInBackground(() => saveProgress(progress));
+    persistProgressInBackground(base, progress);
   },
 
   skipTutorial: () => {
-    const progress = copyProgress(get().progress);
+    const base = get().progress;
+    const progress = copyProgress(base);
     progress.tutorialComplete = true;
     set({ progress, screen: "title" });
-    persistInBackground(() => saveProgress(progress));
+    persistProgressInBackground(base, progress);
   },
 
   retryRace: () => {
     if (get().activeRace) {
       set((state) => ({
+        activeRace: state.activeRace
+          ? promoteSavedCustomTrack(state.activeRace)
+          : state.activeRace,
         latestResult: null,
         latestResultAttempt: null,
+        latestReplayFailureReason: null,
         raceAttempt: state.raceAttempt + 1,
         screen: "race",
       }));
@@ -386,56 +541,141 @@ export const useAppStore = create<AppState>((set, get) => ({
   },
 
   resetLocalProgress: () => {
+    const base = get().progress;
     const progress = createDefaultProgress();
+    progressResetRevision += 1;
+    pendingProgressReplacementRevision = progressResetRevision;
     set({ progress });
-    persistInBackground(() => saveProgress(progress));
+    persistProgressInBackground(base, progress, true);
   },
 
   retryDevicePersistence: async () => {
-    if (get().persistenceStatus.mode !== "session") return;
+    const persistenceStatus = get().persistenceStatus;
+    if (
+      persistenceStatus.mode !== "session"
+      || persistenceStatus.retrying
+      || persistenceRetryInFlight
+    ) return;
+    persistenceRetryInFlight = true;
+    profileWritesBlocked = true;
     set((state) => ({
       persistenceStatus: state.persistenceStatus.mode === "session"
         ? { ...state.persistenceStatus, retrying: true }
         : state.persistenceStatus,
     }));
     try {
-      const { settings, progress } = get();
-      const profile = await retryDatabasePersistence(settings, progress, {
-        preserveExistingProfile: !profileLoadedFromPersistence,
+      await waitForProfileWritesToSettle();
+      const failureRevisionSnapshot = persistenceFailureRevision;
+      const preserveExistingProfile = !profileLoadedFromPersistence;
+      const settingsSnapshot = structuredClone(get().settings);
+      const progressSnapshot = structuredClone(get().progress);
+      const resetRevisionSnapshot = progressResetRevision;
+      const replacementRevision = pendingProgressReplacementRevision;
+      const profile = await retryDatabasePersistence(settingsSnapshot, progressSnapshot, {
+        preserveExistingProfile,
+        baseSettings: lastAppliedSettingsSnapshot,
+        baseProgress: lastAppliedProgressSnapshot,
+        replaceProgress: replacementRevision !== null,
       });
+      if (persistenceFailureRevision !== failureRevisionSnapshot) {
+        throw new Error("A newer persistence failure interrupted retry.");
+      }
+      const current = get();
+      const settings = mergeSettingsChanges(
+        settingsSnapshot,
+        profile.settings,
+        current.settings,
+      );
+      const retryAppliedReplacement = !preserveExistingProfile && replacementRevision !== null;
+      const preservePendingReplacement = (
+        progressResetRevision !== resetRevisionSnapshot
+        || (preserveExistingProfile && replacementRevision !== null)
+      );
+      const progress = preservePendingReplacement
+        ? structuredClone(current.progress)
+        : mergeProgressChanges(progressSnapshot, profile.progress, current.progress);
       profileLoadedFromPersistence = true;
+      lastAppliedSettingsSnapshot = structuredClone(profile.settings);
+      lastAppliedProgressSnapshot = structuredClone(profile.progress);
+      if (
+        retryAppliedReplacement
+        && pendingProgressReplacementRevision === replacementRevision
+      ) {
+        pendingProgressReplacementRevision = null;
+      }
+      profileWritesBlocked = false;
       set((state) => ({
-        settings: profile.settings,
-        progress: profile.progress,
+        settings,
+        progress,
         recoveredSave: state.recoveredSave || profile.recovered,
       }));
+      persistSettingsInBackground(profile.settings, settings);
+      persistProgressInBackground(
+        profile.progress,
+        progress,
+        pendingProgressReplacementRevision !== null,
+      );
+      await waitForProfileWritesToSettle();
+      if (profileWritesBlocked) throw new Error("Profile writes remain unavailable after retry.");
       const pendingTestRideSave = get().pendingTestRideSave;
-      if (pendingTestRideSave) await saveCustomTrack(pendingTestRideSave);
+      const pendingTrackResult = pendingTestRideSave
+        ? await saveCustomTrack(
+            pendingTestRideSave.track,
+            pendingTestRideSave.persistedBase,
+          )
+        : null;
       set((state) => {
-        if (state.pendingTestRideSave !== pendingTestRideSave) {
-          return {
-            persistenceStatus: state.persistenceStatus.mode === "session"
-              ? { ...state.persistenceStatus, retrying: false }
-              : state.persistenceStatus,
-          };
-        }
+        if (state.pendingTestRideSave !== pendingTestRideSave) return state;
         return {
           pendingTestRideSave: null,
-          persistenceStatus: { mode: "persistent", retrying: false },
+          ...(pendingTrackResult && pendingTestRideSave
+            ? {
+                editorSession: reconcileEditorSessionAfterTrackSave(
+                  state.editorSession,
+                  pendingTestRideSave.track,
+                  pendingTrackResult.track,
+                ),
+                activeRace: reconcileActiveRaceAfterTrackSave(
+                  state.activeRace,
+                  pendingTestRideSave.track,
+                  pendingTrackResult.track,
+                ),
+              }
+            : {}),
         };
       });
+      await waitForProfileWritesToSettle();
+      if (profileWritesBlocked) throw new Error("A profile write failed during retry.");
+      set((state) => ({
+        persistenceStatus: state.pendingTestRideSave === null
+          ? { mode: "persistent", retrying: false }
+          : state.persistenceStatus.mode === "session"
+            ? { ...state.persistenceStatus, retrying: false }
+            : state.persistenceStatus,
+      }));
     } catch {
+      profileWritesBlocked = true;
       set((state) => ({
         persistenceStatus: state.persistenceStatus.mode === "session"
           ? { ...state.persistenceStatus, retrying: false }
           : state.persistenceStatus,
       }));
+    } finally {
+      persistenceRetryInFlight = false;
     }
   },
 
-  recordPersistenceFailure: (failure) => set({
-    persistenceStatus: { mode: "session", retrying: false, ...failure },
-  }),
+  recordPersistenceFailure: (failure) => {
+    profileWritesBlocked = true;
+    persistenceFailureRevision += 1;
+    set({
+      persistenceStatus: {
+        mode: "session",
+        retrying: persistenceRetryInFlight,
+        ...failure,
+      },
+    });
+  },
 }));
 
 subscribePersistenceFailures((failure) => {
