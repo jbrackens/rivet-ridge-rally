@@ -11,9 +11,9 @@ async function expectHeroBikeReady(canvas: Locator): Promise<void> {
   await expect(canvas).toHaveAttribute("data-hero-bike-primitive-count", "28");
   await expect(canvas).toHaveAttribute("data-hero-bike-material-count", "10");
   await expect(canvas).toHaveAttribute("data-hero-bike-texture-count", "0");
-  await expect(canvas).toHaveAttribute("data-hero-bike-triangle-count", "49780");
+  await expect(canvas).toHaveAttribute("data-hero-bike-triangle-count", "51820");
   await expect(canvas).toHaveAttribute("data-hero-bike-bike-triangle-count", "39912");
-  await expect(canvas).toHaveAttribute("data-hero-bike-rider-triangle-count", "9868");
+  await expect(canvas).toHaveAttribute("data-hero-bike-rider-triangle-count", "11908");
   await expect(canvas).toHaveAttribute("data-hero-bike-wheel-triangle-count", "14284");
   await expect(canvas).toHaveAttribute("data-hero-bike-gameplay-authority", "presentation-only");
   await expect(canvas).toHaveAttribute("data-hero-bike-vertical-offset", "-0.63");

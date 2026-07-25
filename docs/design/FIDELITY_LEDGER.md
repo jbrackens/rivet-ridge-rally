@@ -186,6 +186,35 @@ The environment layer has genuinely improved and now reads as a coherent, readab
 
 The scoped response is `docs/design/MASCOT_DIRECTION_VERTICAL_SLICE_PLAN.md`: a hero-first vertical slice that also proves the never-yet-exercised authored-texture path end to end, with explicit triangle, primitive, material, byte, draw-call, and frame-time budgets. It is **planned and reviewable, not implemented**. Nothing in this section is owner acceptance, and no baseline was created, changed, or promoted.
 
+## 2026-07-25 rounded-silhouette pass — step 1 of the vertical slice, not accepted
+
+First implemented step of `docs/design/MASCOT_DIRECTION_VERTICAL_SLICE_PLAN.md`. Scoped to hero shading and rider geometry; the bike's triangle regions, the simulation, and every gameplay contract are untouched.
+
+**What changed.**
+
+1. **Smooth-by-angle shading at 40°** (`AUTO_SMOOTH_ANGLE` in `art-source/blender/hero-bike-rider/build_hero_bike_rider.py`). Bevelled meshes were flat-shaded, so each bevel segment rendered as its own plane — a significant reason the authored forms read as faceted. Smoothing by angle keeps 90° panel corners sharp and blends only the shallow bevel transitions.
+2. **Rider silhouette density**, spending the rider region's headroom: ico subdivisions 2 → 3 on shoulder/hip/glove masses; `ring_shell` segments raised on helmet (16 → 24), torso (16 → 24), pelvis (14 → 22); limb frusta 14 → 20; cuffs 12 → 18; neck guard 14 → 20.
+
+**Measured result.**
+
+| Metric | Before | After | Note |
+|---|---:|---:|---|
+| Hero triangles | 49,780 | 51,820 | cap 70,000 |
+| Bike region | 39,912 | 39,912 | unchanged; cap 40,000, only 88 of headroom existed |
+| Wheels | 14,284 | 14,284 | unchanged; cap 18,000 |
+| Rider region | 9,868 | 11,908 | cap 30,000 |
+| Raw GLB | 2,379,208 B | 1,269,932 B | −47% |
+| **Meshopt runtime GLB** | **517,664 B** | **317,936 B** | **−39%** |
+| Render primitives / materials / textures | 28 / 10 / 0 | 28 / 10 / 0 | contracts unchanged |
+
+The size reduction is a side effect of correct shading: smooth normals let the exporter weld vertices that flat shading forced apart. The asset is now materially smaller *and* better shaded while carrying 2,040 more triangles.
+
+**Honest assessment.** Shoulders, arms, helmet and pelvis read visibly rounder in the source contact sheet and at the gameplay camera. The improvement is **real but incremental**. It does not by itself reach the pivot target: the forms are still assembled from boxes, so smoothing their normals cannot change their outline, and the ten materials remain flat solid colours with **zero texture maps**. Comparing the live frame against `concepts/hero-bike-rider-production-reference.png`, material depth is now clearly the dominant remaining gap, ahead of silhouette.
+
+**Evidence.** Verified at the working tree on pinned Node 26.4.0 / npm 11.17.0: `npm run assets:verify` (51,820 triangles, 28 mesh-bearing nodes, 28 render primitives, 317,936 bytes), `typecheck`, `lint`, `npm test` (456 checks), `audit:release-scope` (131 files / 14,517,304 bytes / aggregate `2c063ff586322c1ac780281f9556048d870b27faf705dda05b7fa0d5feaf58fa` / zero findings), `VITE_QA_MODE=0 npm run build`, and the Chromium e2e case that asserts the exact hero contract (`reliability.spec.ts` › authored Canyon kit) 1/1. Live non-QA preview reported `data-hero-bike-triangle-count="51820"`, rider `11908`, bike `39912`, textures `0`, authored hero/Canyon/panorama ready, no console errors.
+
+This is dirty-working-tree implementation evidence. **No owner visual acceptance is claimed, no baseline was created or promoted, and concept fidelity remains NOT ACCEPTED.**
+
 ## Current conclusion
 
 Concept fidelity is **NOT ACCEPTED**. The 2026-07-19 clean-source controlled visual capture for `a9a97ef` passes the 11-frame five-track technical matrix, and the 2026-07-17/18 diagnostic slices add desktop start, cooling approach, bend, portrait, headed live-performance, and 15-state hero evidence. These are real technical results, but no regression baseline was created or promoted. The hero/rider's blocky/flat finish, lack of authored texture/normal/ORM material depth, rear-camera occlusion, subtle pitch/landing presentation, and crash/recovery fidelity remain material gaps, and the current Canyon frame is still less textural and densely authored than `gameplay-desktop.png`. The 2026-07-25 creative pivot raises the acceptance target further away from blocky/Roblox-adjacent forms and toward polished original mascot-racer finish. Builder/Test Ride, high contrast, physical devices, frozen-candidate performance, similarity/legal review, and owner acceptance remain open. No launch-readiness claim is made here.

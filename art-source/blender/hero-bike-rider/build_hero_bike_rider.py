@@ -47,6 +47,10 @@ MATERIAL_SPECS = {
     "number_cream": ("RRR_NumberCream", 0.7, 0.0),
 }
 
+# Shallower than a box corner (90) and steeper than an applied bevel facet, so
+# molded plastic reads as continuously curved while panel breaks stay legible.
+AUTO_SMOOTH_ANGLE = 40.0
+
 ROOT_NAME = "RRR_HeroBikeRider"
 REQUIRED_NODE_NAMES = (
     ROOT_NAME,
@@ -232,6 +236,30 @@ def bevel(obj: bpy.types.Object, width: float, segments: int = 2) -> None:
     obj.select_set(False)
 
 
+def auto_smooth(obj: bpy.types.Object, angle_degrees: float = AUTO_SMOOTH_ANGLE) -> None:
+    """Blend bevel facets into rounded surfaces while keeping real edges crisp.
+
+    Flat shading makes every bevel segment read as its own plane, which is the
+    single biggest reason the authored forms look faceted at gameplay distance.
+    Smoothing by angle costs zero triangles: edges sharper than the threshold
+    (a box's 90 degree corners) stay sharp, while the shallow bevel transitions
+    blend into a continuous highlight.
+    """
+    if not obj.data.polygons:
+        return
+    previous_active = bpy.context.view_layer.objects.active
+    bpy.context.view_layer.objects.active = obj
+    obj.select_set(True)
+    try:
+        bpy.ops.object.shade_smooth_by_angle(angle=math.radians(angle_degrees))
+    except (RuntimeError, AttributeError):
+        # Fall back to the prior flat-shaded contract rather than failing the build.
+        for polygon in obj.data.polygons:
+            polygon.use_smooth = False
+    obj.select_set(False)
+    bpy.context.view_layer.objects.active = previous_active
+
+
 def finish_mesh(
     obj: bpy.types.Object,
     key: str,
@@ -245,6 +273,8 @@ def finish_mesh(
     bevel(obj, bevel_width)
     for polygon in obj.data.polygons:
         polygon.use_smooth = smooth
+    if bevel_width > 0 and not smooth:
+        auto_smooth(obj)
     return obj
 
 
@@ -1325,15 +1355,15 @@ def add_arm(
     elbow = (sign * 0.12, 0.44, -0.08)
     hand = (sign * 0.18, 0.8, -0.26)
     parts = [
-        frustum_between("UpperArm", (0.0, 0.0, 0.0), elbow, 0.098, 0.072, "coral", arm_group, vertices=14),
-        frustum_between("Forearm", elbow, hand, 0.078, 0.055, "coral", arm_group, vertices=14),
-        frustum_between("ShoulderCuff", (0.0, 0.0, 0.0), tuple(Vector(elbow) * 0.3), 0.122, 0.1, "navy", arm_group, vertices=12),
+        frustum_between("UpperArm", (0.0, 0.0, 0.0), elbow, 0.098, 0.072, "coral", arm_group, vertices=20),
+        frustum_between("Forearm", elbow, hand, 0.078, 0.055, "coral", arm_group, vertices=20),
+        frustum_between("ShoulderCuff", (0.0, 0.0, 0.0), tuple(Vector(elbow) * 0.3), 0.122, 0.1, "navy", arm_group, vertices=18),
         box("ElbowGuard", (0.17, 0.145, 0.17), elbow, "navy", arm_group, rotation=(-0.18, 0.0, sign * 0.14), bevel_width=0.03),
         box("ElbowCreamCap", (0.12, 0.06, 0.09), (elbow[0] + sign * 0.035, elbow[1] + 0.035, elbow[2] + 0.01), "navy", arm_group, rotation=(-0.18, 0.0, sign * 0.14), bevel_width=0.014),
         box("ForearmTealCuff", (0.14, 0.08, 0.08), (sign * 0.17, 0.67, -0.22), "coral", arm_group, rotation=(-0.14, 0.0, sign * 0.08), bevel_width=0.018),
         add_side_decal(f"{side.title()}ForearmNavyFlash", LIGHTNING_FLASH_PROFILE, sign * 0.205, 0.61, -0.18, 0.13, "navy", arm_group, depth=0.012),
         add_side_decal(f"{side.title()}BicepCoralFlash", LIGHTNING_FLASH_PROFILE, sign * 0.165, 0.24, -0.04, 0.12, "coral", arm_group, depth=0.012),
-        ico("GlovePalm", (0.18, 0.17, 0.15), hand, "navy", arm_group, subdivisions=2, smooth=True),
+        ico("GlovePalm", (0.18, 0.17, 0.15), hand, "navy", arm_group, subdivisions=3, smooth=True),
         box("GloveCuff", (0.17, 0.13, 0.085), (hand[0], hand[1] - 0.07, hand[2] + 0.04), "navy", arm_group, bevel_width=0.024),
         cylinder("GripWrap", 0.048, 0.15, hand, "navy", arm_group, vertices=12, rotation=(0.0, math.pi / 2, 0.0), bevel_width=0.007, smooth=True),
     ]
@@ -1354,9 +1384,9 @@ def add_leg(
     knee = (sign * 0.17, 0.45, -0.33)
     ankle = (sign * 0.21, 0.12, -0.6)
     parts = [
-        frustum_between("Thigh", (0.0, 0.0, 0.0), knee, 0.122, 0.094, "teal", leg_group, vertices=14),
-        frustum_between("Shin", knee, ankle, 0.098, 0.072, "teal", leg_group, vertices=14),
-        frustum_between("HipCuff", (0.0, 0.0, 0.0), tuple(Vector(knee) * 0.27), 0.14, 0.12, "teal", leg_group, vertices=12),
+        frustum_between("Thigh", (0.0, 0.0, 0.0), knee, 0.122, 0.094, "teal", leg_group, vertices=20),
+        frustum_between("Shin", knee, ankle, 0.098, 0.072, "teal", leg_group, vertices=20),
+        frustum_between("HipCuff", (0.0, 0.0, 0.0), tuple(Vector(knee) * 0.27), 0.14, 0.12, "teal", leg_group, vertices=18),
         box("KneeGuard", (0.21, 0.155, 0.21), knee, "cream", leg_group, rotation=(-0.24, 0.0, sign * 0.12), bevel_width=0.034),
         box("KneeGuardDarkInset", (0.145, 0.05, 0.13), (knee[0] + sign * 0.02, knee[1] + 0.065, knee[2] + 0.008), "teal", leg_group, rotation=(-0.24, 0.0, sign * 0.12), bevel_width=0.011),
         box("ShinCreamSidePlate", (0.12, 0.07, 0.2), (sign * 0.245, 0.31, -0.5), "cream", leg_group, rotation=(-0.22, 0.0, sign * 0.1), bevel_width=0.018),
@@ -1391,17 +1421,17 @@ def add_rider(root: bpy.types.Object) -> bpy.types.Object:
     rider = empty("player-rider", (0.0, 0.0, 0.0), root, display_size=0.3)
     rider["pose_pivot_count"] = 6
     hips_parts = [
-        ring_shell("RiderPelvisCore", ((-0.15, 0.04, 0.32, 0.24), (-0.02, 0.06, 0.44, 0.3), (0.14, 0.095, 0.43, 0.27), (0.19, 0.1, 0.31, 0.2)), (0.0, -0.43, 1.45), "charcoal", rider, segments=14),
+        ring_shell("RiderPelvisCore", ((-0.15, 0.04, 0.32, 0.24), (-0.02, 0.06, 0.44, 0.3), (0.14, 0.095, 0.43, 0.27), (0.19, 0.1, 0.31, 0.2)), (0.0, -0.43, 1.45), "charcoal", rider, segments=22),
         box("RiderHipBand", (0.44, 0.2, 0.075), (0.0, -0.34, 1.61), "charcoal", rider, bevel_width=0.022),
         box("RiderBeltBuckle", (0.16, 0.045, 0.08), (0.0, -0.22, 1.61), "charcoal", rider, bevel_width=0.012),
-        ico("RiderHipPanelL", (0.22, 0.26, 0.23), (-0.195, -0.31, 1.49), "charcoal", rider, rotation=(-0.12, 0.0, -0.08), subdivisions=2, smooth=True),
-        ico("RiderHipPanelR", (0.22, 0.26, 0.23), (0.195, -0.31, 1.49), "charcoal", rider, rotation=(-0.12, 0.0, 0.08), subdivisions=2, smooth=True),
+        ico("RiderHipPanelL", (0.22, 0.26, 0.23), (-0.195, -0.31, 1.49), "charcoal", rider, rotation=(-0.12, 0.0, -0.08), subdivisions=3, smooth=True),
+        ico("RiderHipPanelR", (0.22, 0.26, 0.23), (0.195, -0.31, 1.49), "charcoal", rider, rotation=(-0.12, 0.0, 0.08), subdivisions=3, smooth=True),
     ]
     join_as("Rider_Hips", hips_parts)
 
     torso = empty("rider-torso-pivot", (0.0, -0.4, 1.56), rider, display_size=0.12)
     torso_parts = [
-        ring_shell("TorsoFabric", ((0.0, 0.1, 0.39, 0.23), (0.18, 0.19, 0.44, 0.27), (0.39, 0.34, 0.52, 0.3), (0.53, 0.48, 0.56, 0.28), (0.58, 0.52, 0.41, 0.21)), (0.0, 0.0, 0.0), "coral", torso, segments=16),
+        ring_shell("TorsoFabric", ((0.0, 0.1, 0.39, 0.23), (0.18, 0.19, 0.44, 0.27), (0.39, 0.34, 0.52, 0.3), (0.53, 0.48, 0.56, 0.28), (0.58, 0.52, 0.41, 0.21)), (0.0, 0.0, 0.0), "coral", torso, segments=24),
         side_prism("TorsoCoralSideL", -0.25, 0.075, ((0.08, 0.05), (0.22, 0.43), (0.39, 0.54), (0.46, 0.42), (0.27, 0.13)), "coral", torso, bevel_width=0.019),
         side_prism("TorsoCoralSideR", 0.25, 0.075, ((0.08, 0.05), (0.22, 0.43), (0.39, 0.54), (0.46, 0.42), (0.27, 0.13)), "coral", torso, bevel_width=0.019),
         side_prism("TorsoNavyRibL", -0.285, 0.042, ((0.05, 0.08), (0.17, 0.43), (0.29, 0.51), (0.32, 0.42), (0.2, 0.14)), "navy", torso, bevel_width=0.012),
@@ -1418,8 +1448,8 @@ def add_rider(root: bpy.types.Object) -> bpy.types.Object:
         box("ChestArmorRivet", (0.12, 0.035, 0.11), (0.0, 0.65, 0.32), "coral", torso, rotation=(-0.18, 0.0, math.pi / 4), bevel_width=0.018),
         box("ChestArmorCreamLatchL", (0.09, 0.033, 0.055), (-0.13, 0.66, 0.16), "number_cream", torso, rotation=(-0.18, 0.0, -0.08), bevel_width=0.01),
         box("ChestArmorCreamLatchR", (0.09, 0.033, 0.055), (0.13, 0.66, 0.16), "number_cream", torso, rotation=(-0.18, 0.0, 0.08), bevel_width=0.01),
-        ico("ShoulderArmorL", (0.27, 0.24, 0.2), (-0.31, 0.39, 0.46), "navy", torso, subdivisions=2, smooth=True),
-        ico("ShoulderArmorR", (0.27, 0.24, 0.2), (0.31, 0.39, 0.46), "navy", torso, subdivisions=2, smooth=True),
+        ico("ShoulderArmorL", (0.27, 0.24, 0.2), (-0.31, 0.39, 0.46), "navy", torso, subdivisions=3, smooth=True),
+        ico("ShoulderArmorR", (0.27, 0.24, 0.2), (0.31, 0.39, 0.46), "navy", torso, subdivisions=3, smooth=True),
     ]
     join_as("Rider_ChestArmor", chest_parts)
 
@@ -1438,8 +1468,8 @@ def add_rider(root: bpy.types.Object) -> bpy.types.Object:
     head = empty("rider-head-pivot", (0.0, 0.48, 0.55), torso, display_size=0.1)
     empty("Rider_Head", (0.0, 0.02, 0.07), head, display_size=0.06)
     helmet_parts = [
-        ring_shell("HelmetShell", ((-0.12, 0.015, 0.24, 0.2), (-0.04, 0.045, 0.34, 0.34), (0.12, 0.06, 0.42, 0.44), (0.28, 0.045, 0.39, 0.4), (0.38, 0.02, 0.25, 0.25), (0.43, 0.0, 0.06, 0.08)), (0.0, 0.015, 0.04), "coral", head, segments=16),
-        cylinder("HelmetNeckGuard", 0.125, 0.17, (0.0, 0.0, -0.13), "teal", head, vertices=14, bevel_width=0.016, smooth=True),
+        ring_shell("HelmetShell", ((-0.12, 0.015, 0.24, 0.2), (-0.04, 0.045, 0.34, 0.34), (0.12, 0.06, 0.42, 0.44), (0.28, 0.045, 0.39, 0.4), (0.38, 0.02, 0.25, 0.25), (0.43, 0.0, 0.06, 0.08)), (0.0, 0.015, 0.04), "coral", head, segments=24),
+        cylinder("HelmetNeckGuard", 0.125, 0.17, (0.0, 0.0, -0.13), "teal", head, vertices=20, bevel_width=0.016, smooth=True),
         side_prism("HelmetCrownStripe", 0.0, 0.1, ((-0.14, 0.25), (0.01, 0.45), (0.21, 0.38), (0.27, 0.19), (-0.06, 0.16)), "teal", head, bevel_width=0.017),
         side_prism("HelmetCoralRearBand", 0.0, 0.11, ((-0.14, 0.09), (-0.03, 0.31), (0.12, 0.31), (0.19, 0.16), (0.1, 0.06)), "coral", head, bevel_width=0.014),
         side_prism("HelmetTealRearSlashL", -0.145, 0.055, ((0.0, 0.25), (0.16, 0.36), (0.28, 0.21), (0.19, 0.09)), "teal", head, bevel_width=0.012),

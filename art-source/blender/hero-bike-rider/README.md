@@ -29,7 +29,18 @@ The raw GLB is an authoring output, not an accepted production asset. Produce th
 node scripts/build-hero-bike-rider-assets.mjs
 ```
 
-That isolated asset build does not start the game or qualify runtime behavior. The current authored revision contains 88 nodes, 28 mesh-bearing nodes/render primitives, all 10 contracted semantic materials, 49,780 triangles, and a 2.58 m wheelbase. It keeps the no-texture solid-color PBR contract while adding gameplay-distance saddle ribs, grip-end flashes, boot toe/latch accents, and a visor split; the wheel tread count is deliberately reduced within contract so the bike remains under its 40,000-triangle region budget. Manifest schema 2 checks source-pair UUID `31000dd4-2c42-4c74-ad5d-28b5e4aec32f`, records the 517,664-byte Meshopt runtime GLB, and binds the source, raw export, primary preview, all four fixed-angle panels, contact sheet, runtime, canonical reference, optimizer, independent verifier, PNG inspector, package-manifest, and Basis-support hashes. Blender exporter serialization may differ byte-for-byte between rebuilds even when the visible geometry and named-root contract are unchanged, so any accepted revision must refresh and review that manifest.
+That isolated asset build does not start the game or qualify runtime behavior. The current authored revision contains 88 nodes, 28 mesh-bearing nodes/render primitives, all 10 contracted semantic materials, 51,820 triangles, and a 2.58 m wheelbase. It keeps the no-texture solid-color PBR contract; the wheel tread count remains deliberately reduced within contract so the bike stays under its 40,000-triangle region budget. Manifest schema 2 checks the source-pair UUID, records the Meshopt runtime GLB, and binds the source, raw export, primary preview, all four fixed-angle panels, contact sheet, runtime, canonical reference, optimizer, independent verifier, PNG inspector, package-manifest, and Basis-support hashes. Blender exporter serialization may differ byte-for-byte between rebuilds even when the visible geometry and named-root contract are unchanged, so any accepted revision must refresh and review that manifest.
+
+## 2026-07-25 rounded-silhouette pass
+
+First step of the creative pivot toward a polished original mascot-racer finish (`docs/design/MASCOT_DIRECTION_VERTICAL_SLICE_PLAN.md`). Two changes, both scoped to shading and rider geometry; the bike's triangle regions are untouched.
+
+1. **Smooth-by-angle shading (`AUTO_SMOOTH_ANGLE = 40°`).** Bevelled meshes were flat-shaded, so every bevel segment read as its own plane — the main reason the authored forms looked faceted at gameplay distance. Smoothing by angle keeps a box's 90° corners sharp while blending the shallow bevel transitions. It costs **zero triangles** and lets the exporter weld vertices that flat shading forced apart, which nearly halved the raw GLB (2,379,208 → 1,269,932 bytes) and cut the Meshopt runtime GLB from **517,664 to 317,936 bytes, a 39% reduction**.
+2. **Rider silhouette density**, using the rider region's large headroom: ico subdivisions 2 → 3 on shoulder, hip and glove masses; `ring_shell` segments raised on the helmet (16 → 24), torso (16 → 24) and pelvis (14 → 22); limb frusta 14 → 20 and cuffs 12 → 18; neck guard 14 → 20.
+
+Region totals move from 49,780 to 51,820 triangles: bike unchanged at 39,912 (cap 40,000), wheels unchanged at 14,284 (cap 18,000), rider 9,868 → 11,908 (cap 30,000). Total remains well under the 70,000 cap.
+
+This is an incremental improvement, not the finished target. Silhouettes read rounder and the asset is materially smaller, but the flat untextured materials remain the dominant gap against `docs/design/concepts/hero-bike-rider-production-reference.png`. The authored base-colour/ORM/normal atlas pass is the next and larger step. No owner visual acceptance is claimed and no baseline was promoted.
 
 ## Coordinate and pivot contract
 
