@@ -60,21 +60,21 @@ These dependencies ship with or directly support the browser game runtime.
 
 The current graphics direction keeps the direct Three.js renderer and improves authored production assets around it. Engine migration is intentionally deferred unless a future requirement cannot be met with the current architecture.
 
-## Graphics upgrade adoption plan
+## Graphics tool status and adoption plan
 
-This is the prioritized external/open-source tool plan for improving the game toward the concept-art target while keeping the existing TypeScript/Three.js architecture.
+This table separates tools that are already active in the repository from tools that are recommended for future art/VFX passes. "Adopt" here is a planning verdict, not proof that the tool is already installed, committed, or wired into the runtime.
 
-| Priority | Tool | Purpose here | License | Verdict |
-|---:|---|---|---|---|
-| 1 | [Blender 4.5 LTS + official glTF exporter](https://github.com/KhronosGroup/glTF-Blender-IO) | Hero bike/rider, terrain, jumps, barriers, festival structures, animation, LODs, baking, and Geometry Nodes. | Blender GPL; exported artwork remains project-owned. Official exporter Apache-2.0. | Adopt immediately. Blender is already installed and active in the authored asset pipeline; keep expanding its role. |
-| 2 | [Material Maker](https://github.com/RodZill4/material-maker) | Consistent dirt, mud, rubber, painted metal, rock, grass, and track-surface PBR materials. | MIT | Adopt for the next material/texture pass. Not yet required by the current solid-color authored slices. |
-| 3 | [Krita](https://krita.org/en/about/license/) | Concept paintovers, liveries, decals, signs, VFX sprites, UI art, and color keys. | GPL; created artwork remains project-owned. | Adopt for concept/art-direction and texture-support work. |
-| 4 | [glTF Transform](https://github.com/donmccurdy/glTF-Transform), [meshoptimizer](https://github.com/zeux/meshoptimizer), and KTX2 | Optimize Blender exports, generate LODs, compress geometry/textures, and validate assets. | MIT / Apache-family components depending on package. | Already present; extend the pipeline as authored content grows. |
-| 5 | [Three.js PMREM / environment lighting](https://threejs.org/docs/pages/MeshStandardMaterial.html) | Real ambient/specular response across PBR materials instead of hemisphere/direct light alone. | MIT | First runtime upgrade; already active as the baseline PBR lighting path. |
-| 6 | [pmndrs/postprocessing](https://github.com/pmndrs/postprocessing) | Subtle AO, selective emissive bloom, SMAA, and concept-matched LUT/color grading. | Zlib | Adopt after IBL/material baseline is accepted. Treat as polish, not a substitute for better authored assets. |
-| 7 | [three.quarks](https://github.com/Alchemist0823/three.quarks) | Batched dust, exhaust, impact dirt, cooling mist, sparks, finish effects, and celebratory particles. | MIT | Pilot after core art and performance budgets are stable. |
-| 8 | [Blockbench](https://github.com/JannisX11/blockbench) | Rapid chunky props, fencing, bleachers, crates, signs, and low-poly set dressing. | GPL-3.0; created assets remain project-owned. | Useful selectively; avoid making the game look voxel/Minecraft-like. |
-| Optional | [ArmorPaint](https://github.com/armory3d/armorpaint) | Hero bike/rider texture painting and baking. | Zlib | Defer until the hero/rider texture needs exceed the Blender/Krita path and the tool maturity risk is acceptable. |
+| Priority | Tool | Purpose here | License | Current status | Verdict |
+|---:|---|---|---|---|---|
+| 1 | [Blender 4.5 LTS + official glTF exporter](https://github.com/KhronosGroup/glTF-Blender-IO) | Hero bike/rider, terrain, jumps, barriers, festival structures, animation, LODs, baking, and Geometry Nodes. | Blender GPL; exported artwork remains project-owned. Official exporter Apache-2.0. | Current and verified. Blender 4.5.11 LTS is installed locally, and the repo's Blender Python scripts call the glTF exporter for the hero, rival, and Canyon asset sources. | Adopt immediately; already active and should keep expanding. |
+| 2 | [Material Maker](https://github.com/RodZill4/material-maker) | Consistent dirt, mud, rubber, painted metal, rock, grass, and track-surface PBR materials. | MIT | Planned/recommended. Not verified as installed and not currently a package/runtime dependency. | Adopt for the next material/texture pass. |
+| 3 | [Krita](https://krita.org/en/about/license/) | Concept paintovers, liveries, decals, signs, VFX sprites, UI art, and color keys. | GPL; created artwork remains project-owned. | Planned/recommended. Not verified as installed and not currently required by the checked-in asset pipeline. | Adopt for concept/art-direction and texture-support work. |
+| 4 | [glTF Transform](https://github.com/donmccurdy/glTF-Transform), [meshoptimizer](https://github.com/zeux/meshoptimizer), and KTX2 | Optimize Blender exports, generate LODs, compress geometry/textures, and validate assets. | MIT / Apache-family components depending on package. | Current and verified. glTF Transform, meshoptimizer, glTF validator, KTX2 encoder, and Basis runtime support are pinned in the repo. | Already present; extend the pipeline as authored content grows. |
+| 5 | [Three.js PMREM / environment lighting](https://threejs.org/docs/pages/MeshStandardMaterial.html) | Real ambient/specular response across PBR materials instead of hemisphere/direct light alone. | MIT | Current and verified. `GameEngine.ts` uses Three.js `RoomEnvironment` and `PMREMGenerator`. | First runtime upgrade; already active as the baseline PBR lighting path. |
+| 6 | [pmndrs/postprocessing](https://github.com/pmndrs/postprocessing) | Subtle AO, selective emissive bloom, SMAA, and concept-matched LUT/color grading. | Zlib | Planned. Not currently installed in `package.json` and not wired into the renderer. | Adopt after IBL/material baseline is accepted. Treat as polish, not a substitute for better authored assets. |
+| 7 | [three.quarks](https://github.com/Alchemist0823/three.quarks) | Batched dust, exhaust, impact dirt, cooling mist, sparks, finish effects, and celebratory particles. | MIT | Planned pilot. Not currently installed in `package.json`; current dust/VFX are custom runtime effects. | Pilot after core art and performance budgets are stable. |
+| 8 | [Blockbench](https://github.com/JannisX11/blockbench) | Rapid chunky props, fencing, bleachers, crates, signs, and low-poly set dressing. | GPL-3.0; created assets remain project-owned. | Optional/recommended. Not verified as installed and not part of the current hero/Canyon/rival pipeline. | Useful selectively; avoid making the game look voxel/Minecraft-like. |
+| Optional | [ArmorPaint](https://github.com/armory3d/armorpaint) | Hero bike/rider texture painting and baking. | Zlib | Deferred. Not verified as installed and not part of the current pipeline. | Defer until the hero/rider texture needs exceed the Blender/Krita path and the tool maturity risk is acceptable. |
 
 | Tool / format | Version | Role |
 |---|---:|---|
@@ -88,11 +88,14 @@ This is the prioritized external/open-source tool plan for improving the game to
 | `ktx2-encoder` | `0.5.3` | KTX2/Basis texture pipeline support. |
 | Basis Universal transcoders | Bundled from Three.js examples | Runtime texture transcoding support for supported compressed textures. |
 
-Optional art tools recorded as useful but not required by the current shipped asset pipeline:
+Planned or optional art tools recorded as useful but not currently verified as installed or required by the shipped asset pipeline:
 
 - Krita for hand-painted masks, decals, and texture atlases.
 - Material Maker for procedural dirt, rock, wood, and terrain PBR atlases.
+- pmndrs/postprocessing for a later restrained post-processing pass.
+- three.quarks for a later particle/VFX pilot.
 - Blockbench for deliberately blocky secondary props.
+- ArmorPaint as a deferred texture-painting option.
 - Blender MCP for future interactive art iteration. The production workflow currently does not depend on a Blender MCP; canonical source remains checked-in `.blend`/Python/GLB pipeline files.
 
 ## MCP packages installed as project dev dependencies
