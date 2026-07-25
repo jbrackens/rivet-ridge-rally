@@ -188,10 +188,32 @@ Historical statements are retained. Corrections are recorded as current-state su
 | `docs/design/FIDELITY_LEDGER.md` | Yes | None |
 | `docs/TOOLCHAIN.md` | Yes | None |
 | `docs/HANDOFF_TO_CLAUDE_FABLE.md` | Yes | None |
-| `docs/design/CANYON_VERTICAL_SLICE.md` | **No — contradicts it.** Line 17 sets the style target as "chunky but purposeful proportions … Assets should feel toy-like in clarity". | **Updated** |
-| `docs/design/HERO_BIKE_RIDER_VERTICAL_SLICE.md` | No pivot statement (its "blocky" mentions are gap findings, which are correct) | **Updated** |
-| `docs/design/RIVAL_PACK_VERTICAL_SLICE.md` | No pivot statement | **Updated** |
+| `docs/design/CANYON_VERTICAL_SLICE.md` | **No — contradicts it.** Line 17 sets the style target as "chunky but purposeful proportions … Assets should feel toy-like in clarity". | **BLOCKED — see R4** |
+| `docs/design/HERO_BIKE_RIDER_VERTICAL_SLICE.md` | No pivot statement (its "blocky" mentions are gap findings, which are correct) | **BLOCKED — see R4** |
+| `docs/design/RIVAL_PACK_VERTICAL_SLICE.md` | No pivot statement | **BLOCKED — see R4** |
 | `README.md`, `docs/ASSET_PIPELINE.md`, `docs/UI_UX_POLISH_PLAN.md` | "blocky"/"chunky" occurrences are gap findings or intentional HUD styling language, not style targets | None |
+
+### Finding R4 — the three asset-contract documents are hash-bound and cannot be edited in isolation
+
+The first attempt at this gate edited all three `docs/design/*_VERTICAL_SLICE.md` files to carry the pivot. That **broke the asset verification chain**, and the error was pushed before it was caught:
+
+```
+AssertionError: docs/design/HERO_BIKE_RIDER_VERTICAL_SLICE.md manifest record
+  actual:   { bytes: 25595, sha256: '619e905a…' }   # value recorded in the manifest
+  expected: { bytes: 26610, sha256: '619e…'      }   # freshly computed from the edited file
+```
+
+`node scripts/verify-hero-bike-rider-assets.mjs`, `…-rival-pack-…`, and `…-canyon-…` all failed, which also fails `npm run assets:verify` and therefore `prebuild` and `npm run build`. Only `verify-production-art.mjs` still passed.
+
+**Cause.** Each of those three documents is the `contract` provenance record inside its asset's schema-v2 manifest — `public/assets/3d/asset-manifest.json`, `public/assets/rivals/asset-manifest.json`, and `public/assets/canyon/asset-manifest.json` — bound by exact byte count and SHA-256 (`scripts/build-hero-bike-rider-assets.mjs:1159`, `scripts/build-rival-pack-assets.mjs:297`, `scripts/build-canyon-assets.mjs:272`). They are **production contracts, not commentary**. This is correct and deliberate design: the document that specifies an asset is bound to the asset it specifies.
+
+**Consequence.** Amending any of the three requires re-running `npm run assets:build`, which re-authors the GLBs through Blender and rewrites the manifests — a **product-bytes change**. That cannot be done inside a documentation-only reconciliation, and it is entangled with the unresolved candidate question in §2.
+
+**Resolution taken.** All three files were reverted to their `bb10ce4` content and the verifiers confirmed passing again. The pivot statements intended for them are recorded instead in `docs/design/MASCOT_DIRECTION_VERTICAL_SLICE_PLAN.md` §0, which is not hash-bound, and re-binding the contracts is folded into the slice's deliverables where an `assets:build` run is required anyway.
+
+**Classification: gate 2 is complete for every document that can be changed without touching product bytes, and BLOCKED for the three asset contracts.** Governing intent is not lost — `GAME_BIBLE.md` and `GAME_SPEC.md` both carry the pivot normatively and outrank the per-asset contracts.
+
+**Process note.** The regression reached `origin` because `npm run assets:verify` was not re-run after the documentation edits. Any change to a `docs/design/*_VERTICAL_SLICE.md` file must be treated as an asset-pipeline change and re-verified before commit.
 
 ## 10. Current visual shortcomings — assessed directly, not inherited
 

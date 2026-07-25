@@ -10,14 +10,6 @@ The pack uses only project-authored Blender-native geometry, a project-generated
 
 The target is a readable secondary silhouette: continuous knobby tires, clear wheel hubs, fork, engine, exhaust, tank/shroud, side-number field, helmet, torso, arms, knees, and boots. It should support the hero rather than compete with its detail density.
 
-### 2026-07-25 creative pivot
-
-The owner moved the visual target away from Roblox-adjacent, blocky, cube-first, primitive-heavy forms and toward an original, polished mascot-kart-racer level of charm and material finish. The rival pack must follow the hero to that standard — rounded silhouettes and authored material depth rather than flat primitive volumes — while keeping its lower detail budget and its supporting role behind the hero.
-
-"Mascot-kart-racer" is a quality and readability reference only; it is not permission to copy Mario Kart, Nintendo, or Roblox expression. The originality rules above remain in force unchanged.
-
-Per `docs/design/MASCOT_DIRECTION_VERTICAL_SLICE_PLAN.md`, the rival pack is deliberately **out of scope for the first slice** and is sequenced immediately after owner acceptance of the hero, reusing the hero's authored material atlases.
-
 ## Exact base hierarchy
 
 ```text

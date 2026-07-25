@@ -7,6 +7,18 @@
 
 This plan defines the smallest contained change that can prove — or disprove — whether the revised original mascot-kart-racer direction is achievable inside the existing Three.js architecture. It is written to be reviewable before any art or code is produced.
 
+## 0. Pivot statements for the three asset contracts
+
+`docs/design/HERO_BIKE_RIDER_VERTICAL_SLICE.md`, `docs/design/RIVAL_PACK_VERTICAL_SLICE.md`, and `docs/design/CANYON_VERTICAL_SLICE.md` are **hash-bound production contracts**: each is recorded by exact byte count and SHA-256 inside its asset's schema-v2 manifest, so editing one breaks `npm run assets:verify` until `npm run assets:build` regenerates the manifest — a product-bytes change (reconciliation record finding R4).
+
+The pivot text intended for them is therefore held here until the slice runs `assets:build` anyway, at which point it moves into those documents and the manifests re-bind in the same commit. `GAME_BIBLE.md` and `GAME_SPEC.md` already carry the pivot normatively and outrank these per-asset contracts in the meantime.
+
+**Applies to all three.** The owner moved the visual target away from Roblox-adjacent, blocky, cube-first, primitive-heavy forms and toward an original, polished mascot-kart-racer level of charm, material finish, and animation readability. "Mascot-kart-racer" is a quality and readability reference only; it is not permission to copy Mario Kart, Nintendo, or Roblox expression. Every originality guardrail already in those contracts stays in force unchanged.
+
+- **Hero** — rounded, appealing silhouettes with real bevelled volume, shaped plastics, and authored base-colour/ORM/normal material depth replacing the current flat solid-colour PBR treatment. The canonical reference sheet already embodies the target, so the design goal is unchanged; the required fidelity of the delivered asset rises.
+- **Rival pack** — follows the hero to the same standard, reusing its material atlases, while keeping the lower detail budget and the supporting role behind the hero.
+- **Canyon** — supersedes the "chunky but purposeful proportions … toy-like in clarity" wording in that contract's *Art direction* section. The target becomes rounded, softened volumes with authored surface detail rather than flat colour blocking. Palette, festival identity, readability contract, and originality rules are unaffected.
+
 ## 1. Why a slice, and why this slice
 
 `docs/RC2_RECONCILIATION_2026-07-25.md` §10 assessed the live `bb10ce4` runtime directly. The environment layer has improved substantially and now reads as a coherent, readable arcade course. The unmet part of the pivot is **asset-level finish**: silhouettes built from boxes and cylinders, ten flat solid-colour PBR materials with **zero texture maps**, and no authored surface detail anywhere in the hero.
@@ -104,6 +116,7 @@ Measurement must use the pinned toolchain (Node `26.4.0` / npm `11.17.0`) on hea
 ## 5. Deliverables
 
 1. Updated Blender source and regenerated GLB via `npm run assets:build`, passing `npm run assets:verify`.
+2. The §0 pivot statements moved into the three `*_VERTICAL_SLICE.md` contracts, with their asset manifests re-bound in the **same** commit so `assets:verify` never lands broken.
 2. First authored KTX2 texture atlas set, fully inventoried in `ASSET_LICENSES.md`.
 3. Krita and Material Maker versions recorded in `docs/TOOLCHAIN.md`, moved from "planned" to "current" **only if actually installed and used**.
 4. A capture matrix at fixed 1280×720, non-QA build, commit-bound: neutral, lean left, lean right, wheelie, barrier clearance, airborne, clean landing, crash, recovery, Reduced Motion, portrait — each paired with the equivalent `bb10ce4` frame as a before/after.
