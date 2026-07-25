@@ -60,6 +60,22 @@ These dependencies ship with or directly support the browser game runtime.
 
 The current graphics direction keeps the direct Three.js renderer and improves authored production assets around it. Engine migration is intentionally deferred unless a future requirement cannot be met with the current architecture.
 
+## Graphics upgrade adoption plan
+
+This is the prioritized external/open-source tool plan for improving the game toward the concept-art target while keeping the existing TypeScript/Three.js architecture.
+
+| Priority | Tool | Purpose here | License | Verdict |
+|---:|---|---|---|---|
+| 1 | [Blender 4.5 LTS + official glTF exporter](https://github.com/KhronosGroup/glTF-Blender-IO) | Hero bike/rider, terrain, jumps, barriers, festival structures, animation, LODs, baking, and Geometry Nodes. | Blender GPL; exported artwork remains project-owned. Official exporter Apache-2.0. | Adopt immediately. Blender is already installed and active in the authored asset pipeline; keep expanding its role. |
+| 2 | [Material Maker](https://github.com/RodZill4/material-maker) | Consistent dirt, mud, rubber, painted metal, rock, grass, and track-surface PBR materials. | MIT | Adopt for the next material/texture pass. Not yet required by the current solid-color authored slices. |
+| 3 | [Krita](https://krita.org/en/about/license/) | Concept paintovers, liveries, decals, signs, VFX sprites, UI art, and color keys. | GPL; created artwork remains project-owned. | Adopt for concept/art-direction and texture-support work. |
+| 4 | [glTF Transform](https://github.com/donmccurdy/glTF-Transform), [meshoptimizer](https://github.com/zeux/meshoptimizer), and KTX2 | Optimize Blender exports, generate LODs, compress geometry/textures, and validate assets. | MIT / Apache-family components depending on package. | Already present; extend the pipeline as authored content grows. |
+| 5 | [Three.js PMREM / environment lighting](https://threejs.org/docs/pages/MeshStandardMaterial.html) | Real ambient/specular response across PBR materials instead of hemisphere/direct light alone. | MIT | First runtime upgrade; already active as the baseline PBR lighting path. |
+| 6 | [pmndrs/postprocessing](https://github.com/pmndrs/postprocessing) | Subtle AO, selective emissive bloom, SMAA, and concept-matched LUT/color grading. | Zlib | Adopt after IBL/material baseline is accepted. Treat as polish, not a substitute for better authored assets. |
+| 7 | [three.quarks](https://github.com/Alchemist0823/three.quarks) | Batched dust, exhaust, impact dirt, cooling mist, sparks, finish effects, and celebratory particles. | MIT | Pilot after core art and performance budgets are stable. |
+| 8 | [Blockbench](https://github.com/JannisX11/blockbench) | Rapid chunky props, fencing, bleachers, crates, signs, and low-poly set dressing. | GPL-3.0; created assets remain project-owned. | Useful selectively; avoid making the game look voxel/Minecraft-like. |
+| Optional | [ArmorPaint](https://github.com/armory3d/armorpaint) | Hero bike/rider texture painting and baking. | Zlib | Defer until the hero/rider texture needs exceed the Blender/Krita path and the tool maturity risk is acceptable. |
+
 | Tool / format | Version | Role |
 |---|---:|---|
 | Blender | `4.5.11 LTS` | Editable 3D source authoring for hero bike/rider, rival pack, and Canyon kit. |
