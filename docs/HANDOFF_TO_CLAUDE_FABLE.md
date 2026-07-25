@@ -1,0 +1,177 @@
+# Handoff to Claude Fable — Rivet Ridge Rally RC2 Closure
+
+Prepared: 2026-07-25
+Project folder: `/Users/john/Sandbox/Rivet Ridge Rally`
+Repository: `https://github.com/jbrackens/rivet-ridge-rally.git`
+Active branch: `agent/rc2-launch-hardening`
+Open PR: `https://github.com/jbrackens/rivet-ridge-rally/pull/1`
+Current release status: **NOT READY**
+
+## Handoff mission
+
+Pick up the paused RC2 launch-hardening goal and close the remaining release-candidate gates honestly. Do not restart the project, do not migrate engines, and do not relabel scoped/dirty/historical evidence as final release evidence.
+
+The first task is to reconcile `LAUNCH_READINESS.md`, `QA_REPORT.md`, and the current repository state, then produce and execute a concrete remaining-gates checklist.
+
+## Current product direction
+
+Rivet Ridge Rally is an original browser motocross game. It may take high-level arcade motocross inspiration from old lane/jump/heat racing games, but shipped branding, assets, code, UI, audio, tracks, and marketing must remain original and legally distinct.
+
+The current architecture is:
+
+- TypeScript + Vite.
+- React only for menus, HUD, settings, results, and editor UI.
+- Direct Three.js/WebGLRenderer for 3D game presentation.
+- Custom fixed-step arcade simulation for bike handling, heat, jumping, collisions, AI, timing, and recovery.
+- Zustand for app/game flow state.
+- Dexie/IndexedDB for local persistence.
+- Web Audio/procedural audio.
+- Blender-authored GLB assets with glTF Transform, Meshopt, KTX2/Basis support, and verification scripts.
+
+Engine migration is intentionally rejected unless a future requirement cannot be met with the current Three.js architecture and the gameplay/editor/offline/release cost is explicitly accepted by the owner.
+
+## Do not do these without owner approval
+
+- Do not migrate to Godot, Bevy, Babylon.js, PlayCanvas, React Three Fiber, or a hosted game engine.
+- Do not delete historical evidence or rewrite release history.
+- Do not move or recreate published release tags casually.
+- Do not claim `READY`, `RC READY`, or `launch-ready` unless `LAUNCH_READINESS.md` and `QA_REPORT.md` gates are actually satisfied.
+- Do not add third-party art, sounds, models, textures, fonts, or marketplace assets without inventorying source, license, hashes, and shipped/retained status.
+- Do not mark owner/legal/manual acceptance as complete using automated test output.
+
+## Latest local/Git state at handoff
+
+Recent commits on `agent/rc2-launch-hardening`:
+
+- `37bd64d docs: clarify current versus planned graphics tools`
+- `7686bf7 docs: record graphics tool adoption plan`
+- `a953af4 docs: add toolchain and MCP inventory`
+- `b7693c3 docs(polish): correct the Lighthouse baseline — prior numbers measured a QA-mode build`
+
+The old duplicate folder `/Users/john/Excitebike 2026` was moved to Trash and should not be used. The active project is `/Users/john/Sandbox/Rivet Ridge Rally`.
+
+## Important source-of-truth documents
+
+Start by reading these:
+
+1. `LAUNCH_READINESS.md` — current commercial readiness decision and remaining gates.
+2. `QA_REPORT.md` — evidence ledger and test status.
+3. `docs/OPERATIONS.md` — release, visual approval, deployment, cache, support, backup, and rollback procedures.
+4. `docs/ASSET_PIPELINE.md` — reproducible Blender/GLB/KTX2 asset pipeline.
+5. `docs/TOOLCHAIN.md` — current tools, planned tools, MCPs, and local development commands.
+6. `docs/design/GRAPHICS_TOOLCHAIN.md` — renderer/tooling decision record and why engine migration is deferred.
+7. `docs/design/FIDELITY_LEDGER.md` — current visual-fidelity gaps and evidence.
+8. `ASSET_LICENSES.md` — source/license/hash inventory for assets.
+9. `THIRD_PARTY_NOTICES.md` — dependency notices.
+10. `AGENTS.md` — repo contribution/agent rules.
+
+## What is already done or substantially progressed
+
+The project has extensive scoped evidence for:
+
+- Arrow-key lane controls replacing A/D as the primary lane-change defaults.
+- Comprehensive Rider School/tutorial work, including contact drills and under-three-minute in-game recap assertions.
+- Heat tuning so the bike does not overheat too abruptly after warning.
+- Wheelie/barrier behavior and crash/slowdown mechanics work.
+- Track editor, local persistence, campaign progression, and built-in track coverage.
+- Blender-authored hero bike/rider, rival pack, and Canyon kit with Meshopt GLB verification.
+- PMREM/RoomEnvironment material lighting.
+- Production/offline smoke, performance, and 30-minute soak evidence for a tagged RC2 candidate.
+- Toolchain/MCP documentation in `docs/TOOLCHAIN.md`.
+
+These are not all final release gates. Many are scoped, historical, dirty-working-tree, diagnostic, or not yet bound to the final required attestation.
+
+## Current verified or active tools
+
+Current/verified:
+
+- Blender 4.5.11 LTS.
+- Blender official glTF export path via the repo's Blender Python scripts.
+- glTF Transform.
+- meshoptimizer.
+- KTX2/Basis support.
+- Three.js PMREM / `RoomEnvironment`.
+- Vite, TypeScript, React, Three.js, Zustand, Dexie, Zod.
+- Vitest, Playwright, axe-core, ESLint.
+- Project dev MCP packages: `@playwright/mcp`, `chrome-devtools-mcp`, `@danielsogl/lighthouse-mcp`.
+
+Planned/recommended, not currently confirmed as active dependencies:
+
+- Material Maker.
+- Krita.
+- `pmndrs/postprocessing`.
+- `three.quarks`.
+- Blockbench.
+- ArmorPaint.
+
+Do not present the planned/recommended tools as already in use.
+
+## Remaining high-level blockers
+
+As of this handoff, `LAUNCH_READINESS.md` still marks the game **NOT READY**. The main remaining blockers are:
+
+1. Owner visual acceptance is incomplete.
+2. Visual baselines have not been promoted.
+3. Physical-device/manual accessibility/fairness review remains open.
+4. Rollback proof is incomplete.
+5. Public support, hosting, privacy, license, and legal/trademark approvals remain incomplete or owner-dependent.
+6. Schema-v3 release attestation is incomplete.
+7. Structured release-QA evidence is incomplete. The readiness doc says 7/10 mandatory records exist; missing records are:
+   - `browser`
+   - `accessibility`
+   - `visual`
+
+## Recommended first Claude Fable task
+
+Do this before implementing anything new:
+
+1. Read `LAUNCH_READINESS.md` completely.
+2. Read `QA_REPORT.md` sections for current RC2 evidence and remaining gates.
+3. Read `docs/OPERATIONS.md` sections for visual approval, release manifest, production smoke, attestation, rollback, and deployment.
+4. Produce a short `Remaining Gates Checklist` that maps each open gate to:
+   - exact source doc section;
+   - required command or manual action;
+   - required output file/artifact;
+   - whether it can be completed by code/test automation or requires owner/manual/legal input;
+   - whether it changes product bytes or only evidence/docs.
+
+Suggested output file:
+
+`docs/RC2_REMAINING_GATES_CHECKLIST.md`
+
+## Suggested next execution order
+
+1. Reconcile docs and current Git state.
+2. Close or explicitly owner-block the missing structured QA records:
+   - browser;
+   - accessibility;
+   - visual.
+3. Prepare owner visual-review package from the latest qualifying captures.
+4. Only after owner approval, promote visual baselines using the guarded repo workflow.
+5. Complete manual/physical-device accessibility and fairness checklist, or mark owner-blocked with specific unavailable devices/inputs.
+6. Complete rollback proof and data-safety rehearsal evidence.
+7. Complete schema-v3 release attestation.
+8. Update `LAUNCH_READINESS.md` and `QA_REPORT.md` truthfully.
+9. Commit/push evidence-only changes without changing product bytes unless a gate explicitly requires a code fix.
+
+## Useful commands
+
+Run from `/Users/john/Sandbox/Rivet Ridge Rally`.
+
+```sh
+git status -sb
+npm run assets:verify
+npm run typecheck
+npm run lint
+npm test
+npm run audit
+npm run audit:release-scope
+npm run build
+npm run test:e2e
+```
+
+Before running expensive or destructive release flows, read `docs/OPERATIONS.md` and verify whether the command is supposed to operate on a clean tagged candidate, a working tree, or an evidence-only commit.
+
+## Practical warning
+
+The project has many historical, scoped, and diagnostic passes. Treat each evidence item as valid only for the exact scope and byte identity documented beside it. The remaining work is not “make tests green in general”; it is to bind the final readiness claim to one frozen candidate, accepted visuals, required manual/physical reviews, rollback proof, and the final attestation.
