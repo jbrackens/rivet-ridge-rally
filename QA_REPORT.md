@@ -1,10 +1,32 @@
 # RIVET RIDGE RALLY — QA Report
 
-**Report date:** 2026-07-17
+> ## Reconciliation notice — 2026-07-25 at `bb10ce4448bc3b4036ba832382c57b7086747400`
+>
+> A reconciliation pass against current source found stale statements in this report. Full evidence: `docs/RC2_RECONCILIATION_2026-07-25.md`. **No historical result below has been deleted, altered, or relabelled**; each remains valid for the exact bytes and scope it names.
+>
+> **The "Current source" line below is stale.** The branch continuation after the `v1.0.0-rc.2` tag was **not** evidence-only. Eighteen product-byte files changed between `2b40695` and `bb10ce4`, including `src/game/engine/GameEngine.ts` (Canyon-kit readiness timeout 12 s → 30 s, plus new failure-reason diagnostics), `src/game/input/InputManager.ts` (keyboard lane-tap arbitration when another device wins the frame), `src/styles.css`, `src/ui/editor/TrackEditorScreen.tsx`, `index.html`, `package.json`/lockfile, four shipped icon PNGs, and three asset manifests.
+>
+> Consequently, for current source these are **`HISTORICAL`**, not current passes: the format-2 release manifest (aggregate `e7af57d5…`), the installed-Chrome production/offline smoke (`83ea1008…`), the headed performance measurement (`02c1a14b…`), the 30-minute Rival soak (`4e8f509d…`), and all 7 structured QA records. The 3 missing records (`browser`, `accessibility`, `visual`) cannot be meaningfully generated until the candidate is re-frozen — generating them against `bb10ce4` would bind a manifest aggregate that does not exist. Owner decision tracked as row 14 of `docs/RC2_REMAINING_GATES_CHECKLIST.md`.
+>
+> **Superseded counts and results:**
+>
+> | Statement below | Current at `bb10ce4` |
+> |---|---|
+> | `npm test` passes 452 checks (302 Vitest, 45 manifest, 71 attestation, 34 smoke) | **456 checks** — 303 Vitest across 32 files, 45 release-manifest, 71 release-attestation, 37 production-smoke/service-worker/release-scope |
+> | `npm audit --audit-level=high` reports zero vulnerabilities | **`FAILED`** — 24 vulnerabilities (18 moderate, 6 high). All in devDependencies (`lighthouse`/`@sentry/node`/`@opentelemetry/*` via the MCP dev packages; `sharp` via `@gltf-transform/functions`). None reaches the shipped browser runtime. The `sharp` fix is breaking. Tracked as row 15. |
+> | Latest live-smoke runtime marker `0b4413f` | **`bb10ce4`** / `dirty=false` / `shell-v35`, authored hero + Canyon kit + panorama ready, `pmrem` environment, zero console errors |
+>
+> **Also recorded:** the machine's default `PATH` now resolves Node `v22.23.1` / npm `10.9.8` against a `26.4.0` / `11.17.0` pin — under drift the release-manifest guard correctly fails closed, so all evidence in this notice explicitly used the pinned toolchain. And `v1.0.0-rc.1` exists **locally only**; `origin` carries just `v1.0.0-rc.2`, which independently blocks predecessor rollback (row 17).
+>
+> **Gameplay behaviour re-verified at `bb10ce4` — `VERIFIED` for source and live-runtime scope:** arrow-key lane steering (`ArrowLeft`/`ArrowRight`), arrow-key pitch (`ArrowUp`/`ArrowDown`), 12 gated tutorial lessons plus 2 contact drills, the forgiving heat band (8 heat/s to the 78 % warning, then 4 heat/s to overheat, 14/s passive cooling, recovery at 35), and front-wheel barrier clearance at `pitch >= 0.18` — below the `0.28` wheelie latch — applying a retained-speed penalty instead of a crash. Tutorial copy, live button accessible names, and `InputManager` defaults agree with each other. One ambiguity is open: forward throttle is `W`, not an arrow key (row 16, owner-blocked).
+>
+> **Current-source `DIAGNOSTIC` evidence at `bb10ce4`, clean tree, pinned toolchain:** `assets:verify`, `typecheck`, `lint`, `npm test` (456), `audit:release-scope` (131 files / 14,916,760 bytes / aggregate `ceff8bedb6b88393786ddfafac55b8cb395642b37ba014dc9c103ecada0fe3b7` / zero findings), and `VITE_QA_MODE=0 npm run build` all pass. This does not qualify a frozen candidate and is not owner, manual, accessibility, or legal approval. **Release decision remains NOT READY.**
+
+**Report date:** 2026-07-17; reconciled 2026-07-25
 
 **Milestone:** `1.0.0-rc.2` working-candidate hardening
 
-**Current source:** annotated `v1.0.0-rc.2` candidate tag at `2b4069538c242da37c8c43d6581e097149fa1994`, with an evidence-only branch continuation after the product tag
+**Current source:** annotated `v1.0.0-rc.2` candidate tag at `2b4069538c242da37c8c43d6581e097149fa1994`, with an evidence-only branch continuation after the product tag — **stale; the continuation included product-byte changes. See the reconciliation notice above.**
 
 **Overall code-owned QA status:** UNVERIFIED
 

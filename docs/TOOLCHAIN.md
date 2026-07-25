@@ -11,8 +11,36 @@ This document describes the local software, project dependencies, graphics pipel
 
 | Tool | Verified version / path | Why it matters |
 |---|---|---|
-| Node.js | `v26.4.0` at `/opt/homebrew/bin/node` | Runs the Vite app, TypeScript checks, asset scripts, tests, release tooling, and local preview server. The repo pins `26.4.0` in `.node-version`. |
-| npm | `11.17.0` at `/opt/homebrew/bin/npm` | Installs locked dependencies and runs the package scripts. The repo declares `packageManager: npm@11.17.0`. |
+| Node.js | `v26.4.0` at `/opt/homebrew/bin/node` | Runs the Vite app, TypeScript checks, asset scripts, tests, release tooling, and local preview server. The repo pins `26.4.0` in `.node-version`. **See the toolchain-drift warning below.** |
+| npm | `11.17.0` at `/opt/homebrew/bin/npm` | Installs locked dependencies and runs the package scripts. The repo declares `packageManager: npm@11.17.0`. **See the toolchain-drift warning below.** |
+
+### Toolchain-drift warning (recorded 2026-07-25)
+
+The pinned Node and npm above are installed, but they are **no longer first on this machine's default `PATH`**. A plain shell resolves:
+
+```
+node -> /Users/john/.local/bin/node   v22.23.1
+npm  -> /Users/john/.local/bin/npm    10.9.8
+```
+
+Run under the drifted toolchain, the release-manifest fixture suite fails closed by design:
+
+```
+not ok 2 - qualifies the installed npm package tree against a detached fixture
+  Error: Release guard failed: npm package version does not match packageManager
+```
+
+That is the guard working, not a defect. Prefix release, manifest, smoke, performance, and attestation commands with the pinned toolchain:
+
+```sh
+export PATH="/opt/homebrew/bin:$PATH"
+```
+
+**Evidence produced under `v22.23.1` must not be used for release qualification.** Recorded in `docs/RC2_RECONCILIATION_2026-07-25.md` §3.
+
+### Dependency-audit status (recorded 2026-07-25)
+
+`npm run audit` currently **fails** at `bb10ce4` with 24 vulnerabilities (18 moderate, 6 high). Every affected package is a devDependency and none reaches the shipped browser runtime: `brace-expansion`/`minimatch` and the `@sentry/node` + `@opentelemetry/*` cluster arrive via `@danielsogl/lighthouse-mcp` and `chrome-devtools-mcp`; `sharp`/libvips arrives via `@gltf-transform/functions` in the asset optimizer. The `sharp` remediation is breaking. Details and options in `docs/RC2_RECONCILIATION_2026-07-25.md` §5; tracked as row 15 of `docs/RC2_REMAINING_GATES_CHECKLIST.md`.
 | Git | Apple Git `2.50.1` at `/usr/bin/git` | Source control, release provenance, tags, branches, and review history. |
 | GitHub CLI | `gh 2.94.0` at `/opt/homebrew/bin/gh` | GitHub authentication, remote status, pull request checks, and push/PR workflow support. |
 | Blender | `4.5.11 LTS` at `/opt/homebrew/bin/blender` and `/Applications/Blender.app/Contents/MacOS/Blender` | Authors the original 3D assets: hero bike/rider, rival pack, and Canyon kit source `.blend` and raw GLB outputs. |

@@ -2,9 +2,25 @@
 
 # NOT READY
 
-**Decision date:** 2026-07-19
+> ## Reconciliation notice — 2026-07-25 at `bb10ce4448bc3b4036ba832382c57b7086747400`
+>
+> A reconciliation pass against current source found that **this document's candidate statement is stale**. Full evidence: `docs/RC2_RECONCILIATION_2026-07-25.md`. Nothing below has been deleted; every historical result remains valid for the exact bytes it names.
+>
+> 1. **The tagged candidate has been superseded.** Eighteen product-byte files changed between `v1.0.0-rc.2` (`2b40695`) and `bb10ce4` — including `src/game/engine/GameEngine.ts`, `src/game/input/InputManager.ts`, `src/styles.css`, `src/ui/editor/TrackEditorScreen.tsx`, `index.html`, `package.json`/lockfile, four shipped icon PNGs, and three asset manifests. **Every release-bound artifact recorded below against `2b40695` — the format-2 manifest, the installed-Chrome production/offline smoke, the headed performance measurement, the 30-minute soak, and all 7 structured QA records — is therefore `HISTORICAL` with respect to current source.** Choosing the candidate is an owner decision, tracked as row 14 of `docs/RC2_REMAINING_GATES_CHECKLIST.md`.
+> 2. **`npm run audit` now FAILS.** 24 vulnerabilities (18 moderate, 6 high) at `bb10ce4`. Statements below reporting "zero high-severity npm audit vulnerabilities" were accurate on 2026-07-19 and are **superseded**. All affected packages are devDependencies (`lighthouse`/`@sentry/node`/`@opentelemetry/*` via the MCP dev packages, `sharp` via `@gltf-transform/functions`); none reaches the shipped browser runtime. Tracked as row 15.
+> 3. **Test-count statements are superseded.** `npm test` now runs **456 checks** — 303 Vitest across 32 files, 45 release-manifest fixtures, 71 release-attestation fixtures, and 37 production-smoke/service-worker/release-scope fixtures. Statements below citing 452 checks / 302 Vitest / 34 smoke fixtures describe an earlier source.
+> 4. **Local toolchain drift.** The default `PATH` now resolves Node `v22.23.1` / npm `10.9.8` against a pin of `26.4.0` / `11.17.0`. Under the drifted toolchain the release-manifest guard correctly fails closed. All evidence in this notice used the pinned toolchain explicitly.
+> 5. **`v1.0.0-rc.1` is local-only and unpublished.** `origin` carries only `v1.0.0-rc.2`. This is an additional, independent reason the predecessor-rollback gate cannot close. Tracked as row 17.
+>
+> **Current-source evidence at `bb10ce4`, clean tree, pinned toolchain — `VERIFIED` for static/unit/build scope only:** `npm run assets:verify` (hero 49,780 triangles / 517,664 bytes; rival pack; Canyon 32,008 triangles / 427,028 bytes; production art), `npm run typecheck`, `npm run lint`, `npm test` (456 checks), `npm run audit:release-scope` (131 files / 14,916,760 bytes / aggregate SHA-256 `ceff8bedb6b88393786ddfafac55b8cb395642b37ba014dc9c103ecada0fe3b7` / zero findings), and `VITE_QA_MODE=0 npm run build` (notices 43,872 bytes / `f837ed705667d0f3976bbd419f42d8c63844a3eb4b52f76db88ed3a1d6e270c2`).
+>
+> A live non-QA preview on `127.0.0.1:4173` confirmed runtime marker `bb10ce4` / `dirty=false` / `shell-v35` / `offlineReady=true`, absent QA and performance APIs, authored hero + Canyon kit + panorama all ready, `pmrem` environment, and **zero console errors**. This is the first live evidence bound to this commit; prior live-smoke markers below (`0b4413f`, `f5882c9`, `466dd80`, `36fec40`) are historical.
+>
+> This is `DIAGNOSTIC` / current-source evidence. It is **not** a frozen-candidate release pass, a manifest-bound artifact, production/offline smoke, performance qualification, or any owner, manual, accessibility, or legal approval. **The release remains NOT READY.**
 
-**Candidate:** annotated `v1.0.0-rc.2` candidate tag at `2b4069538c242da37c8c43d6581e097149fa1994`, with release evidence recorded after the product tag
+**Decision date:** 2026-07-19 (readiness decision); reconciled 2026-07-25
+
+**Candidate:** annotated `v1.0.0-rc.2` candidate tag at `2b4069538c242da37c8c43d6581e097149fa1994`, with release evidence recorded after the product tag — **superseded by later product commits; see the reconciliation notice above**
 
 **Code-owned gate status:** PARTIAL PASS / RELEASE ATTESTATION INCOMPLETE
 

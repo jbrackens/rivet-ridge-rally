@@ -8,6 +8,14 @@ The canonical visual source of truth remains `docs/design/concepts/hero-bike-rid
 
 The production reference is a modeling and material guide only. It must not be shipped as a texture, projected onto geometry, traced as a decal sheet, or used as a substitute for an authored 3D asset.
 
+## 2026-07-25 creative pivot
+
+The owner moved the visual target away from Roblox-adjacent, blocky, cube-first, primitive-heavy forms and toward an original, polished mascot-kart-racer level of charm, material finish, and animation readability. For this asset that means rounded, appealing silhouettes with real bevelled volume, shaped plastics, and authored base-colour/ORM/normal material depth in place of the current flat solid-colour PBR treatment.
+
+The canonical reference sheet already embodies that target, so the pivot does not change the design goal — it raises the required fidelity of the delivered asset. "Mascot-kart-racer" is a quality and readability reference only; it is not permission to copy Mario Kart, Nintendo, or Roblox expression. The originality guardrails below remain in force unchanged.
+
+The next authored pass is scoped in `docs/design/MASCOT_DIRECTION_VERTICAL_SLICE_PLAN.md`, which sets explicit triangle, primitive, material, byte, draw-call, and frame-time budgets for the work.
+
 ## Original and non-infringing art direction
 
 Build a bright, tactile, fictional trail bike and a compact athletic motocross rider in the established coral, teal, cream, charcoal, and brushed-metal palette. The target is a readable, polished, toy-like 3D finish: molded plastics with softened bevels, dense but orderly knobby tires, visible suspension and chain-drive silhouettes, layered safety gear, clean color blocking, and enough mechanical depth to hold up in the close follow camera.

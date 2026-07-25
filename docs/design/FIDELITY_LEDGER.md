@@ -170,6 +170,22 @@ The following remain technical/product constraints, not visual-fidelity waivers:
 - Campaign `CoursePresentationRoute` shaping is laterally curved, positively graded, and renderer-only. Authored custom-track test play now uses schema-v2 checkpoint centerlines through the same presentation boundary; migrated v1 tracks stay identity-mapped. Saved local module transforms/collision footprints remain editor data while authoritative progress stays scalar as recorded in `ARCHITECTURE.md`.
 - Physical-device brightness, display calibration, touch ergonomics, and motion comfort remain hardware-specific evidence gaps tracked in `QA_REPORT.md`.
 
+## 2026-07-25 direct assessment at `bb10ce4` — not accepted
+
+A reconciliation pass assessed the **live** `bb10ce4` runtime and the newest controlled capture (`artifacts/visual-review/rc2-current-466dd80-20260719T110548Z/`, commit `466dd80`, historical) directly against `concepts/gameplay-desktop.png` and `concepts/hero-bike-rider-production-reference.png`. Full record: `docs/RC2_RECONCILIATION_2026-07-25.md` §10.
+
+The environment layer has genuinely improved and now reads as a coherent, readable arcade course: the route banners, rail bleachers, shoulder cut-banks, cactus dressing, festival stands, and per-lane open cooling arches all install and read together. **The unmet part of the pivot is asset-level finish.**
+
+1. **Hero bike and rider remain the dominant mismatch.** The reference sheet is already an appealing, original, rounded mascot-racer design; the runtime asset reads as boxes and cylinders — a capsule head with a flat visor plate, a slab torso, rectangular limbs, a plate-like number panel, and tyres without sidewall or spoke depth. All 10 materials are flat solid-colour PBR with **zero textures**; no base-colour, ORM, or normal atlases exist anywhere in the project.
+2. **Terrain is a flat plane with painted detail.** `layered-rut-pebble-v3` supplies 512×512 colour and height maps, but there is no real displacement, no berm cross-section, no contact deformation, and visible repetition down the sightline.
+3. **Canyon walls are stacked boxes** with hard 90° corners, against eroded layered rock in the concept.
+4. **Crowd and props are placeholder primitives** — 198 route and 132 start spectators as capsule/box figures, unanimated.
+5. **No post-processing.** `pmndrs/postprocessing` is not installed; contact darkening is limited to `pcf-contact` shadows.
+6. **VFX are sparse.** The `soft-speed-reactive-twin-wheel-plume` dust works, but there is no exhaust, spark, cooling mist, or impact debris. `three.quarks` is not installed.
+7. **Lighting is competent but flat.** PMREM + `RoomEnvironment` gives correct ambient response with no authored key-light drama or atmospheric depth beyond fog.
+
+The scoped response is `docs/design/MASCOT_DIRECTION_VERTICAL_SLICE_PLAN.md`: a hero-first vertical slice that also proves the never-yet-exercised authored-texture path end to end, with explicit triangle, primitive, material, byte, draw-call, and frame-time budgets. It is **planned and reviewable, not implemented**. Nothing in this section is owner acceptance, and no baseline was created, changed, or promoted.
+
 ## Current conclusion
 
 Concept fidelity is **NOT ACCEPTED**. The 2026-07-19 clean-source controlled visual capture for `a9a97ef` passes the 11-frame five-track technical matrix, and the 2026-07-17/18 diagnostic slices add desktop start, cooling approach, bend, portrait, headed live-performance, and 15-state hero evidence. These are real technical results, but no regression baseline was created or promoted. The hero/rider's blocky/flat finish, lack of authored texture/normal/ORM material depth, rear-camera occlusion, subtle pitch/landing presentation, and crash/recovery fidelity remain material gaps, and the current Canyon frame is still less textural and densely authored than `gameplay-desktop.png`. The 2026-07-25 creative pivot raises the acceptance target further away from blocky/Roblox-adjacent forms and toward polished original mascot-racer finish. Builder/Test Ride, high contrast, physical devices, frozen-candidate performance, similarity/legal review, and owner acceptance remain open. No launch-readiness claim is made here.
