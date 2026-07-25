@@ -11,11 +11,15 @@ Current release status: **NOT READY**
 
 Pick up the paused RC2 launch-hardening goal and close the remaining release-candidate gates honestly. Do not restart the project, do not migrate engines, and do not relabel scoped/dirty/historical evidence as final release evidence.
 
-The first task is to reconcile `LAUNCH_READINESS.md`, `QA_REPORT.md`, and the current repository state, then produce and execute a concrete remaining-gates checklist.
+The first task is to reconcile `LAUNCH_READINESS.md`, `QA_REPORT.md`, `docs/RC2_REMAINING_GATES_CHECKLIST.md`, and the current repository state, then execute the remaining gates checklist.
+
+The owner also changed the desired visual target on 2026-07-25: move away from 3D Roblox-style/blocky toy assets and pursue an original, polished mascot-kart-racer level of charm, color, material finish, and track spectacle. This is a quality/readability target, not permission to copy Mario Kart or Nintendo-controlled expression.
 
 ## Current product direction
 
 Rivet Ridge Rally is an original browser motocross game. It may take high-level arcade motocross inspiration from old lane/jump/heat racing games, but shipped branding, assets, code, UI, audio, tracks, and marketing must remain original and legally distinct.
+
+Creative pivot: the project should no longer aim for Roblox-style blocky 3D assets. Future visual work should push toward rounded, glossy, expressive, premium arcade-racer assets and richer course dressing, while preserving motocross mechanics and the four-lane readability contract.
 
 The current architecture is:
 
@@ -33,6 +37,7 @@ Engine migration is intentionally rejected unless a future requirement cannot be
 ## Do not do these without owner approval
 
 - Do not migrate to Godot, Bevy, Babylon.js, PlayCanvas, React Three Fiber, or a hosted game engine.
+- Do not copy Mario Kart, Nintendo characters, items, course layouts, UI, vehicle silhouettes, sounds, music, iconography, branding, or trade dress.
 - Do not delete historical evidence or rewrite release history.
 - Do not move or recreate published release tags casually.
 - Do not claim `READY`, `RC READY`, or `launch-ready` unless `LAUNCH_READINESS.md` and `QA_REPORT.md` gates are actually satisfied.
@@ -59,11 +64,12 @@ Start by reading these:
 3. `docs/OPERATIONS.md` — release, visual approval, deployment, cache, support, backup, and rollback procedures.
 4. `docs/ASSET_PIPELINE.md` — reproducible Blender/GLB/KTX2 asset pipeline.
 5. `docs/TOOLCHAIN.md` — current tools, planned tools, MCPs, and local development commands.
-6. `docs/design/GRAPHICS_TOOLCHAIN.md` — renderer/tooling decision record and why engine migration is deferred.
-7. `docs/design/FIDELITY_LEDGER.md` — current visual-fidelity gaps and evidence.
-8. `ASSET_LICENSES.md` — source/license/hash inventory for assets.
-9. `THIRD_PARTY_NOTICES.md` — dependency notices.
-10. `AGENTS.md` — repo contribution/agent rules.
+6. `docs/RC2_REMAINING_GATES_CHECKLIST.md` — operational checklist for the remaining release gates.
+7. `docs/design/GRAPHICS_TOOLCHAIN.md` — renderer/tooling decision record and why engine migration is deferred.
+8. `docs/design/FIDELITY_LEDGER.md` — current visual-fidelity gaps, evidence, and the updated creative target.
+9. `ASSET_LICENSES.md` — source/license/hash inventory for assets.
+10. `THIRD_PARTY_NOTICES.md` — dependency notices.
+11. `AGENTS.md` — repo contribution/agent rules.
 
 ## What is already done or substantially progressed
 
@@ -128,16 +134,12 @@ Do this before implementing anything new:
 1. Read `LAUNCH_READINESS.md` completely.
 2. Read `QA_REPORT.md` sections for current RC2 evidence and remaining gates.
 3. Read `docs/OPERATIONS.md` sections for visual approval, release manifest, production smoke, attestation, rollback, and deployment.
-4. Produce a short `Remaining Gates Checklist` that maps each open gate to:
+4. Verify and update `docs/RC2_REMAINING_GATES_CHECKLIST.md`, which maps each open gate to:
    - exact source doc section;
    - required command or manual action;
    - required output file/artifact;
    - whether it can be completed by code/test automation or requires owner/manual/legal input;
    - whether it changes product bytes or only evidence/docs.
-
-Suggested output file:
-
-`docs/RC2_REMAINING_GATES_CHECKLIST.md`
 
 ## Suggested next execution order
 

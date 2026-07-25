@@ -10,7 +10,9 @@
 
 ## High concept
 
-RIVET RIDGE RALLY is a fast, readable 3D arcade motocross game set in a traveling toy-diorama racing festival. Players choose among four marked lanes, manage turbo heat, shape jumps with bike pitch, and read obstacle rhythms at speed. Short races invite immediate retries, while campaign targets, rivals, and a local track editor create long-term mastery.
+RIVET RIDGE RALLY is a fast, readable 3D arcade motocross game set in a traveling, original motocross festival world. Players choose among four marked lanes, manage turbo heat, shape jumps with bike pitch, and read obstacle rhythms at speed. Short races invite immediate retries, while campaign targets, rivals, and a local track editor create long-term mastery.
+
+The revised art target is no longer Roblox-adjacent blocky toy assets. The target is an original, polished, mascot-kart-racer level of charm, material finish, animation readability, colorful track spectacle, and approachable arcade clarity. This is a quality and readability reference, not permission to copy Mario Kart, Nintendo characters, items, UI, track layouts, vehicle silhouettes, iconography, music, sounds, branding, or trade dress.
 
 The game should feel generous enough for a new player to finish a first race and deep enough for an expert to improve lines, turbo timing, landings, and recovery decisions over many attempts.
 
@@ -48,7 +50,7 @@ Release safety follows the same honest-local principle. The shell-v35 cache is p
 
 ## World and tone
 
-The Rivet Ridge Rally is a colorful festival tour built around compact handcrafted race parks. Oversized track pieces, banners, spectator props, service gantries, cooling equipment, and scenery make each location feel like a physical toy diorama. The tone is playful, energetic, and competitive without hostility.
+The Rivet Ridge Rally is a colorful festival tour built around compact handcrafted race parks. Oversized track pieces, banners, spectator props, service gantries, cooling equipment, and scenery make each location feel like a premium arcade racing playset rather than sparse construction blocks. The tone is playful, energetic, and competitive without hostility.
 
 All names, visuals, layouts, vehicles, riders, icons, music, sound, writing, and promotional material must be original or commercially licensed and recorded in `ASSET_LICENSES.md`.
 
@@ -176,7 +178,10 @@ Import/export is intentionally defensive: corrupt, malicious, oversized, incompa
 
 ## Visual direction
 
-- Chunky, readable low-poly forms and deliberate per-track palettes.
+- Polished, readable, original 3D mascot-racer forms with rounded silhouettes, pleasing proportions, authored surface detail, and deliberate per-track palettes.
+- Avoid Roblox-adjacent block avatars, cube-first bodies, default-engine primitive props, and flat untextured blockiness as a final style.
+- Use the best qualities of family-friendly kart-racer presentation as a quality bar: bold silhouettes, saturated but disciplined color, glossy readable materials, expressive trackside set dressing, lively motion feedback, and clear first-read hazards.
+- Do not copy Mario Kart or Nintendo-controlled expression: no characters, items, logos, UI layout, font treatment, course layouts, vehicle silhouettes, sounds, music, iconography, or recognizable trade dress from those games.
 - Strong hierarchy between dirt, grass, lane paint, mud, cooling gates, hazards, riders, and scenery.
 - Original bikes and riders with silhouettes readable at gameplay distance.
 - Essential HUD only: position, lap, timer, target, heat, and actionable feedback.
@@ -186,14 +191,14 @@ Import/export is intentionally defensive: corrupt, malicious, oversized, incompa
 - Canyon's two unique cooling-gate showcase locations use live bilateral, staffed elevated watchtowers beyond the course fence, with mirrored teal/coral roofs and two, three, or four deck spectators on Low, Medium, or High. The raised silhouettes should make the cyan gate corridor read as a staffed festival venue on both desktop and portrait layouts while preserving the full gate silhouette, lane reads, snowflake cues, and landing sightline; they remain decorative rather than a second hazard or cooling affordance.
 - The dirt color layer, non-color surface relief, and lane-divider geometry remain separate: painted guides stay flat and readable while shallow ruts, clods, and sculpted grass berms catch light without changing bike physics.
 - High-contrast cues belong to the visible route: campaign stripes clear sculpted berms, while custom-course stripes follow authored curves, banks, heights, and rotations and preserve fallback cues wherever an authored strip is buried.
-- Terraced course edges, sculpted lane ridges, and denser theme-specific scenery make the route read as a built festival diorama instead of a road floating through sparse props. Canyon Kickoff and Rider School use a continuous cream/coral/teal modular safety wall with the timber fence behind it; other handcrafted venues retain shorter festival-zone runs, while editor-authored courses omit this straight campaign treatment.
-- `docs/design/concepts/track-builder.png` is the Track Builder composition reference: the live Builder and Test Ride must read as one compact, connected, winding four-lane diorama, with gates, lane guides, modules, camera focus, and elevation attached to the same route rather than independent props on an endless straight.
+- Terraced course edges, sculpted lane ridges, and denser theme-specific scenery make the route read as a premium arcade racing festival course instead of a road floating through sparse props. Canyon Kickoff and Rider School use a continuous cream/coral/teal modular safety wall with the timber fence behind it; other handcrafted venues retain shorter festival-zone runs, while editor-authored courses omit this straight campaign treatment.
+- `docs/design/concepts/track-builder.png` remains a Track Builder composition reference, but the renewed acceptance target should push beyond blocky toy-diorama finish toward a polished, rounded, richly dressed, original 3D racing playset. The live Builder and Test Ride must read as one compact, connected, winding four-lane course with gates, lane guides, modules, camera focus, and elevation attached to the same route rather than independent props on an endless straight.
 - Handcrafted tracks and Rider School open on a code-native four-lane start stencil numbered `1`–`4`; authored Test Rides exclude it so the builder's saved Start Grid remains visually authoritative.
 - Mobile lane/pitch and Ride/Turbo controls use stronger scale, contrast, depth, and separation plus the original rally pictogram set while retaining safe reach, readable Ride/Turbo labels, explicit accessible names, and mirrored layout support.
 - At the 320 CSS-pixel fallback with UI scale at 140%, the steering, throttle, and heat groups must remain in-bounds and non-overlapping in both handed layouts, with 44×44 CSS-pixel minimum touch targets.
 - Avoid generic dashboard cards, default engine UI, excessive gradients, stock-icon misuse, random rounded panels, and visibly temporary meshes.
 
-The desktop and mobile gameplay concepts remain references for composition, hierarchy, richness, rider readability, track depth, and control presence, not pixel-accurate screenshots. The owner rejected the previous blanket acceptance of materially coarser and less-dense output. The post-RC1 rendering changes therefore reopen concept fidelity: they are proposed improvements, not accepted evidence, until renewed side-by-side owner review is recorded.
+The desktop and mobile gameplay concepts remain references for composition, hierarchy, richness, rider readability, track depth, and control presence, not pixel-accurate screenshots. The owner rejected the previous blanket acceptance of materially coarser and less-dense output and has now pivoted the desired finish away from Roblox-style block assets toward a polished, original mascot-kart-racer level of finish. The post-RC1 rendering changes therefore remain proposed improvements, not accepted evidence, until renewed side-by-side owner review is recorded against this updated creative target.
 
 ## Audio direction
 
@@ -216,4 +221,4 @@ Original or properly licensed audio must cover engine load/turbo, landing qualit
 
 ## Creative acceptance bar
 
-The game is not creatively complete when systems merely exist. Each track must be finishable, readable, visually coherent, meaningfully distinct, and accepted against the relevant concept direction; controls must invite mastery; feedback must make mistakes understandable; and every shipped asset must have recorded provenance. Automated screenshot stability cannot substitute for concept-fidelity or first-time-player comprehension review. These criteria require browser playtesting and renewed owner acceptance and cannot be marked complete from this document alone.
+The game is not creatively complete when systems merely exist. Each track must be finishable, readable, visually coherent, meaningfully distinct, and accepted against the updated polished mascot-racer concept direction; controls must invite mastery; feedback must make mistakes understandable; and every shipped asset must have recorded provenance. Automated screenshot stability cannot substitute for concept-fidelity or first-time-player comprehension review. These criteria require browser playtesting and renewed owner acceptance and cannot be marked complete from this document alone.

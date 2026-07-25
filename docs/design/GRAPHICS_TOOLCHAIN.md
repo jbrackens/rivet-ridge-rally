@@ -6,6 +6,12 @@
 
 Keep the existing Three.js renderer and improve the authored content pipeline around it. The repository already has the right web delivery foundation—glTF, Meshopt, KTX2, sRGB output, ACES tone mapping, shadows, fog, instancing, and quality tiers. Rewriting the game in PlayCanvas, Babylon, Godot, React Three Fiber, or a hosted game platform would discard working simulation/editor/release infrastructure without solving the main gap: the game lacked authored production geometry and cohesive materials.
 
+## Creative-direction pivot
+
+On 2026-07-25, the owner pivoted the desired finish away from 3D Roblox-style/blocky toy assets and toward a polished, original mascot-kart-racer level of charm and finish. This does not authorize copying Mario Kart or Nintendo-controlled expression; it means the next visual pass should pursue richer rounded modeling, stronger PBR material response, authored textures/normal/ORM detail, more expressive props, lively trackside animation, and colorful course spectacle while preserving the existing motocross mechanics, four-lane readability, accessibility, and original IP boundary.
+
+The pivot strengthens the case for Blender/Krita/Material Maker/postprocessing/VFX work inside the current Three.js pipeline. It does not by itself justify migrating to Godot, Bevy, Babylon.js, or another engine.
+
 The first vertical slice therefore uses:
 
 | Layer | Tool | Current role |
@@ -37,9 +43,9 @@ The connected GitHub plugin is useful for repository and pull-request work but d
 ## Next art passes
 
 1. Continue beyond the technically passing enriched 15-state hero matrix; review the Canyon kit, authored hero, and five shared-rig rivals at all three quality tiers, with side/three-quarter framing that visibly distinguishes wheelie, airborne pitch, landing compression, crash separation, and recovery.
-2. Correct any scale, orientation, overlap, material exposure, number readability, pose attachment, or density issue in the versioned Blender sources.
+2. Correct any scale, orientation, overlap, material exposure, number readability, pose attachment, or density issue in the versioned Blender sources, prioritizing the new polished mascot-racer finish over blocky toy/Roblox-adjacent forms.
 3. Compare native-size race captures with the approved concept references and record explicit owner/legal acceptance; source previews alone do not establish in-game fidelity.
-4. Build a small KTX2 atlas only where solid-color materials cannot deliver necessary dirt wear, fabric, timber grain, or mechanical readability.
+4. Build small KTX2 atlases where solid-color materials cannot deliver necessary dirt wear, fabric, plastic, metal, rubber, timber grain, decals, or mechanical readability.
 5. Add restrained post-processing or VFX only after gameplay silhouettes, accessibility, draw-call, memory, and frame-time budgets pass.
 
 Scoped runtime qualification has resumed: headed hero action integration passes 5/5, the v7 15-state dirty-working-tree manifest passes with authored Canyon-kit/panorama readiness and browser audio muted, targeted reliability passes its scoped paths, and earlier headed desktop/mobile normal/stress profiles remain near 60 FPS with 1.6–2.6 ms p95 frame work. The 2026-07-18 hero source pass improves side/rear number readability, helmet/rider panel separation, and close-camera handlebar silhouette while staying within the 28-render-primitive contract. The captured blocky/flat proportions/materials, simplified mechanics, rear-camera occlusion, and weak landing/crash/recovery fidelity remain below the concept target. Quality-tier, accessibility, memory/long-duration, offline frozen-candidate, physical-device, and owner/legal acceptance therefore remain **INCOMPLETE / NOT ACCEPTED / UNVERIFIED**.
