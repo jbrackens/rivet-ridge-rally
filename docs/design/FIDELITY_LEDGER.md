@@ -215,6 +215,22 @@ The size reduction is a side effect of correct shading: smooth normals let the e
 
 This is dirty-working-tree implementation evidence. **No owner visual acceptance is claimed, no baseline was created or promoted, and concept fidelity remains NOT ACCEPTED.**
 
+## 2026-07-25 texture spike — rejected on evidence, nothing shipped
+
+A tiling detail-normal-map pass was prototyped end to end to attack the flat-material gap, then **reverted**. It did not ship; the tree carries none of it and the hero asset is byte-identical to the rounded-silhouette commit (`e26ff81a3eb5a8236c7934bea41dba95eae6528d52cc3cf11f82975ac88e7b73`).
+
+Three hard constraints and two measurements came out of it, and together they decide the shape of the real texture pass:
+
+1. **Roughness must remain a per-material scalar** — the material contract asserts `roughnessFactor`/`metallicFactor` ranges, which an image-driven roughness would force to `1.0`.
+2. **The hero's zero-image rule is an IP-safety guarantee**, so it needs replacing with a strict hash-bound allowlist rather than relaxing.
+3. **Optimized `TEXCOORD_0` must be normalized unsigned 16-bit**, so UVs must lie in `[0,1]`. **Tiling UVs are structurally impossible** under the shipped contract; the pipeline assumes a proper unwrapped atlas.
+4. Box projection re-split vertices that smooth shading had welded: raw GLB **+60%** (1,269,932 → 2,026,120 bytes) before optimization.
+5. At 7 tiles/metre the detail repeats ~14× across a 2 m bike, landing near one pixel at the follow camera — shimmer rather than material.
+
+**Direction this sets.** The texture work must be a real `0–1` UV atlas carrying *larger-scale* authored features — panel creases, stitch lines, tread blocks, worn edges, baked crevice occlusion — sized to survive the gameplay camera, with base colour and normal in the atlas and roughness/metallic left as scalars. That is a substantially larger job than a detail map and needs its own scoping. Recorded in `docs/design/MASCOT_DIRECTION_VERTICAL_SLICE_PLAN.md` §2.2.
+
+Concept fidelity remains **NOT ACCEPTED**. No baseline was created or promoted.
+
 ## Current conclusion
 
 Concept fidelity is **NOT ACCEPTED**. The 2026-07-19 clean-source controlled visual capture for `a9a97ef` passes the 11-frame five-track technical matrix, and the 2026-07-17/18 diagnostic slices add desktop start, cooling approach, bend, portrait, headed live-performance, and 15-state hero evidence. These are real technical results, but no regression baseline was created or promoted. The hero/rider's blocky/flat finish, lack of authored texture/normal/ORM material depth, rear-camera occlusion, subtle pitch/landing presentation, and crash/recovery fidelity remain material gaps, and the current Canyon frame is still less textural and densely authored than `gameplay-desktop.png`. The 2026-07-25 creative pivot raises the acceptance target further away from blocky/Roblox-adjacent forms and toward polished original mascot-racer finish. Builder/Test Ride, high contrast, physical devices, frozen-candidate performance, similarity/legal review, and owner acceptance remain open. No launch-readiness claim is made here.

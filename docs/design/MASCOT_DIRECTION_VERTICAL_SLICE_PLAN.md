@@ -49,6 +49,20 @@ Bevels and rounded silhouettes are what "reads as mascot-racer" at gameplay dist
 
 ### 2.2 First authored texture atlas — the pipeline unknown
 
+> **2026-07-25 spike result — the approach is now decided, and one option is ruled out.**
+>
+> A tiling detail-normal-map approach was prototyped end to end and **rejected on evidence**. Findings, in the order they were hit:
+>
+> 1. **Roughness must stay a scalar.** `MATERIAL_CONTRACTS` in the build and verify scripts assert per-material `roughnessFactor`/`metallicFactor` *ranges*. Driving roughness from an image forces those factors to `1.0` and breaks the contract. Any texture pass must therefore either keep roughness scalar or deliberately renegotiate that contract.
+> 2. **The hero forbids images by design.** `assertSerializedRestrictions` asserts zero images, textures and samplers, and `listTextures().length === 0`. This is an IP-safety guarantee, not an oversight. Adding textures requires replacing that blanket ban with a strict allowlist — exactly one image, fixed dimensions, non-colour, normal-map use only, hash-bound in the manifest — rather than simply relaxing it.
+> 3. **Decisive: the asset contract requires `[0,1]` UVs.** Optimized `TEXCOORD_0` must be `VEC2`, `componentType 5123` (unsigned 16-bit) **and normalized**. Normalized `u16` cannot represent values outside `[0,1]`, so **tiling UVs are structurally incompatible with the shipped quantization contract**. The pipeline is built for a properly unwrapped `0–1` atlas.
+> 4. **Cost was moving the wrong way.** Box-projected UVs introduce a seam at every projection-axis change, re-splitting vertices that the smooth-shading pass had just welded: the raw GLB went from 1,269,932 back up to 2,026,120 bytes (+60%) before optimization.
+> 5. **Wrong detail scale for the camera.** At 7 tiles/metre the noise repeats roughly 14 times across a 2 m bike. At the gameplay camera the bike is a few hundred pixels tall, so that detail lands near or below one pixel — it reads as shimmer, not material.
+>
+> **Conclusion.** Micro-detail tiling is the wrong lever for this game's camera distance, and the existing quantization contract already points at the right one: a real UV unwrap into a `0–1` atlas carrying **larger-scale authored features** — panel creases, stitch lines, tread blocks, worn edges, baked occlusion in crevices — at a scale that survives the follow camera. Constraint 1 also means the atlas should carry base colour and normal, leaving roughness/metallic as the existing per-material scalars, unless the material contract is explicitly renegotiated.
+>
+> That is a materially larger job than "add a texture": unwrapping the 28 consolidated primitives, authoring the atlas, then extending the image allowlist, manifest schema, verifier, e2e assertions, and `ASSET_LICENSES.md`. It should be scoped and estimated before it is started. The spike was reverted; the tree carries none of it.
+
 The project has a full KTX2/Basis path that has **never carried an authored texture**. The hero is the right place to prove it end to end.
 
 - Author base-colour, ORM (occlusion / roughness / metallic), and normal atlases for the hero pair.
