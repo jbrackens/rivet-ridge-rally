@@ -231,6 +231,21 @@ Three hard constraints and two measurements came out of it, and together they de
 
 Concept fidelity remains **NOT ACCEPTED**. No baseline was created or promoted.
 
+## 2026-07-26 lighting audit — no structural gap found, no changes made
+
+A lighting and contact-shadow pass was proposed on the assumption that the renderer lacked grounding. **That assumption was wrong**, and the audit is recorded here so it is not repeated.
+
+The current rig already provides, in `GameEngine.createWorld()` and the per-frame player update:
+
+- PMREM environment lighting from `RoomEnvironment`, quality-tiered at 64/128/256.
+- A hemisphere light plus a shadow-casting directional sun (2048² shadow map on High, 1024² on Medium) with tuned bias and normal bias.
+- A dedicated three-point hero rig — cool key spot, warm rim spot, fill point — reported at runtime as `data-hero-bike-material-response="pmrem-three-point"`.
+- **A route-following contact shadow already exists** (`playerShadow`): a soft alpha-mapped plane that tracks the course yaw/pitch, widens with speed, widens further during crash and recovery, and fades out with airborne height. It was confirmed rendering in a live Canyon Practice frame; it simply reads low-contrast because a dark-brown shadow sits on dark-brown dirt.
+
+`data-hero-bike-shadow-style="pcf-contact"` is a **diagnostic label for the PCF shadow map being enabled**, not a separate contact-shadow feature. On Low quality it correctly reports `pcf-disabled-low`, and the `playerShadow` plane remains the grounding cue at that tier.
+
+**No changes were made.** The remaining lighting improvements — contact-shadow contrast against dirt, softer shadow filtering on High, landing-impact shadow darkening — are all subjective art tuning that would alter the look of every existing capture. Under the project's own rule that visual baselines are not moved without owner acceptance, they belong in a reviewed art pass, not an unilateral change. The measured depth gap is better addressed by baked occlusion in the hero atlas, which is scoped in `docs/design/HERO_TEXTURE_ATLAS_PLAN.md` §1.
+
 ## Current conclusion
 
 Concept fidelity is **NOT ACCEPTED**. The 2026-07-19 clean-source controlled visual capture for `a9a97ef` passes the 11-frame five-track technical matrix, and the 2026-07-17/18 diagnostic slices add desktop start, cooling approach, bend, portrait, headed live-performance, and 15-state hero evidence. These are real technical results, but no regression baseline was created or promoted. The hero/rider's blocky/flat finish, lack of authored texture/normal/ORM material depth, rear-camera occlusion, subtle pitch/landing presentation, and crash/recovery fidelity remain material gaps, and the current Canyon frame is still less textural and densely authored than `gameplay-desktop.png`. The 2026-07-25 creative pivot raises the acceptance target further away from blocky/Roblox-adjacent forms and toward polished original mascot-racer finish. Builder/Test Ride, high contrast, physical devices, frozen-candidate performance, similarity/legal review, and owner acceptance remain open. No launch-readiness claim is made here.

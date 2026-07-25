@@ -191,6 +191,9 @@ test.describe("production asset network fallbacks", () => {
 
   test("a failed same-origin compressed model request keeps the playable fallback", async ({ page }, testInfo) => {
     test.skip(testInfo.project.name !== "chromium", "Asset fallback gate runs once in Chromium");
+    // Boots WebGL plus the WASM transcoders, waits out the hero fallback, then
+    // drives a tutorial lesson. The 30 s Playwright default never covered that.
+    test.setTimeout(90_000);
     const modelRequests: string[] = [];
     await page.route("**/assets/3d/hero-bike-rider.glb", async (route) => {
       modelRequests.push(route.request().url());
@@ -216,6 +219,11 @@ test.describe("production asset network fallbacks", () => {
 
   test("a decoded model with an invalid hero contract keeps the playable fallback", async ({ page }, testInfo) => {
     test.skip(testInfo.project.name !== "chromium", "Malformed asset fallback gate runs once in Chromium");
+    // Unlike the aborted-request sibling above, this case must actually fetch,
+    // Meshopt-decode and contract-validate the full hero GLB before the runtime
+    // can reject it, then still drive a tutorial lesson. In headless Chromium
+    // that reliably exceeds the 30 s default budget.
+    test.setTimeout(120_000);
     await page.route("**/assets/3d/hero-bike-rider.glb", async (route) => {
       const response = await route.fetch();
       const body = Buffer.from(await response.body());
@@ -243,6 +251,10 @@ test.describe("production asset network fallbacks", () => {
 
   test("a failed Canyon kit request keeps procedural scenery and the bike loader independent", async ({ page }, testInfo) => {
     test.skip(testInfo.project.name !== "chromium", "Canyon asset fallback gate runs once in Chromium");
+    // Same shape as the sibling fallback cases: engine boot, an asset deadline,
+    // then a driven tutorial lesson. Sized like its neighbours rather than the
+    // 30 s default.
+    test.setTimeout(90_000);
     const canyonRequests: string[] = [];
     await page.route("**/assets/canyon/canyon-kit.glb", async (route) => {
       canyonRequests.push(route.request().url());
@@ -367,6 +379,8 @@ test.describe("production asset network fallbacks", () => {
 
 test("corrupt local progress is quarantined and replaced with a safe profile", async ({ page }, testInfo) => {
   test.skip(testInfo.project.name !== "chromium", "IndexedDB recovery gate runs once in Chromium");
+  // Two full engine boots either side of the IndexedDB corruption step.
+  test.setTimeout(90_000);
   await page.goto("/");
   await page.getByRole("button", { name: "Skip training" }).click();
   await page.evaluate(async () => {
