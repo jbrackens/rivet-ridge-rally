@@ -180,7 +180,17 @@ Reasoning, since the trade is not one-sided — the revert costs `lifecycle:422`
 2. **I do not yet know whether only the test shifted, or the actual onboarding experience did.** If real players now reach the ramp at a different moment, the wheelie-into-jump window genuinely changed. That is a gameplay question, and the owner explicitly asked that tutorial behaviour not regress.
 3. **Adjusting the tutorial test to accommodate the runtime change would be exactly backwards** — it would mask the open question in (2).
 
-**What re-landing R7 requires:** decouple the tutorial flow from engine start-up timing (drive it on observed state rather than scripted timing), confirm by hand that the jump lesson still plays the same for a human, then remove the key and re-run both `tutorial.spec.ts` and `lifecycle.spec.ts`. Gate row 20 reopened.
+**What re-landing R7 requires — a decouple attempt on 2026-07-26 established this is bigger than it looks.**
+
+The obvious fix was tried: `tutorial.spec.ts:229` holds `ArrowUp` continuously from the wheelie lesson through the jump lesson, so the outcome depends on how long the bike takes to cover the ground between the bump and the ramp — and a wheelie held past `PHYSICS.wheelieCrashSeconds` (1.4 s) is a crash by design. The fix released `ArrowUp` after the wheelie lesson and re-pressed it only once `data-player-motion-snapshot.phase` reported `airborne`, driving on observed state instead of travel timing.
+
+**It fixed the original failure and moved the problem downstream.** `airbornePitchUp` then passed, and the test failed later at the barrier lesson: `data-tutorial-events` reached `trainingBumpClearedInWheelie` but never `choiceBarrierAvoided`, with the tutorial already advanced to Lesson 10 ("Mud slowdown"). The barrier had been passed by a different route than the assertion names, because shifting the airborne window changed where and how the bike landed and therefore which lane it occupied at the barrier.
+
+**Diagnosis: the coupling is the whole chain, not one link.** This is a twelve-lesson scripted flow whose steps share bike state — lane, forward position, phase, held keys. Each lesson's outcome feeds the next, so decoupling any single step redistributes the timing pressure rather than removing it. Properly decoupling it means driving *every* lesson on observed state (lane and forward position as well as phase), which is a substantial test-harness rewrite, and each verification cycle costs about 4.5 minutes.
+
+The attempt was reverted; `tutorial.spec.ts` is unchanged and passing. The attempt is archived as `tutorial-decouple-attempt.spec.ts` in the session scratchpad so the next pass can start from it rather than rediscovering the downstream effect.
+
+**Sequenced honestly, re-landing R7 is: (1) rewrite the comprehensive tutorial flow to be state-driven throughout, (2) confirm by hand that the jump and barrier lessons still play the same for a human, (3) remove the canvas key, (4) re-run `tutorial.spec.ts` and `lifecycle.spec.ts`, (5) run a full sweep.** Step 1 is the real cost, and it is test-harness work rather than a product fix.
 
 **Wider lesson worth recording.** The R7 fix was validated against `lifecycle.spec.ts` (7/7) and `reliability.spec.ts` (13/13) — the two files most obviously related to it — and both were green. The regression was in a file nobody would have thought to run. Targeted verification of a runtime change is not sufficient; only the full sweep caught it, and it cost 2.2 hours to find. That is the argument for running the sweep before landing runtime changes, not after.
 
