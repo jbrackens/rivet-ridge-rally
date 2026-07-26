@@ -42,6 +42,17 @@ test("required surfaces stay free of browser, request, and axe failures", async 
   });
 
   const assertAxe = async (surface: string) => {
+    // Let the screen entrance animation settle first. `.screen-surface` fades
+    // opacity from .01 to 1 over 180 ms, and axe samples *computed* colours: a
+    // mid-fade frame reports the teal step labels as 4.03:1 against the card,
+    // which is the blended value, not the settled one. Accessibility
+    // conformance is a property of the settled UI, so wait for it.
+    await page.evaluate(async () => {
+      const finite = document.getAnimations().filter((animation) => (
+        animation.effect?.getComputedTiming().iterations !== Infinity
+      ));
+      await Promise.all(finite.map((animation) => animation.finished.catch(() => undefined)));
+    });
     const result = await new AxeBuilder({ page }).analyze();
     expect(result.violations, `${surface} axe violations`).toEqual([]);
   };

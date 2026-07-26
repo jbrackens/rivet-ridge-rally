@@ -456,7 +456,7 @@ test("saved-track deletion requires explicit irreversible-loss confirmation", as
 
 test("lap values one through nine start races with the selected lap contract", async ({ page }) => {
   test.setTimeout(90_000);
-  const laps = page.getByLabel("Laps");
+  const laps = page.getByLabel("Laps", { exact: true });
 
   for (let value = 1; value <= 9; value += 1) {
     await laps.fill(String(value));
@@ -529,7 +529,7 @@ test("narrow editor keeps its complete authoring and recovery controls reachable
     await expect(page.getByRole("button", { name, exact: true })).toBeVisible();
   }
   await expect(page.getByLabel("Placed module")).toBeVisible();
-  await expect(page.getByLabel("Laps")).toBeVisible();
+  await expect(page.getByLabel("Laps", { exact: true })).toBeVisible();
   await expect(page.getByRole("button", { name: "Clear all…" })).toBeVisible();
   await expect(page.locator(".validation-panel").getByText("✓ Route complete", { exact: true })).toBeVisible();
   await expect(page.locator(".editor-status output")).toBeVisible();
@@ -563,7 +563,7 @@ test("invalid tracks show actionable errors and block save and export", async ({
 test("a valid track saves, survives reload, and exports safe JSON", async ({ page }) => {
   const trackName = `RC1 Editor ${Date.now()}`;
   await page.getByLabel("Track name").fill(trackName);
-  await page.getByLabel("Laps").fill("7");
+  await page.getByLabel("Laps", { exact: true }).fill("7");
   await page.getByRole("button", { name: "Save", exact: true }).click();
   await expect(page.locator("footer.editor-status output")).toHaveText("Track saved locally.");
 
@@ -583,7 +583,7 @@ test("a valid track saves, survives reload, and exports safe JSON", async ({ pag
   await expect(savedTrack).toBeVisible();
   await savedTrack.getByRole("button", { name: "Open", exact: true }).click();
   await expect(page.getByLabel("Track name")).toHaveValue(trackName);
-  await expect(page.getByLabel("Laps")).toHaveValue("7");
+  await expect(page.getByLabel("Laps", { exact: true })).toHaveValue("7");
 });
 
 test("import keeps a maximum-length source name valid when creating its local copy", async ({ page }) => {
