@@ -189,6 +189,60 @@ test.describe("production asset network fallbacks", () => {
     await expect(canvas).toHaveAttribute("data-environment-height", /^\d+$/);
   });
 
+  test("a panorama resolving after a track switch cannot write into the reused canvas", async ({ page }, testInfo) => {
+    test.skip(testInfo.project.name !== "chromium", "Stale-callback guard runs once in Chromium");
+    test.setTimeout(120_000);
+    // Behaviour-level regression guard for the 2026-07-26 canvas-reuse
+    // restoration.
+    //
+    // The race canvas is intentionally a single long-lived element: reusing it
+    // lets `dispose({ retainRenderer })` keep one WebGL context across restarts
+    // instead of building a new one every attempt. Because the element is shared,
+    // a slow Canyon panorama can still be in flight when a later Pine race owns
+    // the canvas, and it must not write stale environment diagnostics into it.
+    //
+    // Scope, stated honestly: this asserts the observable outcome, not one
+    // mechanism. Probing on 2026-07-26 showed the async panorama chain is guarded
+    // at several points — an early `this.disposed` check in the settle path, then
+    // `disposed || !ownsCanvasDiagnostics()` inside each environment write — and
+    // defeating any single one of them individually does NOT make this test fail.
+    // The layered `disposed` checks, not the ownership comparison, are what stop
+    // this particular scenario; ownership is defence in depth for a shared
+    // canvas. So treat a failure here as "stale environment writes have returned"
+    // rather than as a pointer at one guard.
+    //
+    // Do not "fix" a stale-attribute bug by keying the canvas on the race
+    // attempt. That silently forces `canvas.isConnected` false during cleanup,
+    // defeats `retainRenderer`, and recreates the WebGL context on every restart.
+    // `lifecycle.spec.ts:422` is the test that catches that specific mistake.
+    // See docs/E2E_BASELINE_2026-07-26.md finding R7.
+    await page.route("**/assets/art/canyon-festival-panorama.png", async (route) => {
+      await new Promise((resolve) => setTimeout(resolve, 20_000));
+      await route.continue();
+    });
+
+    await page.goto("/");
+    const canyonCanvas = page.getByLabel("Live 3D race on Canyon Kickoff");
+    await expect(canyonCanvas).toBeVisible({ timeout: 20_000 });
+
+    // Switch tracks while the panorama request is still outstanding.
+    await page.evaluate(() => window.__RRR_QA__?.startTrack("pine-run", "practice"));
+    const pineCanvas = page.locator("canvas[aria-label='Live 3D race on Pine Run']");
+    await expect(pineCanvas).toBeAttached({ timeout: 20_000 });
+    await expect(pineCanvas).toHaveAttribute("data-environment-asset", "not-applicable");
+
+    // Let the Canyon panorama land well after Pine took ownership, then confirm
+    // the retired engine wrote nothing.
+    await page.waitForTimeout(25_000);
+    await expect(pineCanvas).toHaveAttribute("data-environment-asset", "not-applicable");
+    await expectNoCanvasAttributes(pineCanvas, [
+      "data-environment-fallback-reason",
+      "data-environment-load-ms",
+      "data-environment-width",
+      "data-environment-height",
+    ]);
+  });
+
   test("a failed same-origin compressed model request keeps the playable fallback", async ({ page }, testInfo) => {
     test.skip(testInfo.project.name !== "chromium", "Asset fallback gate runs once in Chromium");
     // Boots WebGL plus the WASM transcoders, waits out the hero fallback, then

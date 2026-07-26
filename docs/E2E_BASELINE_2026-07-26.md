@@ -117,6 +117,36 @@ But it is not harmless. Browsers cap simultaneous live WebGL contexts (Chrome ar
 
 Option 1 is preferable if the guard suffices, because it also relieves the suspected resource pressure. **Neither should be chosen unilaterally**: the remount was a deliberate correctness fix, and weakening the test to match current behaviour would erase a real signal. Tracked as gate row 20.
 
+### R7 investigation — option 1 validated, with one of my own claims corrected
+
+**Finding: the remount was redundant belt-and-braces that silently disabled an optimisation the codebase already had.**
+
+`GameView.tsx` cleanup computes `const retainRenderer = canvas.isConnected && sameSessionSurvives;` and passes it to `engine.dispose({ retainRenderer })`. React removes a keyed element from the DOM *before* effect cleanup runs, so with `key={raceAttempt}` the old canvas was always already disconnected, `retainRenderer` always evaluated `false`, and the WebGL context was destroyed every race. The reuse path existed but was unreachable.
+
+**Chronology.** `git log -S` shows the ownership guard (`ownsCanvasDiagnostics`), the remount (`key={raceAttempt}`), and the tests asserting reuse (`reusedCanvas`, and `lifecycle.spec.ts:422` "reuse one WebGL context") were **all introduced in the same commit `aae8943`** (2026-07-19, "Harden rc2 launch candidate"). Two mechanisms for one problem shipped alongside tests requiring only the first — so those tests could never pass. `lifecycle:422` then began timing out, which hid the contradiction until the budgets were fixed.
+
+**Evidence with the `key` removed:**
+
+| Check | Before | After |
+|---|---|---|
+| `npm run typecheck`, `eslint` | — | clean |
+| `lifecycle.spec.ts` (whole file) | 5/7 | **7/7** |
+| `lifecycle:422` twenty restarts | FAIL (22 contexts vs 2) | **PASS** (9.2 min) |
+| `lifecycle:515` six retries release each context | FAIL (timeout) | **PASS** (9.9 min) |
+| `lifecycle:340` device-storage recovery | FAIL in sweep | **PASS** |
+| `reliability.spec.ts` (whole file, the stale-callback surface) | 13/13 | **13/13** — no regression |
+
+**Correction to an earlier claim in this document.** The section above asserted that `ownsCanvasDiagnostics()` is what prevents the stale-callback bug and is "load-bearing on its own". A falsifiability probe disproved that:
+
+1. Stubbing `ownsCanvasDiagnostics()` to `return true` — the new track-switch regression test still **passed**.
+2. Additionally short-circuiting the guard inside `activateEnvironmentBitmap` — still **passed**.
+
+The write never reaches those paths, because an earlier `if (this.disposed)` in the settle path short-circuits first. **The layered `disposed` checks are what actually stop this scenario**; the ownership comparison is defence in depth for a shared canvas, not the primary guard.
+
+This does not weaken the conclusion — it strengthens it. The protection is `disposed`, which is set by the effect cleanup that always runs before the next engine is constructed, and is therefore **entirely independent of whether the canvas element is reused**. Removing the remount cannot reintroduce the bug.
+
+It does mean the new `reliability.spec.ts` regression test is a **behaviour-level** guard, not a probe of one mechanism: no single guard can be defeated to make it fail. Its comment now says so explicitly, and points at `lifecycle:422` as the test that catches a re-added remount. Recording this because a test that cannot fail is worth less than it looks, and that limitation should be visible to whoever reads it next.
+
 ## Recommended next steps
 
 1. Decide the timing question in class C — re-budget the eleven, or investigate host/parallelism first. Re-budgeting is defensible per-test but should be a deliberate call.

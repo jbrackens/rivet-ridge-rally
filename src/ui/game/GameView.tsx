@@ -911,7 +911,6 @@ export function GameView({ tutorial = false }: { tutorial?: boolean }) {
       >
       <h1 className="sr-only">{tutorial ? `${track.name} training` : `${track.name} ${runLabel ?? mode} race`}</h1>
       <canvas
-        key={raceAttempt}
         ref={canvasRef}
         className="game-canvas"
         tabIndex={0}
