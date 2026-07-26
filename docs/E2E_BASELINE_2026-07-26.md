@@ -241,3 +241,50 @@ so the title-screen visual gate **skips by default in every project** and only r
 Across all six projects at `d082b4a`: **121 executed journeys, 119 passing, 2 failing — both already-tracked classes, neither a new defect.** Every visual failure is a baseline awaiting owner acceptance.
 
 **Still does not establish release qualification.** This is a dirty working tree, not a frozen candidate; it is Playwright's bundled engines rather than installed Safari/Firefox/Edge; emulated phone and tablet viewports are not physical devices; and it is not the structured `browser` QA record, which must bind a frozen candidate and its manifest aggregate. It does, however, replace the readiness documents' scoped historical cross-engine claims with current measurements.
+
+
+## R7 RESOLVED 2026-07-27 — and an earlier conclusion of mine corrected
+
+**The canvas-reuse fix is safe and has landed. My previous claim that it regressed the tutorial was wrong.**
+
+### The correction
+
+On 2026-07-26 this document recorded that removing `<canvas key={raceAttempt}>` broke `tutorial.spec.ts:229`, "confirmed as my regression by A/B probe, not inferred". That A/B was **one run each way**, on a test whose real pass rate turns out to be about one in three. It carried no information.
+
+Measured on 2026-07-27, three runs per configuration:
+
+| Configuration | Tutorial pass rate |
+|---|---:|
+| Original test, canvas remounted (as shipped) | **1 / 3** |
+| State-driven test, canvas remounted | **3 / 3** |
+| State-driven test, **canvas reused** | **3 / 3** |
+
+Both baseline failures were the identical `wheelie crash` at *Shape the jump*, with no source change at all. **The canvas was never the variable.** The variable was a test holding `ArrowUp` across the gap between the bump (300 m) and the ramp (340 m), where a wheelie held past `PHYSICS.wheelieCrashSeconds` (1.4 s) is a crash by design.
+
+Gate row 20's recorded prerequisite — "rewrite the tutorial harness first" — therefore rested on a false premise. The rewrite was worth doing anyway, but not for the reason given.
+
+### What was actually true throughout
+
+The underlying defect was real and was measured repeatedly rather than once: `GameView.tsx` already computed `retainRenderer = canvas.isConnected && sameSessionSurvives`, but keying the canvas on the attempt made React detach it *before* effect cleanup ran, so `retainRenderer` always evaluated `false` and the WebGL context was destroyed and rebuilt every race — 20 restarts starting 22 contexts instead of reusing one. **Reproduced independently in Chromium and WebKit.**
+
+### Evidence for the landed fix
+
+With `key={raceAttempt}` removed and the state-driven tutorial in place:
+
+| Check | Result |
+|---|---|
+| `tutorial.spec.ts:268` comprehensive tutorial ×3 | **3/3** |
+| `lifecycle.spec.ts` whole file | **7/7** |
+| `lifecycle:422` twenty restarts reuse one context | **PASS** (8.7 min) — contexts back to baseline from 22 |
+| `lifecycle:515` six retries release each context | **PASS** (9.8 min) |
+| `lifecycle:340` device-storage recovery | **PASS** |
+| `reliability.spec.ts` (verified 2026-07-26 with reuse) | 13/13 |
+| `typecheck`, `lint`, `npm test`, `assets:verify` | pass |
+
+Safety is independent of canvas identity, as established on 2026-07-26: a falsifiability probe showed the layered `disposed` checks — not the ownership comparison — block stale async writes, and `disposed` is set by the effect cleanup that always runs before the next engine is constructed.
+
+**Player-visible benefit:** browsers cap live WebGL contexts (~16 in Chrome) and force-lose the oldest under pressure. Removing twenty context creations per twenty restarts removes that pressure, and because WebKit reproduced the churn, real Safari users were paying for it too.
+
+### The methodological lesson, recorded deliberately
+
+A single run on a test that fails a third of the time is not an A/B result, and presenting it as one produced a wrong conclusion, an unnecessary revert, and a documented prerequisite that did not exist. It was caught only by going back and measuring rather than trusting the earlier write-up. **Repeat-count before causal claims on anything timing-sensitive.**
