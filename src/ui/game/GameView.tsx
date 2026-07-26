@@ -911,6 +911,27 @@ export function GameView({ tutorial = false }: { tutorial?: boolean }) {
       >
       <h1 className="sr-only">{tutorial ? `${track.name} training` : `${track.name} ${runLabel ?? mode} race`}</h1>
       <canvas
+        // Keying on the attempt remounts the canvas every race, which makes
+        // `canvas.isConnected` false during effect cleanup, forces
+        // `retainRenderer` to false, and therefore rebuilds the WebGL context on
+        // every restart. That is measurably wasteful — `lifecycle.spec.ts:422`
+        // fails because 20 restarts start 22 contexts instead of reusing one —
+        // and removing this line does make that test, and `lifecycle:515`, pass.
+        //
+        // It was removed on 2026-07-26 and put back the same day: with the canvas
+        // reused, `tutorial.spec.ts:229` ("a new rider completes the
+        // comprehensive tutorial without skipping") fails reproducibly at the
+        // "Shape the jump" lesson, reaching `wheelie crash` where it expects
+        // `airbornePitchUp`. Verified by A/B: fails without the key, passes with
+        // it. Retaining the renderer changes engine start-up cost and therefore
+        // how much simulation time is dropped on the first frames, which shifts
+        // when the bike reaches the ramp relative to the test's scripted input.
+        //
+        // Do not remove this again without first decoupling that tutorial flow
+        // from engine start-up timing, and confirming the change did not alter
+        // the real onboarding experience rather than only the test. See
+        // docs/E2E_BASELINE_2026-07-26.md finding R7 and gate row 20.
+        key={raceAttempt}
         ref={canvasRef}
         className="game-canvas"
         tabIndex={0}

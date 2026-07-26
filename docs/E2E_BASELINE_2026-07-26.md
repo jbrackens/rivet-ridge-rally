@@ -147,6 +147,43 @@ This does not weaken the conclusion — it strengthens it. The protection is `di
 
 It does mean the new `reliability.spec.ts` regression test is a **behaviour-level** guard, not a probe of one mechanism: no single guard can be defeated to make it fail. Its comment now says so explicitly, and points at `lifecycle:422` as the test that catches a re-added remount. Recording this because a test that cannot fail is worth less than it looks, and that limitation should be visible to whoever reads it next.
 
+### R7 REVERTED — the fix caused a regression the targeted runs could not see
+
+**Third full sweep at `4fed0cc`: 105 passed / 6 failed / 5 skipped (2.2 hours).** Better than 101/9 — but the composition changed, and one change was a regression I introduced.
+
+| Test | Sweep 1 | Sweep 2 | Sweep 3 (with canvas reuse) |
+|---|---|---|---|
+| `lifecycle:422` twenty restarts | FAIL | FAIL | **PASS** |
+| `lifecycle:515`, `lifecycle:340` | FAIL | FAIL | **PASS** |
+| `editor-coverage:457`, `:643` | FAIL | FAIL | **PASS** |
+| `accessibility-controls:221` | FAIL | FAIL | **PASS** |
+| `accessibility-controls:407` | PASS | FAIL | FAIL |
+| **`tutorial:229` comprehensive tutorial** | **PASS** | **PASS** | **FAIL** |
+| 4 × `visual-regression` | FAIL | FAIL | FAIL (correct) |
+
+`tutorial.spec.ts:229` — "a new rider completes the comprehensive tutorial without skipping" — failed at the *"Shape the jump"* lesson, reaching `data-demonstrated-mechanics="… wheelie crash"` where it expects `airbornePitchUp`. The bike wheelie-crashed instead of getting airborne.
+
+**Confirmed as my regression by A/B probe**, not inferred:
+
+| Canvas | Tutorial result |
+|---|---|
+| Reused (key removed) | **FAIL** — reproduced in the sweep *and* twice in isolation |
+| Remounted (key restored) | **PASS** (4.4 min) |
+
+**Mechanism.** Retaining the renderer removes engine start-up cost, which changes how much simulation time is dropped on the first frames after a race begins. That shifts when the bike reaches the ramp relative to the tutorial test's scripted key presses, so `ArrowUp` is still being held while grounded — and a wheelie held past `wheelieCrashSeconds: 1.4` is a crash, exactly as designed.
+
+**Decision: reverted.** The `key={raceAttempt}` is restored, with a comment recording why it must stay until the tutorial flow is decoupled from start-up timing.
+
+Reasoning, since the trade is not one-sided — the revert costs `lifecycle:422`, `:515`, `:340` and possibly `accessibility:221` going back to failing:
+
+1. **The regression is in the most important test in the suite.** It validates that a genuine first-time player can complete onboarding. Lifecycle context churn is an efficiency defect; contexts were always disposed correctly and nothing leaked.
+2. **I do not yet know whether only the test shifted, or the actual onboarding experience did.** If real players now reach the ramp at a different moment, the wheelie-into-jump window genuinely changed. That is a gameplay question, and the owner explicitly asked that tutorial behaviour not regress.
+3. **Adjusting the tutorial test to accommodate the runtime change would be exactly backwards** — it would mask the open question in (2).
+
+**What re-landing R7 requires:** decouple the tutorial flow from engine start-up timing (drive it on observed state rather than scripted timing), confirm by hand that the jump lesson still plays the same for a human, then remove the key and re-run both `tutorial.spec.ts` and `lifecycle.spec.ts`. Gate row 20 reopened.
+
+**Wider lesson worth recording.** The R7 fix was validated against `lifecycle.spec.ts` (7/7) and `reliability.spec.ts` (13/13) — the two files most obviously related to it — and both were green. The regression was in a file nobody would have thought to run. Targeted verification of a runtime change is not sufficient; only the full sweep caught it, and it cost 2.2 hours to find. That is the argument for running the sweep before landing runtime changes, not after.
+
 ## Recommended next steps
 
 1. Decide the timing question in class C — re-budget the eleven, or investigate host/parallelism first. Re-budgeting is defensible per-test but should be a deliberate call.
