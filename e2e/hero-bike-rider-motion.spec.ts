@@ -471,7 +471,7 @@ test.describe("authored hero motion integration", () => {
 
   test("reports airborne pitch states and a real landing pulse through public Canyon controls", async ({ page }, testInfo) => {
     test.skip(testInfo.project.name !== "chromium", "Public Canyon airborne evidence runs once in Chromium");
-    test.setTimeout(180_000);
+    test.setTimeout(300_000);
 
     const canvas = await startPractice(page);
     await armMotionHistory(page);
@@ -484,7 +484,11 @@ test.describe("authored hero motion integration", () => {
     await page.keyboard.down("Shift");
     await expect.poll(
       async () => (await readMotionSnapshot(canvas)).phase,
-      { timeout: 80_000, intervals: [100] },
+      // Turbo has to carry the bike all the way to the first ramp. Under a full
+      // serial sweep the simulation advances in real time against a loaded GPU,
+      // so 80 s was not enough to reach it even though the case passes in
+      // isolation. The assertion is unchanged; only the patience is.
+      { timeout: 150_000, intervals: [100] },
     ).toBe("airborne");
     await page.keyboard.up("Shift");
     const launch = await readMotionSnapshot(canvas);

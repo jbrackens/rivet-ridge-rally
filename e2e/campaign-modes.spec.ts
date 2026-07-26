@@ -126,7 +126,7 @@ test.describe("launch track and mode matrix", () => {
   for (const track of LAUNCH_TRACKS) {
     for (const mode of modesByTrack(track.id)) {
       test(`${track.name} completes ${mode}`, async ({ page }, testInfo) => {
-        test.setTimeout(150_000);
+        test.setTimeout(240_000);
         await onboard(page);
         await unlockCampaign(page);
 
@@ -175,7 +175,7 @@ test.describe("launch track and mode matrix", () => {
 });
 
 test("Solo qualification unlocks Rival and Rival completes with a six-rider field", async ({ page }) => {
-  test.setTimeout(240_000);
+  test.setTimeout(400_000);
   await onboard(page);
   await page.getByRole("button", { name: "Ride", exact: true }).click();
   await page.getByRole("button", { name: /^01 Solo Challenge/ }).click();

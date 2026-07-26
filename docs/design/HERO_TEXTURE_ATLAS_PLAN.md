@@ -1,7 +1,13 @@
 # Hero Texture Atlas — Implementation Plan
 
 **Prepared:** 2026-07-26
-**Status:** PLAN — awaiting owner approval of the shape before any work starts
+**Status:** **APPROVED 2026-07-26** — the three §11 decisions are settled; implementation may begin at Phase A
+
+**Owner decisions, as given:**
+
+1. **Scope — approved as recommended (§1):** the atlas carries **non-colour data only** — normal + occlusion. Base colour, roughness and metallic stay as per-material scalars in code. The material contract's factor ranges are untouched, the palette stays auditable, and the atlas contains no imagery.
+2. **Byte budget — ceiling raised to 1.2 MB** for the hero runtime GLB, superseding the 900 KB figure in `MASCOT_DIRECTION_VERTICAL_SLICE_PLAN.md` §4. Rationale accepted: the whole build is ~5.5 MB gzip against a 12 MB threshold, and the hero is the most-viewed object in the game. Option 1 of §6.
+3. **Phasing — approved (§10), including the stop.** Work halts after **Phase B (occlusion bake)** for owner review before any Phase C normal-map authoring. The cheap half is measured first.
 **Supersedes:** the rejected tiling-detail approach in `docs/design/MASCOT_DIRECTION_VERTICAL_SLICE_PLAN.md` §2.2
 **Governing docs:** `GAME_BIBLE.md`, `GAME_SPEC.md`, `docs/design/FIDELITY_LEDGER.md`, `docs/design/HERO_BIKE_RIDER_VERTICAL_SLICE.md`
 

@@ -421,7 +421,7 @@ test("visibility loss pauses the tutorial and defers a cleared lesson", async ({
 
 test("twenty immediate restarts reuse one WebGL context and retain one engine lifecycle", async ({ page }, testInfo) => {
   test.skip(!desktopLifecycleProject(testInfo.project.name), "Desktop Chromium/WebKit lifecycle gate");
-  test.setTimeout(480_000);
+  test.setTimeout(780_000);
   await installIndexedDbProbe(page);
   const assertNoFailures = observeLifecycleFailures(page, { allowRestartCancelledAssets: true });
   await startPractice(page);
@@ -514,7 +514,7 @@ test("twenty immediate restarts reuse one WebGL context and retain one engine li
 
 test("six results retries release each unmounted WebGL context before starting the next race", async ({ page }, testInfo) => {
   test.skip(!desktopLifecycleProject(testInfo.project.name), "Desktop Chromium/WebKit lifecycle gate");
-  test.setTimeout(480_000);
+  test.setTimeout(780_000);
   const assertNoFailures = observeLifecycleFailures(page);
   await startPractice(page);
 

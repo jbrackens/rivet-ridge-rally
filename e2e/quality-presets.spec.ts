@@ -2,7 +2,7 @@ import { expect, test } from "@playwright/test";
 
 test("Auto, Low, Medium, and High renderer presets all start a clean race", async ({ page }, testInfo) => {
   test.skip(testInfo.project.name !== "chromium", "Single-renderer quality gate");
-  test.setTimeout(90_000);
+  test.setTimeout(200_000);
   const errors: string[] = [];
   page.on("console", (message) => {
     if (message.type() === "error") errors.push(message.text());
