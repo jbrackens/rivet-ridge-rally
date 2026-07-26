@@ -1,7 +1,7 @@
 # Hero Texture Atlas — Implementation Plan
 
 **Prepared:** 2026-07-26
-**Status:** **APPROVED 2026-07-26** — the three §11 decisions are settled; implementation may begin at Phase A
+**Status:** **PHASES A AND B EXECUTED AND MEASURED 2026-07-26 — awaiting the approved owner review before Phase C.** Both were reverted rather than committed; see §5a and §5b. The KTX2 texture pipeline is proven end to end and the byte costs are now measured rather than estimated. **The evidence recommends changing the plan: ship a normal map, drop occlusion.**
 
 **Owner decisions, as given:**
 
@@ -136,6 +136,54 @@ Options, with the geometry figure now fixed:
 | Coarser unwrap (fewer seams) | reduces the 237 KB | Trades UV distortion for bytes; only worth exploring if the normal map proves essential at 1024². |
 
 **Recommendation:** proceed with Phase B exactly as approved — occlusion only — which is comfortably inside budget and answers whether crevice depth alone closes most of the perceived gap. Defer the normal-map resolution decision to the Phase B review, when there is something to look at rather than another estimate.
+
+## 5b. Phase B executed 2026-07-26 — pipeline proven, occlusion not worth its bytes
+
+Phase B was implemented end to end, measured in a browser, and reverted. **This is the approved stop-and-review point.** The implementation is archived (`phaseB-final-blender.py`, `phaseB-final-optimizer.mjs`, `phaseB-final-verifier.mjs` in the session scratchpad) so it can be re-applied directly.
+
+### The pipeline works — the plan's biggest unknown is closed
+
+Every stage ran and the shipped asset was accepted by the game:
+
+| Stage | Result |
+|---|---|
+| Angle-based unwrap into per-material atlas bands | 28 regions, 10 materials, all UVs inside `[0,1]` |
+| Ambient-occlusion bake | 512², contact-scale, mean 0.63 |
+| **KTX2 ETC1S encode** | **PNG 276,807 B → 60,212 B (−78%)** — inside the plan's 60–100 KB estimate |
+| `KHR_texture_basisu` wiring | 10/10 materials bind `occlusionTexture`; no base-colour, normal, metallic-roughness or emissive texture |
+| Material factor contract | intact — roughness, metallic and the teal/coral colours remain scalars |
+| Optimizer + independent verifier | both pass with the new strict image allowlist |
+| **Runtime acceptance** | `data-bike-asset="ready"`, `data-hero-bike-texture-count="1"`, no fallback |
+
+**Measured cost: 317,936 B → 616,092 B (+298,156, +94%)** — 555,216 B geometry plus 60,212 B KTX2, matching the §5a projection of 615–655 KB almost exactly.
+
+### Two corrections found by testing rather than assuming
+
+1. **`bake(type="AO")` produced garbage.** It traces at model scale against this scene's near-black world; whole panels came out solid black, mean 0.39. Caught by *looking at the baked image* rather than trusting a clean exit. Replaced with an explicit `ShaderNodeAmbientOcclusion` at a 6 cm radius baked through Emission.
+2. **The runtime rejects PNG.** The first build fell back to the procedural rider in-game with "compressed bike unavailable". `GameEngine` already permits up to three textures but requires embedded KTX2 reached through `KHR_texture_basisu`. The plan specified KTX2; the step had simply been skipped. The fallback behaving correctly is itself a good sign.
+
+Blender also emits **one texture entry per material** sharing a single image, so the allowlist asserts one *image* with every texture pointing at it, and `PropertyType.TEXTURE` was added to `dedup` so the optimized output collapses to one.
+
+### The verdict: do not ship occlusion alone
+
+**In an A/B of the same start-line frame, the occlusion is not perceptible at the gameplay camera.** 298 KB — a 94% increase on the hero — buys no visible improvement.
+
+**Why, and this matters for the next decision:** a glTF `occlusionTexture` becomes Three.js `aoMap`, which attenuates **indirect/ambient light only**. This hero is lit primarily by a three-point *direct* rig (cool key spot, warm rim spot, fill point) plus a shadow-casting sun, with `envMapIntensity` between 0.5 and 1.72. Direct lighting dominates, so the AO term barely contributes. The runtime material tuning preserves `aoMap` correctly — the limitation is the lighting model, not a wiring bug.
+
+**The plan's cheap-first phasing was backwards for this renderer.** Occlusion was chosen to be measured first because it is cheap; it turns out to be the half that cannot read. A **normal map modulates direct lighting**, so it will show at the same camera distance where occlusion does not.
+
+### Recommended revision to §1 and §10
+
+| Option | Bytes | Assessment |
+|---|---:|---|
+| Occlusion only | 616 KB | **Rejected on evidence** — imperceptible at the gameplay camera |
+| Normal only (768²) | ~805–905 KB | **Recommended next test.** Affects direct lighting, so it should read. |
+| Normal only (1024²) | ~955 KB–1.16 MB | Fits the 1.2 MB ceiling; justify only if 768² proves too soft |
+| Normal + occlusion | 1,015 KB–1.26 MB | Occlusion adds 60 KB for no visible gain; drop it |
+
+Occlusion could be made to matter by rebalancing ambient against direct light, but that changes the look of every existing capture and is an owner art decision, not a side effect of a texture pass.
+
+**Nothing was committed.** Shipping 298 KB of imperceptible data would fail the "earn its bytes" test, and the atlas cannot land without a map that uses it. The unwrap, KTX2 encoder step and strict allowlist are all reusable for the normal map exactly as written.
 
 ## 6. Byte budget
 
