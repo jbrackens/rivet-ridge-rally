@@ -1,7 +1,7 @@
 # Hero Texture Atlas — Implementation Plan
 
 **Prepared:** 2026-07-26
-**Status:** **PHASES A AND B EXECUTED AND MEASURED 2026-07-26 — awaiting the approved owner review before Phase C.** Both were reverted rather than committed; see §5a and §5b. The KTX2 texture pipeline is proven end to end and the byte costs are now measured rather than estimated. **The evidence recommends changing the plan: ship a normal map, drop occlusion.**
+**Status:** **PHASES A, B AND C ALL EXECUTED, MEASURED AND REVERTED 2026-07-26.** See §5a, §5b, §5c. The KTX2 texture pipeline is **proven end to end and is cheap** — that unknown is closed. But neither map improved the game: occlusion is imperceptible in this renderer, and procedurally generated relief actively makes the hero worse. **The conclusion reframes the problem: the blocker is not the pipeline, it is authored art content, which needs a human artist or a high-poly sculpt to bake from. That is a resourcing decision, not a technical one.**
 
 **Owner decisions, as given:**
 
@@ -184,6 +184,61 @@ Blender also emits **one texture entry per material** sharing a single image, so
 Occlusion could be made to matter by rebalancing ambient against direct light, but that changes the look of every existing capture and is an owner art decision, not a side effect of a texture pass.
 
 **Nothing was committed.** Shipping 298 KB of imperceptible data would fail the "earn its bytes" test, and the atlas cannot land without a map that uses it. The unwrap, KTX2 encoder step and strict allowlist are all reusable for the normal map exactly as written.
+
+## 5c. Phase C executed 2026-07-26 — the normal map made it worse
+
+Phase C was implemented on the §5b recommendation (ship a normal map, drop occlusion), measured, looked at, and reverted. Archived as `phaseC-blender.py`, `phaseC-optimizer.mjs`, `phaseC-verifier.mjs`, `phaseC-normal-atlas.png`.
+
+### Technically it all worked, and it was cheap
+
+| Metric | Result |
+|---|---:|
+| Atlas | 768², 10 per-material relief bands, peak deviation 0.457 |
+| **KTX2 UASTC** | PNG 33,915 B → **41,970 B** |
+| **Hero runtime GLB** | **597,820 B** (baseline 317,936; +279,884, +88%) |
+| Wiring | 10/10 materials bind `normalTexture`; no occlusion, base-colour, metallic-roughness or emissive texture |
+| Material contract | intact — roughness 0.550 / metallic 0.000 preserved as scalars |
+| Optimizer + verifier | pass |
+| Runtime | `data-bike-asset="ready"`, `texture-count="1"`, no fallback |
+
+**Far cheaper than estimated.** §5b projected 805–905 KB for a 768² normal; the real figure is 597,820 B, because procedural relief compresses to 42 KB rather than the 250–350 KB a photographic map would need. Comfortably inside the 1.2 MB ceiling.
+
+Relief was authored per material family — panel swell and creases on plastics, quilted cells on armour and fabric, staggered blocks on rubber, fine directional grain on metal — at a feature size of ~26 texels, deliberately chosen so it lands at 13–26 screen pixels rather than the sub-pixel scale that only shimmered in the 2026-07-25 tiling spike.
+
+### And it looks worse
+
+The map is clearly *doing something* — that part succeeded. What it does is wrong:
+
+- **Metal parts gained arbitrary machined ribbing.** Fork tubes, exhaust and engine cases read as though turned on a lathe.
+- **The rider gained corduroy banding** across torso and limbs.
+- **The `22` number plate is obscured** by quilt relief running across it.
+
+The cause is structural, not a tuning problem. **The UV layout is not semantically meaningful.** Islands come from per-mesh angle-based projection packed into material bands, so island orientation and position bear no relation to the part's real form. A crease generated "vertically in UV space" lands wherever that island happens to sit — across a number plate, around an exhaust, diagonally over a shoulder. No amount of adjusting amplitude, feature size or pattern fixes that; the information needed to place relief meaningfully simply is not present.
+
+It also damages something the fidelity ledger repeatedly records as an existing strength: clean colour blocking and number readability.
+
+### What this means — the problem is reframed
+
+Three passes now agree on where the real blocker is, and it is **not** the pipeline:
+
+| Attempt | Outcome |
+|---|---|
+| Tiling detail normals (2026-07-25) | Structurally impossible — normalized-u16 UVs cannot tile |
+| Packed atlas + baked occlusion (Phase B) | Works, imperceptible — `aoMap` only attenuates ambient, hero is direct-lit |
+| Packed atlas + procedural normals (Phase C) | Works, actively worse — arbitrary UVs place relief meaninglessly |
+
+**The pipeline is solved and cheap.** Unwrap, KTX2 encode (both ETC1S and UASTC), `KHR_texture_basisu`, the strict image allowlist, manifest binding, verifier and runtime acceptance all work, at 42–60 KB per map. Any future authored map can ship through it immediately.
+
+**What is missing is authored art content.** Meaningful surface detail requires one of:
+
+1. **Hand-painted maps against a deliberate UV layout** — a human artist unwrapping with intent (seams on real panel edges, islands oriented to the form) and painting relief where the form actually has it. Krita and ArmorPaint are already listed as candidate tools in `docs/TOOLCHAIN.md`; neither is installed, and neither substitutes for the artist.
+2. **A high-poly sculpt to bake from** — model the creases, stitching and wear as geometry, then bake to the low-poly. This is the standard route and produces the best result, but it means authoring a second, denser version of the hero.
+
+Procedural generation cannot substitute for either, because the missing input is *knowledge of where detail belongs*, and that is not derivable from the current mesh.
+
+**Recommendation: stop the texture initiative here and treat it as a resourcing decision.** The remaining honest options for closing the visual gap without an artist are geometry-side — more rounded silhouettes and modelled detail, continuing the successful 2026-07-25 rounded-silhouette pass, which cost 2,040 triangles and *reduced* the shipped file by 39%. That pass improved the asset; both texture passes did not.
+
+**Nothing was committed.** All three phases left the tree clean at 51,820 triangles / 317,936 bytes.
 
 ## 6. Byte budget
 
