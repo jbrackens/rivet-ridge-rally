@@ -15,6 +15,45 @@ async function useLowTutorialQuality(page: import("@playwright/test").Page): Pro
   await expectRiderSchoolReady(page);
 }
 
+/** QA-only player state, used to drive the tutorial on observation not timing. */
+async function readTutorialMotion(
+  canvas: import("@playwright/test").Locator,
+): Promise<{ phase: string; lane: number; forwardPosition: number }> {
+  const serialized = await canvas.getAttribute("data-player-motion-snapshot");
+  if (!serialized) throw new Error("QA player motion snapshot is unavailable.");
+  return JSON.parse(serialized) as { phase: string; lane: number; forwardPosition: number };
+}
+
+/**
+ * Put the bike in a known lane before a lane-sensitive obstacle.
+ *
+ * `TUTORIAL_OBSTACLES` places the choice barrier in lanes 1-2 and the mud and
+ * grass stretches in lanes 0 and 3, so the whole back half of the flow only works
+ * from lane 0. The test used to inherit that lane implicitly from earlier lessons,
+ * which made the barrier outcome depend on exactly where the bike landed off the
+ * ramp. Stating the requirement explicitly removes that coupling.
+ */
+async function steerToLane(
+  page: import("@playwright/test").Page,
+  canvas: import("@playwright/test").Locator,
+  targetLane: number,
+): Promise<void> {
+  for (let move = 0; move < 6; move += 1) {
+    const { lane } = await readTutorialMotion(canvas);
+    if (lane === targetLane) return;
+    await page.keyboard.press(lane > targetLane ? "ArrowLeft" : "ArrowRight");
+    await expect
+      .poll(async () => (await readTutorialMotion(canvas)).lane, {
+        message: `lane should leave ${lane} on the way to ${targetLane}`,
+        timeout: 8_000,
+        intervals: [50],
+      })
+      .not.toBe(lane);
+  }
+  expect((await readTutorialMotion(canvas)).lane, `bike should reach lane ${targetLane}`)
+    .toBe(targetLane);
+}
+
 function displayedTimeMs(value: string): number {
   const [minutes = "0", remainder = "0"] = value.split(":");
   const [seconds = "0", hundredths = "0"] = remainder.split(".");
@@ -308,7 +347,27 @@ test("a new rider completes the comprehensive tutorial without skipping", async 
   await expect(page.locator(".tutorial-card > .tutorial-caption-cue")).toContainText(
     "Front wheel clear",
   );
+  // Release the wheelie before shaping the jump, then pitch only once the bike is
+  // genuinely off the ramp.
+  //
+  // Holding ArrowUp across the gap between the bump (300 m) and the ramp (340 m)
+  // coupled this flow to how fast the bike covered that ground: a wheelie held
+  // past PHYSICS.wheelieCrashSeconds (1.4 s) is a crash by design, so anything
+  // that changed engine start-up cost -- and therefore how much simulation time is
+  // dropped on the opening frames -- could turn a pass into `wheelie crash`.
+  // Reusing the race canvas instead of remounting it did exactly that; see
+  // docs/E2E_BASELINE_2026-07-26.md finding R7. Driving on observed phase keeps
+  // the same assertions without depending on travel timing.
+  await page.keyboard.up("ArrowUp");
   await expect(page.getByRole("heading", { name: "Shape the jump" })).toBeVisible({ timeout: 10_000 });
+  await expect
+    .poll(async () => (await readTutorialMotion(canvas)).phase, {
+      message: "bike should leave the ramp before the jump is shaped",
+      timeout: 60_000,
+      intervals: [50],
+    })
+    .toBe("airborne");
+  await page.keyboard.down("ArrowUp");
   await expect(canvas).toHaveAttribute("data-demonstrated-mechanics", /airbornePitchUp/, { timeout: 20_000 });
   await page.keyboard.up("ArrowUp");
   await page.keyboard.down("ArrowDown");
@@ -317,6 +376,10 @@ test("a new rider completes the comprehensive tutorial without skipping", async 
   await expect(canvas).toHaveAttribute("data-demonstrated-mechanics", /airborneNeutral/, { timeout: 10_000 });
 
   await expect(page.getByRole("heading", { name: "Land both wheels" })).toBeVisible({ timeout: 10_000 });
+  // The choice barrier sits in lanes 1-2 (440 m) and the mud and grass stretches
+  // that follow sit in lanes 0 and 3, so the remaining lessons require lane 0.
+  // Take it explicitly rather than inheriting whichever lane the landing left.
+  await steerToLane(page, canvas, 0);
   await expect(page.getByRole("heading", { name: "Read or clear the barrier" })).toBeVisible({ timeout: 20_000 });
   await expect(canvas).toHaveAttribute("data-tutorial-events", /choiceBarrierAvoided/, { timeout: 20_000 });
   await expect(page.getByRole("heading", { name: "Mud slowdown" })).toBeVisible({ timeout: 10_000 });
