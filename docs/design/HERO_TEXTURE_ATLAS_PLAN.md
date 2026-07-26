@@ -89,6 +89,54 @@ The existing quantization contract already requires `TEXCOORD_0` to be `VEC2`, `
 
 **Expected geometry cost:** UV seams split vertices. The spike measured +60% on raw geometry for a badly-seamed projection; a packed atlas unwrap with deliberate seams should land nearer **+15–25%**, i.e. roughly **+50–80 KB** on the current 318 KB runtime GLB.
 
+## 5a. Phase A executed 2026-07-26 — measured, and it changes §6
+
+Phase A was implemented, measured, and then reverted, because the unwrap cannot land on its own (see "Why nothing was committed" below). Its purpose was to replace the §6 estimate with a number, and it did.
+
+**Implementation.** A deterministic `unwrap_into_atlas()` step in `build_hero_bike_rider.py`, running immediately after `consolidate_render_geometry()` when each render mesh carries exactly one material. Angle-based `smart_project` at a 66° limit with a 0.02 island margin per mesh, then each mesh remapped into its material's band — bands ordered largest-share-first for reproducibility, sized by the §4 allocation, and split into columns by measured polygon area.
+
+**Measured results.**
+
+| Metric | Baseline | Phase A | Delta |
+|---|---:|---:|---:|
+| Triangles | 51,820 | 51,820 | **unchanged** |
+| Render primitives / materials | 28 / 10 | 28 / 10 | unchanged |
+| Mesh vertices | 40,104 | 54,552 | **+14,448 (+36%)** |
+| Raw interchange GLB | 1,269,932 B | 2,089,456 B | +819,524 (+65%) |
+| **Optimized runtime GLB** | **317,936 B** | **555,216 B** | **+237,280 (+75%)** |
+| Atlas regions | — | 28 across 10 materials | — |
+| UVs inside `[0,1]` | — | **all** | contract satisfied |
+
+**Confirmed: §5's central premise holds.** Every UV lands inside `[0,1]`, so a packed atlas satisfies the normalized-unsigned-16-bit `TEXCOORD_0` contract natively. The rule that made tiling structurally impossible is not an obstacle here.
+
+**The estimate in §5 was wrong.** It predicted seams would add 15–25%, i.e. 50–80 KB. The real figure is **+75%, 237 KB** — roughly three times the prediction. Seam-driven vertex splitting is far more expensive than assumed, and no amount of packing skill changes it: vertex count is driven by where seams fall, not by island placement.
+
+**Also discovered: the optimizer prunes unused UVs.** With the default `prune({ keepLeaves, keepExtras })`, `TEXCOORD_0` is stripped because no material references it, and the build then fails its own source-versus-optimized attribute-inventory check. The 555,216 B figure was obtained with `keepAttributes: true` set temporarily — which is exactly the state that will exist naturally once a map references the UVs, so the measurement is a valid forecast rather than an artefact.
+
+**Why nothing was committed.** The unwrap is not independently landable. Without a map, either the build breaks (UVs pruned, inventory check fails) or it ships 237 KB of attributes nothing reads. It must land in the same commit as at least one map. The Blender code and its measurements are recorded here so Phase B can re-apply the approach directly.
+
+### Revised byte budget
+
+| Item | Encoding | Figure |
+|---|---|---:|
+| Geometry incl. atlas UVs | Meshopt | **555,216 B (measured)** |
+| Normal 1024² | KTX2 UASTC + zstd | 400–600 KB (estimate) |
+| Occlusion 512² | KTX2 ETC1S | 60–100 KB (estimate) |
+| **Total, both maps** | | **≈ 1,015,000 – 1,255,000 B** |
+
+**That is at or over the 1.2 MB ceiling.** The approved ceiling was set against a 830 KB–1.1 MB projection built on the wrong seam estimate.
+
+Options, with the geometry figure now fixed:
+
+| Option | Projected total | Verdict |
+|---|---:|---|
+| Occlusion only (512²) | **≈ 615–655 KB** | Comfortable. Already the approved Phase B, and it lands the unwrap with a map that uses it. |
+| Occlusion + normal 768² | ≈ 805–905 KB | Fits with margin. |
+| Occlusion + normal 1024² | ≈ 1,015 KB – 1.26 MB | At or over ceiling. Not recommended without raising it again. |
+| Coarser unwrap (fewer seams) | reduces the 237 KB | Trades UV distortion for bytes; only worth exploring if the normal map proves essential at 1024². |
+
+**Recommendation:** proceed with Phase B exactly as approved — occlusion only — which is comfortably inside budget and answers whether crevice depth alone closes most of the perceived gap. Defer the normal-map resolution decision to the Phase B review, when there is something to look at rather than another estimate.
+
 ## 6. Byte budget
 
 | Item | Encoding | Estimate |
