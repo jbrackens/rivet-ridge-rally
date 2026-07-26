@@ -75,6 +75,48 @@ Three tests in `reliability.spec.ts` with exactly this shape were fixed earlier 
 - The eleven timing failures remain open, so **`npm run test:e2e` does not pass end to end on this host**.
 - It is not the structured `browser` QA record required by the release attestation, which must bind a frozen candidate and its manifest aggregate.
 
+## Confirming run after re-budgeting — and a real defect the timeout was hiding
+
+Second full Chromium sweep, same host, after the `playwright.config.ts` default raise and six individual budget increases.
+
+**101 passed / 9 failed / 5 skipped (2.3 hours)** — up from 91 passed / 19 failed.
+
+| Failure | Class |
+|---|---|
+| 4 × `visual-regression` | A — correct behaviour, unpromoted baselines (unchanged) |
+| `lifecycle.spec.ts:422` twenty immediate restarts | **NEW CLASS D — a real defect, previously masked** |
+| `editor-coverage.spec.ts:457` | C — own budget 90 s; passes individually at ~90 s. Raised to 240 s. |
+| `editor-coverage.spec.ts:643` | C — three sequential test rides. Raised 300 → 480 s. |
+| `accessibility-controls.spec.ts:221` | C — **verified passing in isolation (1.6 min)** |
+| `accessibility-controls.spec.ts:407` | C — **verified passing in isolation (1.1 min)**; failed with `Target page, context or browser has been closed`, i.e. the browser died |
+
+### Finding R7 — restarts recreate the WebGL context instead of reusing it
+
+`lifecycle.spec.ts:422` no longer times out; with a realistic budget it now completes all 20 restarts and **fails a real assertion**:
+
+```
+expect(finalSnapshot.started.webglContexts).toBe(baseline.started.webglContexts)
+  Expected: 2
+  Received: 22
+```
+
+Twenty restarts created twenty additional WebGL contexts. The test's name states the intended contract — *"twenty immediate restarts **reuse one WebGL context**"* — and that contract is not being met.
+
+**Cause.** `src/ui/game/GameView.tsx:914` renders `<canvas key={raceAttempt}>`. Keying the element on the attempt number makes React unmount and remount the canvas for every race, which necessarily destroys and recreates its WebGL context. This was introduced deliberately: the 2026-07-19 dust-plume slice "remounts the game canvas for each new race attempt and keeps the engine-instance diagnostic guard so asynchronous Canyon panorama callbacks cannot leak stale environment attributes into a later Pine canvas."
+
+So two intentional behaviours now contradict each other, and the test guarding one of them has been masked by a timeout ever since — which is exactly why the whole-suite sweep was worth running.
+
+**Severity — churn, not a leak.** The per-resource active-count loop immediately above line 509 **passed**: active engines, contexts, render loops, listener groups and poll loops all returned to 1. Contexts are being disposed correctly. Nothing accumulates.
+
+But it is not harmless. Browsers cap simultaneous live WebGL contexts (Chrome around 16) and respond to pressure by force-losing the oldest. Creating and destroying twenty contexts in a session is real churn, and it is the most plausible explanation for `accessibility-controls.spec.ts:407` dying with `Target page, context or browser has been closed` after a long sweep while passing comfortably in isolation. Three of the remaining class-C failures pass alone and fail only in a long run, which fits resource pressure rather than slowness alone.
+
+**This needs a decision, not a quick fix.** Two coherent options:
+
+1. **Restore context reuse.** Architecturally better — it removes the churn. Viable only if the engine-instance guard and canvas-ownership token added in the same 2026-07-19 slice already prevent the stale-callback bug on their own, in which case the remount is redundant belt-and-braces. Requires confirming that, then removing the `key`.
+2. **Accept remount-per-attempt** and rewrite the test's contract to assert what actually matters — one *active* context, every started context stopped, nothing accumulating — instead of asserting reuse.
+
+Option 1 is preferable if the guard suffices, because it also relieves the suspected resource pressure. **Neither should be chosen unilaterally**: the remount was a deliberate correctness fix, and weakening the test to match current behaviour would erase a real signal. Tracked as gate row 20.
+
 ## Recommended next steps
 
 1. Decide the timing question in class C — re-budget the eleven, or investigate host/parallelism first. Re-budgeting is defensible per-test but should be a deliberate call.

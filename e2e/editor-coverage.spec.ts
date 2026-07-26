@@ -455,7 +455,7 @@ test("saved-track deletion requires explicit irreversible-loss confirmation", as
 });
 
 test("lap values one through nine start races with the selected lap contract", async ({ page }) => {
-  test.setTimeout(90_000);
+  test.setTimeout(240_000);
   const laps = page.getByLabel("Laps", { exact: true });
 
   for (let value = 1; value <= 9; value += 1) {
@@ -641,7 +641,7 @@ test("a valid saved circuit containing every module completes its authored gates
 });
 
 test("all three bundled editor examples complete test rides", async ({ page }) => {
-  test.setTimeout(300_000);
+  test.setTimeout(480_000);
   await page.goto("/?qa-fast-race=1");
   await page.getByRole("button", { name: "Track Builder", exact: true }).click();
 
