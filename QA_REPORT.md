@@ -332,6 +332,41 @@ The current four-minute headed calibration's heap rose 8,919,644 bytes first-to-
 
 The annotated `v1.0.0-rc.1` tag identifies the predecessor's immutable source, and historical reports record 67 Playwright passes with 0 failures, 76 Vitest passes, headed performance, a successful post-fix 30-minute Rival soak, a 21-file non-QA checksum manifest, and an installed-Chrome production smoke. Those records remain comparison evidence only for the predecessor's named bytes. Because no durable artifact locator, exact archive byte count/SHA-256, source-bound format-2 manifest, or complete pre/post staged served-inventory rehearsal is recorded, they do **not** establish a currently deployable rollback archive. The tag must not be moved, rebuilt, or relabeled as `rc.2` evidence.
 
+## 10a. Current browser evidence — 2026-07-27 at `9c455c9`
+
+This section supersedes the scoped historical browser figures above for the exact commit it names. It does not qualify a frozen candidate.
+
+**Chromium: 107 passed / 4 failed / 5 skipped of 116 tests (2.2 h).** The four failures are the deliberately unpromoted visual baselines and nothing else. Four successive sweeps: 91/19 → 101/9 → 105/6 → **107/4**.
+
+**All six Playwright projects measured for the first time:**
+
+| Project | Executed | Passed | Failed |
+|---|---:|---:|---:|
+| Chromium | 111 | 107 | 4 |
+| Firefox | 5 | **5** | **0** |
+| WebKit | 11 | 10 | 1 |
+| mobile-chrome | 4 | 3 | 1 |
+| mobile-safari | 2 | **2** | **0** |
+| tablet-chrome | 4 | **4** | **0** |
+
+**121 executed across the matrix, 119 passing.** Both non-Chromium failures are tracked classes: WebKit reproduces finding R7, and mobile-chrome hits the portrait visual baseline. Non-Chromium projects execute only cross-engine journeys by design.
+
+**Two code-owned defects found and fixed:**
+
+1. **A release accessibility gate was silently broken** by the 2026-07-19 screen-motion change. `release-quality.spec.ts` ran axe mid-fade through `.screen-surface` (opacity `.01 → 1` over 180 ms), so axe measured the teal step labels at ~60 % opacity — 4.03:1 — and reported a WCAG AA contrast failure. The settled UI is well clear. The scoped test for that slice did not cover this gate; only a whole-suite run surfaced it.
+2. **The race WebGL context was rebuilt every restart** (finding R7). 20 restarts started 22 contexts against a browser cap of roughly 16 live contexts. Reproduced in Chromium **and WebKit**, so it affected real Safari users. Fixed by restoring the `retainRenderer` path the codebase already had.
+
+**A hypothesis confirmed by falsifiable prediction:** `accessibility-controls:407` had been dying with `browser has been closed` in long sweeps while passing in isolation. The stated cause was context churn exhausting browser resources. Removing the churn fixed it with **no change to that test**.
+
+**Two earlier conclusions of mine are corrected here:**
+
+- I reported that removing the canvas key regressed the comprehensive tutorial, "A/B verified". That A/B was one run each way on a test since measured at a **1/3** pass rate. The original fails identically two times in three with the key in place. The canvas was never the variable; a wheelie held across a variable-length gap was, and that is fixed separately.
+- The "title checks fail ~6% in Chromium/Firefox/WebKit" statements describe **opt-in runs only**. `core-flow.spec.ts:436` skips unless `RRR_APPROVED_VISUAL_BASELINES=1`.
+
+**Scope limits, stated plainly.** Dirty working tree, not a frozen candidate. Playwright's bundled engines, not installed Safari/Firefox/Edge. Emulated phone and tablet viewports, not physical devices. **Not the structured `browser` QA record**, which must bind a frozen candidate and its manifest aggregate and remains blocked behind the candidate decision. The four visual gates stay correctly failing until owner acceptance exists.
+
+Full evidence and classification: `docs/E2E_BASELINE_2026-07-26.md`.
+
 ## 11. QA conclusion
 
 The resumed working-tree qualification establishes scoped browser and command-gate confidence, not release readiness. Focused Chromium functional, reliability, tutorial, editor, input, migration, persistence, and quality paths passed; campaign modes passed 18/18 in 27.7 minutes; the current rival pack gate passed 2/2 on isolated port 4176; desktop Firefox-plus-WebKit functional passed 10/10; WebKit lifecycle passed 6/6; the emulated touch matrix passed 6/6; and emulated touch tutorial intro passed 2/2. Typecheck, lint, all 452 tests/fixtures, asset verification, the zero-vulnerability high-severity audit, current `npm run build`, and a scoped non-QA live preview smoke passed on the working tree.
