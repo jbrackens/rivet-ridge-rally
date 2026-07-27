@@ -21,6 +21,7 @@
     "release:attestation:verify": "node scripts/release-attestation.mjs",
     "release:manifest": "node scripts/release-manifest.mjs",
     "visual:candidate": "node scripts/release-manifest.mjs --profile visual-qa",
+    "visual:candidate:archive": "node scripts/archive-visual-candidate.mjs",
     "smoke:production": "node scripts/production-smoke.mjs",
     "test": "vitest run && npm run test:release-manifest && npm run test:release-attestation && npm run test:production-smoke-support",
     "test:coverage": "vitest run --coverage",

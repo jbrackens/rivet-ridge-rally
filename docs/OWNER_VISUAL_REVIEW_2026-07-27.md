@@ -56,6 +56,20 @@ acceptance, and no baseline has been promoted.
 > Re-freezing therefore requires your authorisation plus a verified immutable archive of
 > the current candidate first.
 >
+> **The archive prerequisite is now DONE (2026-07-27).** `npm run visual:candidate:archive`
+> preserved all 34 candidate files (7,605,658 bytes) to
+> `artifacts/candidate-evidence/visual/archive/visual-candidate-1.0.0-rc.2-cd06b258cd4f`,
+> verified byte-exact, with a committed integrity record at
+> `artifacts/history/visual-candidate-1.0.0-rc.2-cd06b258cd4f-archive.json` recording every
+> file's SHA-256. Independently confirmed with `shasum -a 256` across both trees outside the
+> script's own logic. The script refuses to overwrite an existing archive (verified: exit 1).
+>
+> **One caveat you should know:** `artifacts/candidate-evidence/` is git-ignored, so the
+> archived *bytes* are on this machine only — just the integrity record is in version
+> control. Off-machine durability is still an operator task and remains on the owner supply
+> list. So the re-freeze is now gated on your authorisation and the identity/scope decisions
+> below, not on the archive.
+>
 > **2. Gate 4 cannot formally accept Foundry — or any venue except Canyon — as built.** The
 > approval tooling is Canyon-scoped: `promote-visual-baseline.mjs` has a single
 > `TARGET_PATH` (`race-curved-course-canyon-chromium-darwin.png`) and its approval statement
