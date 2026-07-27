@@ -99,8 +99,8 @@
     },
     "packageManifest": {
       "path": "package.json",
-      "bytes": 3401,
-      "sha256": "a1d2a28d4a167ee40c864f43f4185c46df085a4b75f6a3b7484f1a3edcd49325"
+      "bytes": 3478,
+      "sha256": "2689a2e818937e170fa0b9259ac215b29591251c17941ecd657b456a64fe9ff4"
     }
   },
   "files": {
