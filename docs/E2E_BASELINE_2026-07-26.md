@@ -438,3 +438,45 @@ control; `tutorial.spec.ts:268` failed as a stalled click in one arm and as
 result, and no agent review, model run, or build may execute concurrently with a
 timing-sensitive sweep. A sweep without a recorded load average is not comparable to another
 sweep.
+
+### RESOLVED — quiet-host run classifies all three as load-induced flakes, not regressions
+
+Run on a quieted host at commit **`9bd9b3f`** with `--repeat-each=3`, so each test executed
+three times rather than once.
+
+| | Commit | Host load (1-min, at start) | Executions | Result |
+|---|---|---|---|---|
+| Sweep 5 | `d3e4480` | 36.8 | 1 each | 3 of 3 **failed** |
+| Isolation | `d3e4480` | ~32 | 1 each | 3 of 3 **failed** |
+| Control | `9c455c9` | 23.1 | 1 each | 3 of 3 **failed** |
+| **Quiet classification** | **`9bd9b3f`** | **6.4** | **3 each** | **9 of 9 PASSED** (26.2 min) |
+
+**Classification: all three are load-induced flakes.** None is a regression, and none is caused
+by the Foundry palette change or R4:
+
+- `e2e/hero-bike-rider-motion.spec.ts:472` — **PASS 3/3**
+- `e2e/lifecycle.spec.ts:340` — **PASS 3/3**
+- `e2e/tutorial.spec.ts:268` — **PASS 3/3**
+
+The evidence is now consistent in both directions: the failures reproduce at a commit
+*predating* the changes when the host is loaded, and disappear at the *current* commit when it
+is not. Host load is the sole variable that tracks the outcome.
+
+**Scope and limits, stated rather than glossed:**
+
+- This is chromium only, on this host, at `9bd9b3f`, with a **dirty-tree** working copy — not a
+  frozen candidate. It is **not** release qualification and not the structured `browser` QA
+  record (gate 5).
+- 3 executions each establishes these tests pass repeatably on a quiet host. It does **not**
+  measure the flake rate under load, and does not prove they will never flake again.
+- **The underlying fragility is real and remains open.** Three release-relevant tests fail
+  under host contention, in the same failure class findings R7 and R9 already addressed once.
+  Nothing here fixes that; it only establishes the recent commits did not cause it. If CI ever
+  runs on a shared or loaded machine, expect these three to fail there.
+- Load rose from 6.4 to 24.9 during the run, which is this run's own Playwright processes and
+  is normal; the starting figure is the comparable one.
+
+**Prior sweep-5 conclusion stands corrected:** the "three non-baseline failures" were real
+observations but invalid as regression evidence, exactly as recorded. Sweep 5's 104/7 should be
+read as a contaminated run, superseded by this classification for these three tests. It is
+retained, not deleted.

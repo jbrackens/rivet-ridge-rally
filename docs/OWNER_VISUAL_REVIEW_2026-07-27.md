@@ -64,6 +64,13 @@ acceptance, and no baseline has been promoted.
 > file's SHA-256. Independently confirmed with `shasum -a 256` across both trees outside the
 > script's own logic. The script refuses to overwrite an existing archive (verified: exit 1).
 >
+> **Restore drill passed (2026-07-27).** An archive that has never been restored is not a
+> safety net, so the archive was copied to a scratch location and every file re-verified
+> against the *committed* integrity record rather than against itself: **34/34 files matched
+> by bytes and SHA-256, zero stray files not in the record, and the restored candidate's own
+> manifest aggregate still matches** (`cd06b258…`). The archive is usable, not merely
+> byte-identical in place.
+>
 > **One caveat you should know:** `artifacts/candidate-evidence/` is git-ignored, so the
 > archived *bytes* are on this machine only — just the integrity record is in version
 > control. Off-machine durability is still an operator task and remains on the owner supply
