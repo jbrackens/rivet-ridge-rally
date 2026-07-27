@@ -480,3 +480,66 @@ is not. Host load is the sole variable that tracks the outcome.
 observations but invalid as regression evidence, exactly as recorded. Sweep 5's 104/7 should be
 read as a contaminated run, superseded by this classification for these three tests. It is
 retained, not deleted.
+
+## Sweep 6 at `75357b2` — 2026-07-27 — **ALSO INVALID (host load reached 109)**
+
+Attempted as the clean full-suite baseline that sweep 5 failed to be. It is invalid for the
+same reason, more severely.
+
+**Result:** 100 passed / 11 failed / 5 skipped, 2.4 h, chromium.
+**Load average: 9.5 at start → 109.0 at finish.**
+
+**Cause identified:** `mediaanalysisd` — macOS Photos media analysis — was consuming ~98% CPU,
+alongside a CoreSimulator device and other host processes. This is macOS background work, not
+this project and not the sweep itself.
+
+Four failures are the expected unpromoted visual baselines. The other seven are pressure
+casualties:
+
+- `accessibility-controls.spec.ts:407`
+- `editor-coverage.spec.ts:472`, `:606`, `:643`
+- `hero-bike-rider-motion.spec.ts:472`
+- `tutorial.spec.ts:186`, `:268`
+
+**`accessibility-controls.spec.ts:407` is the documented pressure canary.** Finding R9 recorded
+that this exact test "had been dying with *browser has been closed* in long sweeps while passing
+in isolation", and that removing WebGL context churn fixed it *without changing the test*. Its
+return under load 109 is precisely the predicted behaviour, and is corroboration rather than a
+new defect.
+
+### This closes the load-versus-code question conclusively
+
+The two runs form a natural experiment, because the code between them is identical:
+
+```
+git diff --stat 9bd9b3f 75357b2
+ docs/E2E_BASELINE_2026-07-26.md        | 42 ++++++++++
+ docs/OWNER_VISUAL_REVIEW_2026-07-27.md |  7 ++++
+ 2 files changed, 49 insertions(+)      <- documentation only, zero code
+```
+
+| Commit | Code delta | Load (1-min) | `hero-motion:472` | `tutorial:268` |
+|---|---|---:|---|---|
+| `9bd9b3f` | — | **6.4** | **PASS 3/3** | **PASS 3/3** |
+| `75357b2` | docs only | **~109** | **FAIL** | **FAIL** |
+
+Same executable code, opposite outcomes, load differing roughly seventeen-fold. **Host load is
+the cause. No product regression is implicated in any of these failures.**
+
+### What this means, stated plainly
+
+- **The last valid full-suite baseline remains sweep 4: 107 passed / 4 failed at `9c455c9`**,
+  where the four failures were exactly the unpromoted visual baselines. Sweeps 5 and 6 do not
+  supersede it; both are retained and marked invalid.
+- **This host cannot currently produce a valid full-suite baseline.** Two consecutive 2.3–2.4 h
+  attempts were destroyed by contention outside this project's control (an ultra-reasoning model
+  review in sweep 5 — my own error — and macOS `mediaanalysisd` in sweep 6).
+- **A valid full-suite baseline needs a dedicated quiet window or a dedicated machine.** That is
+  an operator/hosting decision and belongs with the existing owner blocker for hosting and ops
+  ownership. It is not something further local retries can fix reliably: a 2.4 h window on a
+  daily-driver Mac will keep colliding with background system work.
+- Sweep 6's `test-results/` artifacts **were** archived before any subsequent run, applying the
+  rule adopted after sweep 5's were destroyed.
+
+**No conclusion about the Foundry palette change or R4 may be drawn from sweeps 5 or 6.** The
+valid evidence for those commits is the controlled A/B and the quiet-host classification above.
