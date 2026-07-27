@@ -6,6 +6,10 @@ Replace the primitive Rival and Mastery presentation with one original lower-det
 
 ## Originality and visual direction
 
+**Creative pivot (owner-directed).** The visual target has moved away from Roblox-adjacent, blocky, cube-first, primitive-heavy forms and toward an original, polished mascot-kart-racer level of charm, material finish, and animation readability. "Mascot-kart-racer" is a **quality and readability reference only**; it is not permission to copy Mario Kart, Nintendo, or Roblox expression. Every originality guardrail in this contract stays in force unchanged.
+
+The rival pack follows the hero to the same standard and reuses its material atlases, while keeping the lower detail budget and the supporting role behind the hero defined below.
+
 The pack uses only project-authored Blender-native geometry, a project-generated seven-segment number field, and the existing fictional entrant palettes. No downloaded model, marketplace asset, stock texture, logo, sponsor mark, manufacturer shape, platform-branded block avatar, or third-party character may be included.
 
 The target is a readable secondary silhouette: continuous knobby tires, clear wheel hubs, fork, engine, exhaust, tank/shroud, side-number field, helmet, torso, arms, knees, and boots. It should support the hero rather than compete with its detail density.

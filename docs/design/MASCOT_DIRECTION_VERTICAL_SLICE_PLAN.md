@@ -11,7 +11,23 @@ This plan defines the smallest contained change that can prove — or disprove �
 
 `docs/design/HERO_BIKE_RIDER_VERTICAL_SLICE.md`, `docs/design/RIVAL_PACK_VERTICAL_SLICE.md`, and `docs/design/CANYON_VERTICAL_SLICE.md` are **hash-bound production contracts**: each is recorded by exact byte count and SHA-256 inside its asset's schema-v2 manifest, so editing one breaks `npm run assets:verify` until `npm run assets:build` regenerates the manifest — a product-bytes change (reconciliation record finding R4).
 
-The pivot text intended for them is therefore held here until the slice runs `assets:build` anyway, at which point it moves into those documents and the manifests re-bind in the same commit. `GAME_BIBLE.md` and `GAME_SPEC.md` already carry the pivot normatively and outrank these per-asset contracts in the meantime.
+> **LANDED 2026-07-27.** This text now lives in all three contracts and the manifests were
+> re-bound in the same commit. The section is retained as the drafting record; the
+> contracts themselves are authoritative.
+>
+> The deferral was lifted because its reason expired: the text was being held to avoid
+> invalidating the hash-bound owner review package at `2d0376d`, and that package was
+> superseded anyway by finding R10 (Foundry Flight venue identity). Landing R4 before the
+> re-freeze means one candidate re-freeze captures everything.
+>
+> **The re-bind was verified to be hash-only.** A no-op `npm run assets:build` on an
+> unchanged tree was run first and left the tree completely clean, proving the pipeline is
+> deterministic. After the doc edits, `assets:verify` failed as predicted (exit 1),
+> `assets:build` re-bound, and `assets:verify` passed. The resulting diff is exactly two
+> lines per manifest — the contract document's `bytes` and `sha256`. **No GLB, texture, or
+> other asset binary changed.**
+
+The pivot text intended for them was therefore held here until the slice ran `assets:build`, at which point it moved into those documents and the manifests re-bound in the same commit. `GAME_BIBLE.md` and `GAME_SPEC.md` already carried the pivot normatively and outranked these per-asset contracts in the meantime.
 
 **Applies to all three.** The owner moved the visual target away from Roblox-adjacent, blocky, cube-first, primitive-heavy forms and toward an original, polished mascot-kart-racer level of charm, material finish, and animation readability. "Mascot-kart-racer" is a quality and readability reference only; it is not permission to copy Mario Kart, Nintendo, or Roblox expression. Every originality guardrail already in those contracts stays in force unchanged.
 

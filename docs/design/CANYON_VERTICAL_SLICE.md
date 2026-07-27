@@ -14,6 +14,10 @@ The new sheet is a modeling reference only. It is not a runtime texture, backgro
 
 ## Art direction
 
+**Creative pivot (owner-directed, supersedes the paragraph below where they conflict).** The visual target has moved away from Roblox-adjacent, blocky, cube-first, primitive-heavy forms and toward an original, polished mascot-kart-racer level of charm, material finish, and animation readability. "Mascot-kart-racer" is a **quality and readability reference only**; it is not permission to copy Mario Kart, Nintendo, or Roblox expression. Every originality guardrail in this contract stays in force unchanged.
+
+For this environment specifically, that replaces the "chunky but purposeful proportions … toy-like in clarity" wording with **rounded, softened volumes carrying authored surface detail rather than flat colour blocking**. Palette, festival identity, the readability contract, and the originality rules below are unaffected.
+
 Target a bright, tactile motocross diorama: chunky but purposeful proportions, softened bevels, broad color blocking, restrained surface variation, readable mechanical or structural joints, and a clear cream/coral/teal festival identity against dusty sandstone terrain. Assets should feel toy-like in clarity rather than toy-sized.
 
 Avoid featureless primitives, photoreal scan noise, black plastic everywhere, razor-sharp edges, flat single-color silhouettes, dense micro-detail, brand marks, readable sponsor text, platform-branded block-avatar proportions, or a direct imitation of any third-party game's assets.

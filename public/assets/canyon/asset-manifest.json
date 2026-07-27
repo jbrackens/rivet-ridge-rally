@@ -115,8 +115,8 @@
     },
     "contract": {
       "path": "docs/design/CANYON_VERTICAL_SLICE.md",
-      "bytes": 8997,
-      "sha256": "3b8268705be46d850621ee3d196b6a40f92c2059e7cae1284c088341fea1d3fd"
+      "bytes": 9834,
+      "sha256": "3484dbfffd6654449280a9a356ef026fbae6dfe261a98e0519519e1e815e9f90"
     },
     "sourceReadme": {
       "path": "art-source/blender/canyon-kit/README.md",

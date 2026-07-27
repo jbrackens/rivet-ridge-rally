@@ -192,8 +192,8 @@
     },
     "contract": {
       "path": "docs/design/RIVAL_PACK_VERTICAL_SLICE.md",
-      "bytes": 4516,
-      "sha256": "aa6077001ff3df3d0527f4ba71a39964abf6f4a573181db15e5cf6eaf188399c"
+      "bytes": 5155,
+      "sha256": "053e233f90a30475791b14acb8e94ea25271854e0327ef13c5b63128d2159458"
     },
     "runtime": {
       "path": "public/assets/rivals/rival-pack.glb",

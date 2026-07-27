@@ -383,8 +383,8 @@
     },
     "contract": {
       "path": "docs/design/HERO_BIKE_RIDER_VERTICAL_SLICE.md",
-      "bytes": 25595,
-      "sha256": "619e905a8a2696126156c14dc95fa9598a847d604593d78d3e0c7557bbdd6788"
+      "bytes": 26419,
+      "sha256": "94708be6ebd4dd020fd944f16a1372d34b8b13a77cdd7c36fa32c624423dc933"
     },
     "editableSource": {
       "path": "art-source/blender/hero-bike-rider/generated/hero-bike-rider-source.blend",

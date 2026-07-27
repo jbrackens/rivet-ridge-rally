@@ -10,6 +10,10 @@ The production reference is a modeling and material guide only. It must not be s
 
 ## Original and non-infringing art direction
 
+**Creative pivot (owner-directed).** The visual target has moved away from Roblox-adjacent, blocky, cube-first, primitive-heavy forms and toward an original, polished mascot-kart-racer level of charm, material finish, and animation readability. "Mascot-kart-racer" is a **quality and readability reference only**; it is not permission to copy Mario Kart, Nintendo, or Roblox expression. Every originality guardrail in this contract stays in force unchanged.
+
+For the hero specifically: rounded, appealing silhouettes with real bevelled volume, shaped plastics, and authored base-colour/ORM/normal material depth replacing the current flat solid-colour PBR treatment. The canonical reference sheet already embodies this target, so the design goal is unchanged — what rises is the required fidelity of the delivered asset.
+
 Build a bright, tactile, fictional trail bike and a compact athletic motocross rider in the established coral, teal, cream, charcoal, and brushed-metal palette. The target is a readable, polished, toy-like 3D finish: molded plastics with softened bevels, dense but orderly knobby tires, visible suspension and chain-drive silhouettes, layered safety gear, clean color blocking, and enough mechanical depth to hold up in the close follow camera.
 
 The asset must be created from project-authored Blender geometry and project-authored textures. Do not download, kitbash, scan, trace, or modify a commercial motorcycle, branded riding suit, platform-branded block avatar, marketplace model, stock texture, proprietary logo, or third-party game asset. Do not reproduce a real manufacturer's frame, plastics, engine casing, helmet shell, livery, sponsor layout, or distinctive trade dress.
