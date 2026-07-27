@@ -288,3 +288,52 @@ Safety is independent of canvas identity, as established on 2026-07-26: a falsif
 ### The methodological lesson, recorded deliberately
 
 A single run on a test that fails a third of the time is not an A/B result, and presenting it as one produced a wrong conclusion, an unnecessary revert, and a documented prerequisite that did not exist. It was caught only by going back and measuring rather than trusting the earlier write-up. **Repeat-count before causal claims on anything timing-sensitive.**
+
+
+## Sweep 4 — 2026-07-27 at `9c455c9`: the first clean browser suite
+
+**107 passed / 4 failed / 5 skipped across 116 tests (2.2 hours).**
+
+**All four failures are the deliberately unpromoted visual baselines.** There are no other failures. This is the first time this project has recorded a Chromium suite whose only outstanding items are screenshots awaiting owner acceptance.
+
+| Sweep | Passed | Failed | Change |
+|---|---:|---:|---|
+| 1 — as found | 91 | 19 | baseline established |
+| 2 — timing budgets re-based | 101 | 9 | +10 |
+| 3 — canvas reuse (later reverted) | 105 | 6 | +4 |
+| **4 — tutorial state-driven + canvas reuse** | **107** | **4** | **+2, only visual gates left** |
+
+### Every previously-failing non-visual test now passes
+
+| Test | Earlier | Sweep 4 |
+|---|---|---|
+| `accessibility-controls:407` renderer cues / dropped time | browser died in sweeps 2–3 | **PASS** |
+| `accessibility-controls:221` keyboard remapping | failed in sweep 2 | **PASS** |
+| `lifecycle:422` twenty restarts reuse one context | failed every sweep | **PASS** |
+| `lifecycle:515` six retries release each context | failed sweeps 1–2 | **PASS** |
+| `tutorial:268` comprehensive tutorial | failed sweep 3 | **PASS** |
+| `editor-coverage:457`, `:643` | failed sweeps 1–3 | **PASS** |
+| `campaign-modes:177` Solo→Rival six-rider field | failed sweeps 1–2 | **PASS** |
+| `quality-presets:3` four renderer presets | failed sweeps 1–2 | **PASS** |
+| `rival-pack:67` failed rival request | failed sweeps 1–2 | **PASS** |
+
+### The resource-pressure hypothesis is confirmed
+
+`accessibility-controls:407` failed in sweeps 2 and 3 with `Target page, context or browser has been closed` while passing comfortably in isolation. The stated hypothesis was that WebGL context churn — 22 contexts created per 20 restarts, against a browser cap of roughly 16 live contexts — was exhausting browser resources and causing collateral deaths in unrelated tests later in the run.
+
+**Removing the churn fixed it, with no change to that test.** That is the hypothesis surviving a falsifiable prediction rather than being argued for.
+
+It also means the churn was doing real damage beyond its own test, and since WebKit reproduced it, beyond this host.
+
+### What sweep 4 establishes
+
+At `9c455c9`, on this machine, Chromium exercises **107 passing browser journeys** across accessibility controls, campaign modes, core flow, editor coverage, gamepad emulation, hero motion, lifecycle, migrations, persistence, quality presets, release quality, reliability, rival pack, and the full twelve-lesson tutorial. **Zero product defects outstanding.**
+
+### What it still does not establish
+
+- **Dirty working tree, not a frozen candidate.** Release evidence must bind one frozen candidate and its manifest aggregate.
+- Chromium only in this run; the cross-browser sweep above covers the other five projects separately.
+- Playwright's bundled engines, not installed Safari, Firefox or Edge.
+- Emulated phone and tablet viewports, not physical devices.
+- **Not the structured `browser` QA record.** That remains gate 5 and is blocked behind the candidate decision in row 14.
+- The four visual gates stay correctly failing until owner acceptance exists (gates 4 and 6).
