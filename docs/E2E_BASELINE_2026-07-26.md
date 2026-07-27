@@ -337,3 +337,65 @@ At `9c455c9`, on this machine, Chromium exercises **107 passing browser journeys
 - Emulated phone and tablet viewports, not physical devices.
 - **Not the structured `browser` QA record.** That remains gate 5 and is blocked behind the candidate decision in row 14.
 - The four visual gates stay correctly failing until owner acceptance exists (gates 4 and 6).
+
+## Sweep 5 at `d3e4480` — 2026-07-27 — **INVALID AS REGRESSION EVIDENCE (host contention)**
+
+**Result:** 104 passed / 7 failed / 5 skipped, 2.3 h, chromium. Four failures are the expected
+unpromoted visual baselines. Three are not:
+
+| Test | Sweep 1 | Sweep 3 | Sweep 4 | verify2 | Sweep 5 (`d3e4480`) | Isolation (`d3e4480`) |
+|---|---|---|---|---|---|---|
+| `hero-bike-rider-motion.spec.ts:472` landing pulse | **fail** | pass | pass | pass | **fail** | **fail** |
+| `lifecycle.spec.ts:340` device-storage recovery | **fail** | pass | pass | pass | **fail** | **fail** |
+| `tutorial.spec.ts:268` comprehensive tutorial | not run | not run | pass | **fail** | (see note) |
+
+**These results do not establish a regression, and they do not clear the change either.**
+Classification is **INCOMPLETE**, for a reason that invalidates the run:
+
+**The host was under extreme load.** Measured during the isolation re-run: **load average
+36.8 / 35.8 / 34.0**. Contributors included a `Virtualization.framework` VM, a running iOS
+simulator, Google Chrome with many renderer processes, Granola, `coreaudiod`, and my own
+`chrome-headless-shell` at 515% CPU. Most of that load is not from this project.
+
+**Part of it was my own methodological error:** sweep 5 was launched and then a GPT 5.6
+`codex exec` review at ultra reasoning effort was run *concurrently* with it — twice, one of
+which consumed 5.0 M input tokens and was killed at a 10-minute timeout. Running a heavy
+second agent during a 2.3-hour timing-sensitive browser sweep contaminates the sweep.
+
+**Why contention is the leading explanation rather than an excuse.** The two tests that failed
+are *exactly* the two that failed in sweep 1 and were diagnosed then as resource-pressure
+casualties (findings R7 and R9), and both failure signatures are pressure signatures rather
+than logic errors:
+
+- `lifecycle.spec.ts:340` — `locator.click` timeout where the call log shows the element
+  already **"visible, enabled and stable"** and then the click action itself never completes.
+- `tutorial.spec.ts:268` — same shape: `Pursuer crashes` resolves to a real enabled button,
+  then stalls in "visible, enabled and stable".
+- `hero-bike-rider-motion.spec.ts:472` — `landingCompression` polls `0` for a full 5 s, i.e.
+  the simulation never advanced to a landing inside the window.
+
+Playwright actionability requires a stable bounding box across consecutive animation frames,
+and this project drives a 60 Hz fixed-step simulation through `requestAnimationFrame`. Under
+rAF starvation all three symptoms are expected, and none of them indicates broken product
+logic.
+
+**What the change could not plausibly have caused.** The only product change between sweep 4
+(`9c455c9`) and sweep 5 (`d3e4480`) that touches the runtime is the Foundry Flight palette
+(`src/game/content/tracks.ts`). All three failing tests run on **Canyon Kickoff**, and R4
+altered only documentation plus three manifest hash entries with zero asset-binary change.
+That is an argument, not evidence.
+
+**Also invalid:** the `test-results/` artifacts from sweep 5 were **destroyed** before being
+read. Playwright cleans `outputDir` at the start of every run, and the isolation re-run was
+launched without archiving them first, so sweep 5's per-test error contexts are unrecoverable.
+The isolation run's artifacts were archived before further runs.
+
+**Required to close this out — none of it done yet:**
+
+1. Re-run on a **quiet host** and record `uptime` load average alongside the result. A sweep
+   whose load average is not recorded is not comparable to another sweep.
+2. Never run another agent, model review, or build concurrently with a timing-sensitive sweep.
+3. Archive `test-results/` immediately on failure, before any subsequent Playwright run.
+4. Only after a quiet-host run may these three be classified as pass, flake, or regression.
+
+**Do not freeze a candidate on `d3e4480` until step 4 is complete.**

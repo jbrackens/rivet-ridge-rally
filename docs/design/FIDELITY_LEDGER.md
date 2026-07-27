@@ -195,27 +195,56 @@ Against Pine, the first attempt differed by only **4.7 points of luminance and 0
 saturation**. Both are near-neutral greys, and at ~5% saturation a 158° hue gap is
 essentially invisible in the material itself — the two venues would have been told apart
 only by their props (pines vs stacks), not by their terrain. The shipped value is a
-saturated steel blue: it separates from Pine by 18.8 combined luminance + saturation
-points and from every other venue by more.
+saturated steel blue, separated from Pine by 18.8 combined points on the crude metric
+below and from every other venue by more.
+
+> **The separation metric is NOT perceptual validation.** Corrected 2026-07-27 after an
+> external review. The table labels HSL *lightness* as "luminance", which it is not, and
+> then adds lightness distance to saturation distance to produce a single figure with **no
+> calibrated threshold** behind it. It ignores tone mapping, the warm sun, fog, Foundry's
+> higher exposure, terrain transforms, and colour-vision accessibility entirely. Treat the
+> numbers as a rough authoring heuristic that caught a collision I would otherwise have
+> shipped — not as evidence that any venue pair is perceptually distinct. Real separation
+> evidence requires owner review of captures, and ideally a colour-vision check.
 
 Shipped: `palette.rock` `0x805747` → `0x4a5a70`, `palette.dirtDark` `0x46322b` →
-`0x35343a`, `grass` nudged cooler. `palette.dirt` was deliberately left warm
-(`0x84513b`): it textures the running surface, and lane/rut readability must stay
-identical across venues — the warm racing line against cold walls is now what carries the
-venue read. `createTerracedCourseEdges` already special-cased Foundry (`shelfColor` lerps
-toward `0x59636a`), so the cool rock composes with existing intent.
+`0x35343a`, `grass` nudged cooler. `createTerracedCourseEdges` already special-cased
+Foundry (`shelfColor` lerps toward `0x59636a`), so the cool rock composes with existing
+intent.
+
+> **Correction — an earlier claim here was false.** This section previously said
+> `palette.dirt` was "deliberately left warm … lane/rut readability must stay identical
+> across venues", implying the running surface was untouched. **The running surface did
+> change.** `dirtDark` is the second input to
+> `createTerrainTexture(palette.dirt, palette.dirtDark, …)` (`GameEngine.ts:6208`), which
+> textures the track itself, and it also drives dust colour (`:5983`) and two further
+> course/obstacle dirt materials (`:6693`, `:6789`). `dirt` was indeed left warm, but
+> changing `dirtDark` cooled and darkened the dark component of the ruts. **Foundry's
+> lane/rut readability is therefore unverified, not unchanged**, and it needs explicit
+> review at racing speed — including in high contrast.
 
 **Evidence, and its limits.** Working-tree diagnostic captures at `VITE_QA_MODE=1`, high
 quality, 1280×720, Playwright/Chromium. Foundry now renders cold blue-grey steel
-terraces with the warm dirt racing line reading strongly against them and the smokestack
-sitting in a coherent industrial site. Control venues captured in the same runs are
-unchanged: Canyon still warm red mesas with pines, and Pine Run still olive-grey terraces
-with abundant pines and wide green verges, now plainly distinct from Foundry. All five
-launch venues read as different places: red canyon, olive pine forest, sand-and-teal
-coast, cold steel foundry, violet dusk summit.
-`e2e/quality-presets.spec.ts` passes 2/2 on chromium, including "all five launch tracks
-expose distinct venue signature diagnostics". `typecheck`, `lint`, `npm test`,
-`audit:release-scope` and `assets:verify` all pass.
+terraces with the warm dirt racing line reading against them and the smokestack sitting in
+a coherent industrial site. Control venues captured in the same runs looked unchanged:
+Canyon still warm red mesas with pines, and Pine Run still olive-grey terraces with
+abundant pines and wide green verges, distinct from Foundry.
+
+> **Scope of that evidence, corrected.** These are **unretained observations**, not durable
+> evidence: the captures were written to a scratch directory and are not hash-bound or
+> checked in, so "Canyon and Pine unchanged" cannot be independently re-verified from this
+> repository. Anyone relying on it must recapture.
+>
+> **`e2e/quality-presets.spec.ts` does not validate this fix.** An earlier version of this
+> section cited its "all five launch tracks expose distinct venue signature diagnostics"
+> case as supporting evidence. That test asserts only `data-*` diagnostic attributes —
+> cactus style, shoulder dressing, gantry style, furnace panel counts — and contains **no
+> colour, palette or pixel assertion whatsoever**. It would have passed identically before
+> this fix. It validates prop and structural signatures, not venue palette separation.
+> Citing it here was a category error.
+
+`typecheck`, `lint`, `npm test`, `audit:release-scope` and `assets:verify` pass at this
+commit; none of them assert anything about venue colour either.
 
 This is **diagnostic only**. It was captured from the working tree, not from a frozen
 QA candidate, so it certifies nothing and is not a visual baseline. No screenshot here

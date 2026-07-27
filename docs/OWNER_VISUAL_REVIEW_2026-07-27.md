@@ -33,10 +33,46 @@ acceptance, and no baseline has been promoted.
 >
 > 1. **Re-freeze and recapture first (recommended).** The candidate is re-frozen at a
 >    commit including the Foundry fix, all 11 frames are recaptured, and you review once
->    against a build that matches source. Re-freezing the candidate is an owner-gated
->    action, so I have not done it.
-> 2. **Review this package anyway**, treating Foundry's two frames as known-defective and
->    judging only the other four venues. Foundry would then need its own review pass later.
+>    against a build that matches source. **This is owner-gated and I have not done it.**
+> 2. **Review this package as informal feedback only**, treating Foundry's two frames as
+>    known-defective and judging the other four venues. This cannot be Gate 4 acceptance —
+>    see the scope limit below.
+>
+> ### Three constraints found by external review, 2026-07-27 — read before deciding
+>
+> An external skeptical review (GPT 5.6, read-only, checking the scripts rather than my
+> summary) found three things I had wrong. All three are verified against the code.
+>
+> **1. Re-freezing is destructive, and I was wrong to say I could do it unilaterally.** I
+> had told you re-freezing the *visual candidate* was mine to run because the artifact is
+> regenerable. That was rationalisation. `npm run visual:candidate` calls
+> `removeRootOutputs()`, which performs `rm(visualCandidateRoot, { recursive: true, force:
+> true })` (`scripts/release-manifest.mjs:639`), so it **deletes the existing candidate
+> distribution**. Those artifacts are git-ignored, and `promote-visual-baseline.mjs`
+> validates only the fixed `current/` path, so keeping copies elsewhere does not preserve
+> the candidate or its ability to be revalidated or promoted. My supporting citation was
+> also the wrong proof: `docs/ROLLBACK_REPRODUCIBILITY_2026-07-27.md` covers tag commit
+> `2b40695` built with `VITE_QA_MODE=0`, **not** the QA-mode candidate at `2d0376d`.
+> Re-freezing therefore requires your authorisation plus a verified immutable archive of
+> the current candidate first.
+>
+> **2. Gate 4 cannot formally accept Foundry — or any venue except Canyon — as built.** The
+> approval tooling is Canyon-scoped: `promote-visual-baseline.mjs` has a single
+> `TARGET_PATH` (`race-curved-course-canyon-chromium-darwin.png`) and its approval statement
+> reads *"I reviewed the exact Canyon Practice 500 capture … and accept it as the checked-in
+> visual regression baseline."* So reviewing 11 frames produces an acceptance record for
+> **one Canyon frame**. Either the approval scope is expanded to enumerate all 11 frames and
+> their hashes, or Gate 4's claim narrows honestly to Canyon. I had been describing Gate 4
+> as satisfiable by you reviewing the package; that was not accurate.
+>
+> **3. Candidate identity must be decided before any recapture.** The candidate records
+> commit `2d0376d` with `expectedVersionTagAtCommit: false`, yet still carries version
+> `1.0.0-rc.2`, whose tag points elsewhere. The next immutable identity (likely `rc.3`)
+> needs deciding *before* a replacement candidate is built, not after.
+>
+> Separately, the full Chromium sweep at `d3e4480` returned **104 passed / 7 failed**, and
+> three of those failures are **not** the expected unpromoted baselines. Those are being
+> diagnosed. Nothing should be frozen until they are classified.
 >
 > Everything below describes the superseded `2d0376d` package and is accurate for that
 > build only.
