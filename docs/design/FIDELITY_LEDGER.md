@@ -176,16 +176,43 @@ otherwise warm-brown terraced walls that were indistinguishable from Canyon's.
    By contrast Summit reads as distinct because its `rock` is `0x7e7180`, a genuine
    violet-grey.
 
-**The fix.** `palette.rock` `0x805747` → `0x6d7178` (cool slate) and `palette.dirtDark`
-`0x46322b` → `0x3b3a3f`, with `grass` nudged cooler. `palette.dirt` was deliberately
-left warm (`0x84513b`): it textures the running surface, and lane/rut readability must
-stay identical across venues. `createTerracedCourseEdges` already special-cased Foundry
-(`shelfColor` lerps toward `0x59636a`), so the cool rock composes with existing intent.
+**The fix, in two steps — the first attempt was not good enough.**
 
-**Evidence, and its limits.** A working-tree diagnostic capture at `VITE_QA_MODE=1`,
-high quality, 1280×720, Playwright/Chromium, shows Foundry with cool grey slate
-terraces against the warm dirt racing line and the smokestack reading as part of a
-quarry/industrial site; Canyon in the same run is unchanged (warm red mesas, pines).
+The first correction set `palette.rock` to `0x6d7178`, a neutral cool slate. It fixed the
+Canyon collision, but checking it against the *other* venues rather than assuming showed
+it had created a new one. Measured in HSL:
+
+| Venue | `rock` | hue | sat | lum |
+|---|---|---:|---:|---:|
+| Canyon | `0xae482f` | 11.8° | 57.5% | 43.3% |
+| Coastline | `0xd28b66` | 20.6° | 54.5% | 61.2% |
+| Pine | `0x6c6c61` | 60.0° | 5.4% | 40.2% |
+| Summit | `0x7e7180` | 292.0° | 6.2% | 47.3% |
+| Foundry, first attempt | `0x6d7178` | 218.2° | 4.8% | 44.9% |
+| **Foundry, shipped** | **`0x4a5a70`** | **214.7°** | **20.4%** | **36.5%** |
+
+Against Pine, the first attempt differed by only **4.7 points of luminance and 0.6% of
+saturation**. Both are near-neutral greys, and at ~5% saturation a 158° hue gap is
+essentially invisible in the material itself — the two venues would have been told apart
+only by their props (pines vs stacks), not by their terrain. The shipped value is a
+saturated steel blue: it separates from Pine by 18.8 combined luminance + saturation
+points and from every other venue by more.
+
+Shipped: `palette.rock` `0x805747` → `0x4a5a70`, `palette.dirtDark` `0x46322b` →
+`0x35343a`, `grass` nudged cooler. `palette.dirt` was deliberately left warm
+(`0x84513b`): it textures the running surface, and lane/rut readability must stay
+identical across venues — the warm racing line against cold walls is now what carries the
+venue read. `createTerracedCourseEdges` already special-cased Foundry (`shelfColor` lerps
+toward `0x59636a`), so the cool rock composes with existing intent.
+
+**Evidence, and its limits.** Working-tree diagnostic captures at `VITE_QA_MODE=1`, high
+quality, 1280×720, Playwright/Chromium. Foundry now renders cold blue-grey steel
+terraces with the warm dirt racing line reading strongly against them and the smokestack
+sitting in a coherent industrial site. Control venues captured in the same runs are
+unchanged: Canyon still warm red mesas with pines, and Pine Run still olive-grey terraces
+with abundant pines and wide green verges, now plainly distinct from Foundry. All five
+launch venues read as different places: red canyon, olive pine forest, sand-and-teal
+coast, cold steel foundry, violet dusk summit.
 `e2e/quality-presets.spec.ts` passes 2/2 on chromium, including "all five launch tracks
 expose distinct venue signature diagnostics". `typecheck`, `lint`, `npm test`,
 `audit:release-scope` and `assets:verify` all pass.

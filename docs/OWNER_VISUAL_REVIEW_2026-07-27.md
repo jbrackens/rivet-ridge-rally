@@ -13,10 +13,16 @@ acceptance, and no baseline has been promoted.
 > supported by these captures. Full analysis: finding **R10** in
 > `docs/design/FIDELITY_LEDGER.md`.
 >
-> **This is already fixed in source** (`palette.rock` warm brown → cool slate, plus a
-> cooler `dirtDark`), and a working-tree diagnostic capture confirms Foundry now reads as
-> a grey slate quarry/industrial site with Canyon unchanged. That diagnostic is *not*
-> certification: it was rendered from the working tree, not a frozen candidate.
+> **This is already fixed in source** (`palette.rock` warm brown → steel blue `0x4a5a70`,
+> plus a cooler `dirtDark`), and working-tree diagnostic captures confirm Foundry now
+> reads as a cold steel industrial site, with Canyon and Pine Run unchanged in the same
+> runs and plainly distinct from it. All five venues now read as different places. That
+> diagnostic is *not* certification: it was rendered from the working tree, not a frozen
+> candidate.
+>
+> I also checked all five venues rather than only the one that looked wrong. Pine Run,
+> Coastline Clash, Canyon Kickoff and Summit Showdown each read as their documented
+> identity in this package; Foundry was the only venue-identity defect.
 >
 > **What this means for your review.** These frames are of candidate build `2d0376d`,
 > which predates the fix, so reviewing them now would spend your time on a venue defect

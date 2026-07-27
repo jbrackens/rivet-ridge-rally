@@ -263,9 +263,9 @@ export const TRACKS: readonly TrackDefinition[] = [
       // dark industrial palette; with brown rock it read as Canyon with one
       // smokestack, which is what the 2026-07-27 review captures showed.
       dirt: 0x84513b,
-      dirtDark: 0x3b3a3f,
+      dirtDark: 0x35343a,
       grass: 0x5d7350,
-      rock: 0x6d7178,
+      rock: 0x4a5a70,
       accent: 0xff8147,
     },
     obstacles: [
