@@ -256,10 +256,16 @@ export const TRACKS: readonly TrackDefinition[] = [
     palette: {
       sky: 0x7abed4,
       fog: 0xd3e2df,
+      // Track surface stays warm packed dirt so lane and rut reads are identical
+      // across venues, but the surrounding rock is cool slate rather than the
+      // brown earth tone it used to share with the desert venues. Foundry's own
+      // theme is "Colorful reclaimed metalworks" and the fidelity ledger claims a
+      // dark industrial palette; with brown rock it read as Canyon with one
+      // smokestack, which is what the 2026-07-27 review captures showed.
       dirt: 0x84513b,
-      dirtDark: 0x46322b,
-      grass: 0x607b48,
-      rock: 0x805747,
+      dirtDark: 0x3b3a3f,
+      grass: 0x5d7350,
+      rock: 0x6d7178,
       accent: 0xff8147,
     },
     obstacles: [

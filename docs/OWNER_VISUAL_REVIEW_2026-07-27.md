@@ -1,7 +1,39 @@
 # Owner Visual Review Package — 2026-07-27
 
 **Gate:** 4 of `docs/RC2_REMAINING_GATES_CHECKLIST.md` (owner visual acceptance).
-**Status:** **PACKAGE READY — AWAITING OWNER REVIEW.** Nothing here is acceptance, and no baseline has been promoted.
+**Status:** **SUPERSEDED — DO NOT REVIEW YET. RECAPTURE REQUIRED FIRST.** Nothing here is
+acceptance, and no baseline has been promoted.
+
+> ## Hold — a venue defect was found in this package after it was assembled
+>
+> I validated these 11 frames myself before asking you to spend time on them, and found
+> that **Foundry Flight does not read as a distinct venue** in this build. Its terraces
+> render the same warm brown as Canyon and Coastline, so the venue reads as "Canyon plus
+> one smokestack". The fidelity ledger's claim of a "dark industrial palette" was not
+> supported by these captures. Full analysis: finding **R10** in
+> `docs/design/FIDELITY_LEDGER.md`.
+>
+> **This is already fixed in source** (`palette.rock` warm brown → cool slate, plus a
+> cooler `dirtDark`), and a working-tree diagnostic capture confirms Foundry now reads as
+> a grey slate quarry/industrial site with Canyon unchanged. That diagnostic is *not*
+> certification: it was rendered from the working tree, not a frozen candidate.
+>
+> **What this means for your review.** These frames are of candidate build `2d0376d`,
+> which predates the fix, so reviewing them now would spend your time on a venue defect
+> that no longer exists in source. The frames remain on disk unaltered as historical
+> evidence — nothing has been deleted or overwritten.
+>
+> **Your decision — one of:**
+>
+> 1. **Re-freeze and recapture first (recommended).** The candidate is re-frozen at a
+>    commit including the Foundry fix, all 11 frames are recaptured, and you review once
+>    against a build that matches source. Re-freezing the candidate is an owner-gated
+>    action, so I have not done it.
+> 2. **Review this package anyway**, treating Foundry's two frames as known-defective and
+>    judging only the other four venues. Foundry would then need its own review pass later.
+>
+> Everything below describes the superseded `2d0376d` package and is accurate for that
+> build only.
 
 ## What to look at
 

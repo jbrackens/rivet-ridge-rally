@@ -151,8 +151,56 @@ Manually reviewed scripted start and midcourse captures for all five venues exis
 | Canyon Kickoff | Warm red-rock mesas, terraced canyon edges, festival treatment, readable cooling rhythm, and an open long sightline are distinct in the retained pre-route capture. | **SCOPED DISTINCTION SHOWN; NOT ACCEPTED / UNVERIFIED** |
 | Pine Run | Cooler grey-green terraces and pine/timber treatment distinguish the route while retaining lane clarity; density and material finish remain below the concept. | **SCOPED DISTINCTION SHOWN; NOT ACCEPTED / UNVERIFIED** |
 | Coastline Clash | Bright sand, teal open-water treatment, and coastal huts/canopies distinguish the venue and preserve readable heat/jump routes. | **SCOPED DISTINCTION SHOWN; NOT ACCEPTED / UNVERIFIED** |
-| Foundry Flight | The dark industrial palette, stacks/gantries, furnace warmth, and safety treatment distinguish the venue, though the captured industrial density remains sparse relative to the concept. | **SCOPED DISTINCTION SHOWN; NOT ACCEPTED / UNVERIFIED** |
+| Foundry Flight | Superseded claim, see R10 below. The former "dark industrial palette" wording was **not supported** by the 2d0376d captures: Foundry's terraces rendered the same warm brown as the desert venues, so the venue read as Canyon plus one smokestack. The palette has since been corrected (`rock` warm brown → cool slate) and a working-tree diagnostic capture shows grey slate terraces against the warm dirt racing line. Industrial density still remains sparse relative to the concept. | **PALETTE CORRECTED; DIAGNOSTIC ONLY, NOT RE-CAPTURED IN A FROZEN CANDIDATE, NOT ACCEPTED** |
 | Summit Showdown | Violet dusk, pale snow-capped mountain silhouettes, and high-risk obstacle treatment distinguish the finale from Canyon and Pine. | **SCOPED DISTINCTION SHOWN; NOT ACCEPTED / UNVERIFIED** |
+
+### R10 — Foundry Flight did not read as its documented identity (found and corrected 2026-07-27)
+
+Found while validating the owner review package at `2d0376d` before asking the owner to
+spend time on it, rather than after.
+
+**The defect.** This document claimed Foundry Flight was distinguished by a "dark
+industrial palette". The captured frames did not support that claim. Foundry's start
+frame showed the same warm brown dirt, teal/coral fencing and festival tents as
+Coastline and Canyon; its midcourse frame showed one lone grey smokestack against
+otherwise warm-brown terraced walls that were indistinguishable from Canyon's.
+
+**Why the claim was wrong.** Two independent reasons, both measured:
+
+1. `WORLD_VISUAL_PROFILES["foundry-flight"]` is not configured as a dark venue at all.
+   Its `sun` is warm (`0xffbb78`), its `sunIntensity` (3.6) is effectively Canyon's
+   (3.7), and its `exposure` (1.12) is *higher* than Canyon's (1.08).
+2. The venue's terrain identity is carried by `palette.rock` (consumed as `wallColor`
+   in `createTerracedCourseEdges`, and by mesas, arches and scatter rock). Foundry's
+   `rock` was `0x805747`, a medium warm brown in the same family as the desert venues.
+   By contrast Summit reads as distinct because its `rock` is `0x7e7180`, a genuine
+   violet-grey.
+
+**The fix.** `palette.rock` `0x805747` → `0x6d7178` (cool slate) and `palette.dirtDark`
+`0x46322b` → `0x3b3a3f`, with `grass` nudged cooler. `palette.dirt` was deliberately
+left warm (`0x84513b`): it textures the running surface, and lane/rut readability must
+stay identical across venues. `createTerracedCourseEdges` already special-cased Foundry
+(`shelfColor` lerps toward `0x59636a`), so the cool rock composes with existing intent.
+
+**Evidence, and its limits.** A working-tree diagnostic capture at `VITE_QA_MODE=1`,
+high quality, 1280×720, Playwright/Chromium, shows Foundry with cool grey slate
+terraces against the warm dirt racing line and the smokestack reading as part of a
+quarry/industrial site; Canyon in the same run is unchanged (warm red mesas, pines).
+`e2e/quality-presets.spec.ts` passes 2/2 on chromium, including "all five launch tracks
+expose distinct venue signature diagnostics". `typecheck`, `lint`, `npm test`,
+`audit:release-scope` and `assets:verify` all pass.
+
+This is **diagnostic only**. It was captured from the working tree, not from a frozen
+QA candidate, so it certifies nothing and is not a visual baseline. No screenshot here
+is promoted or accepted.
+
+**Method note worth keeping.** My first attempt to verify this fix appeared to show no
+change, because `scripts/capture-visual-review.mjs` serves
+`artifacts/candidate-evidence/visual/current/dist` — the *frozen candidate* — and
+asserts it matches its manifest. By design it cannot render a working-tree change. The
+two frames came back byte-identical (`1836a297…`), which I briefly misread as "the fix
+does not work" before checking what the harness actually serves. Byte-identical output
+from that harness after a source edit is expected, not evidence.
 
 ## Acceptance criteria and constraints
 
