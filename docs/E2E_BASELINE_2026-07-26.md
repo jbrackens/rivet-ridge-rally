@@ -399,3 +399,42 @@ The isolation run's artifacts were archived before further runs.
 4. Only after a quiet-host run may these three be classified as pass, flake, or regression.
 
 **Do not freeze a candidate on `d3e4480` until step 4 is complete.**
+
+### Controlled A/B — the three failures are NOT caused by the RC2 palette/R4 commits
+
+Because a quiet host was unavailable, the attribution question was settled by holding the host
+constant and varying only the commit. The same three tests were run in a detached worktree at
+**`9c455c9`** — sweep 4's commit, where all three **passed** — on a separate port
+(`RRR_PLAYWRIGHT_PORT=4271`), while the host stayed under the same heavy load.
+
+| Arm | Commit | Host load (start → end) | Result |
+|---|---|---|---|
+| Sweep 4 (historical) | `9c455c9` | not recorded, quieter | **3 of 3 passed** |
+| Test | `d3e4480` | 36.8 → 32.1 | 3 of 3 **failed** |
+| **Control** | **`9c455c9`** | **23.1 → 66.5** | **3 of 3 failed** |
+
+**Conclusion: the failures reproduce at a commit that predates the Foundry palette change and
+R4, so commits `497feb6`, `ac21df1` and `d3e4480` are not the cause.** The differentiator is
+host load, not code.
+
+Supporting detail: under load the same tests fail in *varying* ways, which is characteristic of
+nondeterministic resource pressure rather than a specific logic break. `lifecycle.spec.ts:340`
+failed as a stalled `locator.click` in one arm and as `expect(locator).toHaveCount()` in the
+control; `tutorial.spec.ts:268` failed as a stalled click in one arm and as
+`expect(locator).toContainText()` in the control.
+
+**Limits of this result, stated plainly:**
+
+- **n = 1 per arm.** This is sufficient to remove the RC2 commits as a *necessary* cause, since
+  the failures occur without them. It does **not** quantify a flake rate, and it cannot exclude
+  an interaction effect in which the new commits worsen behaviour that was already fragile.
+- **It does not clear the tests.** Three release-relevant tests are demonstrably fragile under
+  host load. That is a real pre-existing quality problem, not a non-issue, and it is exactly
+  the failure class that findings R7 and R9 addressed once already.
+- **A valid pass/fail classification still requires a quiet-host run** with the load average
+  recorded. Until then these three remain **INCOMPLETE**, not "passing".
+
+**Standing rule adopted from this episode:** every sweep records `uptime` load average with its
+result, and no agent review, model run, or build may execute concurrently with a
+timing-sensitive sweep. A sweep without a recorded load average is not comparable to another
+sweep.
