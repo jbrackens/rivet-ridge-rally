@@ -1,6 +1,24 @@
 # RIVET RIDGE RALLY — Operations Runbook
 
-**Candidate:** `1.0.0-rc.2` working candidate
+**Candidate:** `1.0.0-rc.3` working candidate (version bumped 2026-07-27; **no tag created yet — deliberately**)
+
+> **`rc.3` identity decision, 2026-07-27.** `1.0.0-rc.2` was retired as a candidate identity
+> because its annotated tag `v1.0.0-rc.2` cannot complete its QA record set (finding R1 / gate
+> 14). `package.json` and `package-lock.json` now read `1.0.0-rc.3`.
+>
+> **The tag `v1.0.0-rc.3` must NOT be created yet.** The visual QA candidate has to be captured
+> from an *untagged* commit: `scripts/promote-visual-baseline.mjs` requires
+> `expectedTagAtCommit === false` and `candidateManifest.source.expectedVersionTagAtCommit ===
+> false`, while the normal release-manifest profile later requires the annotated tag at `HEAD`.
+> The correct order is therefore: bump version → capture candidate untagged → owner review →
+> guarded promotion → full pre-tag qualification → *then* tag that exact commit.
+>
+> Also note: any unrelated tracked change between the candidate capture and the tag will
+> invalidate the strict promotion diff, so the tree must stay otherwise untouched across that
+> window.
+>
+> `v1.0.0-rc.1` and `v1.0.0-rc.2` remain immutable historical records. Do not move, rebuild or
+> relabel either.
 
 **Application model:** static Vite site with same-origin assets and an offline service worker
 
@@ -90,10 +108,10 @@ npm run build
 
 `npm run test` executes Vitest plus the Node release-manifest, release-attestation, production-smoke-support, production-smoke-flow, and service-worker-install fixtures. `npm run test:coverage` is a separate Vitest-only coverage report; it does not cover the Node fixtures or replace browser coverage.
 
-After every required pre-tag gate and the guarded owner review/promotion pass, create the annotated local tag `v1.0.0-rc.2` at that exact commit and verify that the tag peels to the recorded commit. Performance, soak, and production smoke are post-tag gates: their evidence binds the annotated tag and the format-2 manifest, so they cannot run as qualifying pre-tag evidence. Do not move or reuse a published tag. The manifest guard requires that exact annotated tag at `HEAD` and a clean tree:
+After every required pre-tag gate and the guarded owner review/promotion pass, create the annotated local tag `v1.0.0-rc.3` at that exact commit and verify that the tag peels to the recorded commit. (The historical `v1.0.0-rc.2` procedure below is retained for the record; `rc.2` is retired as a candidate identity and its tag must not be moved.) Performance, soak, and production smoke are post-tag gates: their evidence binds the annotated tag and the format-2 manifest, so they cannot run as qualifying pre-tag evidence. Do not move or reuse a published tag. The manifest guard requires that exact annotated tag at `HEAD` and a clean tree:
 
 ```sh
-git tag -a v1.0.0-rc.2 -m "RIVET RIDGE RALLY 1.0.0-rc.2"
+git tag -a v1.0.0-rc.3 -m "RIVET RIDGE RALLY 1.0.0-rc.3"
 npm run release:manifest
 ```
 
