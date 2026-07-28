@@ -34,6 +34,57 @@ const EXPECTED_MATRIX = Object.freeze([
   ...TRACKS.map((track) => ({ track, phase: "midcourse", mode: "rival", distance: track.midcourseDistance })),
   { track: TRACKS[0], phase: "curved-baseline-candidate", mode: "practice", distance: 500 },
 ]);
+// Promotion candidates for the checked-in visual-regression baselines. These cannot come
+// from Playwright -- visual-regression.spec.ts refuses to create or replace baselines -- so
+// they are captured by the harness and must be validated here before anything is promoted.
+const BASELINE_SNAPSHOT_PREFIX = "e2e/visual-regression.spec.ts-snapshots/";
+const EXPECTED_BASELINE_IDS = Object.freeze([
+  "curved-canyon",
+  "desktop-race",
+  "editor",
+  "high-contrast",
+  "portrait-race",
+]);
+
+function validateBaselineCandidates(value) {
+  requireCondition(Array.isArray(value), "capture manifest baselineCandidates must be an array");
+  requireCondition(
+    value.length === EXPECTED_BASELINE_IDS.length,
+    `capture manifest must contain ${EXPECTED_BASELINE_IDS.length} baseline candidates`,
+  );
+  const ids = value.map((entry) => entry?.id);
+  requireCondition(new Set(ids).size === ids.length, "capture manifest baselineCandidates contains duplicate ids");
+  requireCondition(
+    JSON.stringify(ids.toSorted()) === JSON.stringify([...EXPECTED_BASELINE_IDS]),
+    "capture manifest baselineCandidates ids do not match the expected set",
+  );
+  for (const entry of value) {
+    const label = `baseline candidate ${entry?.id}`;
+    exactKeys(entry, [
+      "bytes",
+      "device",
+      "file",
+      "id",
+      "project",
+      "sha256",
+      "snapshotPath",
+      "specTitle",
+      "status",
+    ], label);
+    requireCondition(entry.status === "PASS", `${label} status must be PASS`);
+    requireCondition(
+      typeof entry.snapshotPath === "string" && entry.snapshotPath.startsWith(BASELINE_SNAPSHOT_PREFIX),
+      `${label} snapshotPath must sit inside the checked-in snapshot directory`,
+    );
+    requireCondition(!entry.snapshotPath.includes(".."), `${label} snapshotPath must not traverse`);
+    requireCondition(
+      Number.isSafeInteger(entry.bytes) && entry.bytes > 0,
+      `${label} bytes must be positive`,
+    );
+    requireCondition(SHA256_PATTERN.test(entry.sha256 ?? ""), `${label} sha256 is invalid`);
+  }
+}
+
 const REQUIRED_CHECKS = Object.freeze([
   "source-clean-before-and-after",
   "source-identity-stable",
@@ -719,6 +770,7 @@ export function validateVisualCaptureManifest(
   exactKeys(value, [
     "appVersion",
     "baseURL",
+    "baselineCandidates",
     "browser",
     "candidate",
     "captures",
@@ -733,6 +785,7 @@ export function validateVisualCaptureManifest(
     "viewport",
   ], "capture manifest");
   requireCondition(value.schemaVersion === 3 && value.kind === CAPTURE_KIND, "capture manifest schema identity does not match");
+  validateBaselineCandidates(value.baselineCandidates);
   requireCondition(value.status === "PASS", "capture manifest status must be PASS");
   const createdAt = validateTimestamp(value.createdAt, "capture manifest createdAt");
   requireCondition(createdAt <= Date.parse(approval.approvedAt), "owner approval predates the capture manifest");

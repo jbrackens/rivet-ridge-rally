@@ -136,6 +136,7 @@ function validateCaptureManifest(value) {
   exactKeys(value, [
     "appVersion",
     "baseURL",
+    "baselineCandidates",
     "browser",
     "candidate",
     "captures",

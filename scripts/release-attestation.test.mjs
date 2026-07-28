@@ -30,6 +30,20 @@ const ATTESTATION_PATH = `artifacts/release-attestations/${PRODUCT_TAG}.json`;
 const ROLLBACK_ARCHIVE_BYTES = 1_234_567;
 const ROLLBACK_ARCHIVE_SHA256 = "7".repeat(64);
 const ROLLBACK_STAGED_BASE_URL = "https://staging.rivet-ridge.example/";
+const BASELINE_CANDIDATE_FIXTURES = [
+  { id: "desktop-race", snapshotPath: "e2e/visual-regression.spec.ts-snapshots/race-screen-chromium-darwin.png", specTitle: "desktop race matches its checked-in visual baseline", project: "chromium", device: "Desktop Chrome" },
+  { id: "curved-canyon", snapshotPath: "e2e/visual-regression.spec.ts-snapshots/race-curved-course-canyon-chromium-darwin.png", specTitle: "production Canyon bend matches its checked-in visual baseline", project: "chromium", device: "Desktop Chrome" },
+  { id: "editor", snapshotPath: "e2e/visual-regression.spec.ts-snapshots/editor-screen-chromium-darwin.png", specTitle: "editor matches its checked-in visual baseline", project: "chromium", device: "Desktop Chrome" },
+  { id: "portrait-race", snapshotPath: "e2e/visual-regression.spec.ts-snapshots/race-mobile-mobile-chrome-darwin.png", specTitle: "portrait race matches its checked-in visual baseline", project: "mobile-chrome", device: "Pixel 7" },
+  { id: "high-contrast", snapshotPath: "e2e/visual-regression.spec.ts-snapshots/race-high-contrast-chromium-darwin.png", specTitle: "high-contrast scaled HUD matches its checked-in visual baseline", project: "chromium", device: "Desktop Chrome" },
+].map((state, index) => ({
+  ...state,
+  file: `baseline-candidates/${state.id}.png`,
+  bytes: 100_000 + index,
+  sha256: `${String(index + 1).repeat(2)}${"0".repeat(62)}`,
+  status: "PASS",
+}));
+
 const VISUAL_CAPTURE_COMMIT = "9".repeat(40);
 const VISUAL_BASELINE_APPROVAL_PATH = "docs/design/RACE_CURVED_CANYON_BASELINE_APPROVAL.json";
 const VISUAL_BASELINE_PATH = "e2e/visual-regression.spec.ts-snapshots/race-curved-course-canyon-chromium-darwin.png";
@@ -1245,6 +1259,7 @@ function visualCaptureManifest(candidateManifest, candidateReference, baseline) 
   return {
     schemaVersion: 3,
     kind: "five-track-controlled-visual-review",
+    baselineCandidates: BASELINE_CANDIDATE_FIXTURES,
     createdAt: "2026-07-16T12:01:00.000Z",
     appVersion: VERSION,
     candidate: {

@@ -5,7 +5,7 @@ import process from "node:process";
 import { isDeepStrictEqual } from "node:util";
 import { gzipSync } from "node:zlib";
 
-import { chromium } from "playwright";
+import { chromium, devices } from "playwright";
 
 import {
   REPO_ROOT,
@@ -17,6 +17,7 @@ import {
   loadVisualCandidate,
   startVisualCandidateServer,
 } from "./visual-candidate-support.mjs";
+import { BASELINE_STATES, captureBaselineCandidates } from "./capture-baseline-candidates.mjs";
 
 const TRACKS = [
   { id: "canyon-kickoff", name: "Canyon Kickoff", midcourseDistance: 650 },
@@ -26,6 +27,9 @@ const TRACKS = [
   { id: "summit-showdown", name: "Summit Showdown", midcourseDistance: 900 },
 ];
 const VIEWPORT = { width: 1280, height: 720 };
+// Promotion candidates for the checked-in visual-regression baselines live in their own
+// output phase so the 11-entry review matrix keeps its exact shape.
+const BASELINE_PHASE = "baseline-candidates";
 const argumentsList = process.argv.slice(2);
 const serverPort = Number(readOption(argumentsList, "port", "4373"));
 if (!Number.isSafeInteger(serverPort) || serverPort <= 0 || serverPort > 65_535) {
@@ -708,7 +712,7 @@ const matrix = [
   },
 ];
 const candidateBefore = await loadVisualCandidate();
-await prepareFreshOutputBundle(matrix.map((entry) => entry.phase));
+await prepareFreshOutputBundle([...matrix.map((entry) => entry.phase), BASELINE_PHASE]);
 const candidate = {
   manifest: {
     path: candidateBefore.manifestReference,
@@ -737,6 +741,7 @@ await collectCandidateEvidence(
   () => sourceIdentityEvidence(),
 );
 const captures = [];
+const baselineCandidates = [];
 let browser = null;
 let browserVersion = null;
 let server = null;
@@ -765,6 +770,35 @@ try {
       for (const entry of matrix) {
         captures.push(await capture(browser, entry, candidateBefore, server.baseURL));
       }
+      // Baselines cannot be produced by Playwright: visual-regression.spec.ts refuses to
+      // create or replace them. They are captured here, from the same frozen candidate and
+      // the same browser, so the owner reviews review frames and promotion candidates as
+      // one package (finding R14).
+      await captureBaselineCandidates({
+        browser,
+        devices,
+        baseURL: server.baseURL,
+        onCapture: async (state, contents) => {
+          const relativePath = `${BASELINE_PHASE}/${state.id}.png`;
+          const absolutePath = resolve(outputRoot, relativePath);
+          if (relative(outputRoot, absolutePath).split(sep).join("/") !== relativePath) {
+            throw new Error(`Baseline candidate path escaped the fresh output bundle: ${relativePath}`);
+          }
+          await assertSafeOutputPhase(BASELINE_PHASE);
+          await writeFile(absolutePath, contents, { flag: "wx" });
+          baselineCandidates.push({
+            id: state.id,
+            snapshotPath: state.snapshotPath,
+            specTitle: state.specTitle,
+            project: state.project,
+            device: state.device,
+            file: relativePath,
+            bytes: contents.byteLength,
+            sha256: sha256(contents),
+            status: "PASS",
+          });
+        },
+      });
     } catch (error) {
       candidateErrors.push(asCandidateError("browser-orchestration", error));
     } finally {
@@ -819,6 +853,12 @@ try {
 const capturesComplete = captures.length === matrix.length;
 const capturesPassed = capturesComplete
   && captures.every((captureResult) => captureResult.status === "PASS");
+// A package missing any promotion candidate cannot support a combined owner review, so an
+// incomplete baseline set fails the manifest exactly like an incomplete review matrix.
+const baselineCandidatesComplete = baselineCandidates.length === BASELINE_STATES.length
+  && BASELINE_STATES.every((state) => baselineCandidates.some((entry) => entry.id === state.id));
+const baselineCandidatesPassed = baselineCandidatesComplete
+  && baselineCandidates.every((entry) => entry.status === "PASS");
 const rivalAssetsReady = capturesComplete
   && captures
     .filter((captureResult) => captureResult.mode === "rival")
@@ -956,6 +996,15 @@ const candidateChecks = [
     actual: { expected: matrix.length, captured: captures.length },
   },
   {
+    id: "complete-baseline-candidate-set",
+    passed: baselineCandidatesPassed,
+    actual: {
+      expected: BASELINE_STATES.length,
+      captured: baselineCandidates.length,
+      ids: baselineCandidates.map((entry) => entry.id),
+    },
+  },
+  {
     id: "rival-assets-ready",
     passed: rivalAssetsReady,
     actual: captures
@@ -1003,6 +1052,7 @@ const manifest = {
   quality: "high",
   productionCourseScale: true,
   captures,
+  baselineCandidates,
   status: passed ? "PASS" : "FAIL",
 };
 await assertSafeOutputRoot();
