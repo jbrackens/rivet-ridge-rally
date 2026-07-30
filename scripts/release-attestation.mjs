@@ -40,7 +40,15 @@ const PERFORMANCE_EXPECTED_TRACK_IDS = [
 ];
 const EXPECTED_OFFLINE_CACHE_NAME = "rivet-ridge-rally-shell-v35";
 const VISUAL_BASELINE_APPROVAL_PATH = "docs/design/RACE_CURVED_CANYON_BASELINE_APPROVAL.json";
+const VISUAL_BASELINE_DIRECTORY = "e2e/visual-regression.spec.ts-snapshots/";
 const VISUAL_BASELINE_PATH = "e2e/visual-regression.spec.ts-snapshots/race-curved-course-canyon-chromium-darwin.png";
+const VISUAL_BASELINE_IDS = Object.freeze([
+  "curved-canyon",
+  "desktop-race",
+  "editor",
+  "high-contrast",
+  "portrait-race",
+]);
 const VISUAL_APPROVAL_AUTHENTICATION = "external-manual-trust-boundary";
 const PERFORMANCE_BUDGETS = Object.freeze({
   compressedBundleBytesExclusive: 12_000_000,
@@ -2101,21 +2109,52 @@ function validateEmbeddedVisualDocument(value, expectedPath, label, { aggregate 
 
 function validateVisualBaselineApprovalRecord(value, expectedVersion) {
   const label = "visual baseline approval record";
-  requireExactKeys(value, ["authentication", "evidence", "kind", "ownerApproval", "promotedBaseline", "schemaVersion"], label);
+  requireExactKeys(value, ["authentication", "evidence", "kind", "ownerApproval", "promotedBaselines", "schemaVersion"], label);
   requireCondition(
-    value.schemaVersion === 2
+    value.schemaVersion === 3
       && value.kind === "rivet-ridge-rally-visual-baseline-approval-record"
       && value.authentication === VISUAL_APPROVAL_AUTHENTICATION,
     `${label} schema identity does not match`,
   );
 
-  requireExactKeys(value.promotedBaseline, ["bytes", "path", "sha256"], `${label}.promotedBaseline`);
-  requireCondition(value.promotedBaseline.path === VISUAL_BASELINE_PATH, `${label}.promotedBaseline.path is not canonical`);
+  // Every checked-in visual baseline is promoted from one owner-approved package, so the
+  // record enumerates all of them. The Canyon baseline must still be present by name: it is
+  // what the QA approval separately hash-binds.
   requireCondition(
-    Number.isSafeInteger(value.promotedBaseline.bytes) && value.promotedBaseline.bytes > 0,
-    `${label}.promotedBaseline.bytes must be positive`,
+    Array.isArray(value.promotedBaselines) && value.promotedBaselines.length === VISUAL_BASELINE_IDS.length,
+    `${label}.promotedBaselines must list all ${VISUAL_BASELINE_IDS.length} promoted baselines`,
   );
-  requireSha256(value.promotedBaseline.sha256, `${label}.promotedBaseline.sha256`);
+  const promotedIds = value.promotedBaselines.map((entry) => entry?.id);
+  requireCondition(new Set(promotedIds).size === promotedIds.length, `${label}.promotedBaselines contains duplicate ids`);
+  requireCondition(
+    JSON.stringify(promotedIds.toSorted()) === JSON.stringify([...VISUAL_BASELINE_IDS]),
+    `${label}.promotedBaselines ids do not match the expected set`,
+  );
+  const promotedPaths = new Set();
+  for (const promoted of value.promotedBaselines) {
+    const promotedLabel = `${label}.promotedBaselines[${promoted?.id}]`;
+    requireExactKeys(promoted, ["bytes", "id", "path", "sha256"], promotedLabel);
+    requireCondition(
+      typeof promoted.path === "string"
+        && promoted.path.startsWith(VISUAL_BASELINE_DIRECTORY)
+        && !promoted.path.includes(".."),
+      `${promotedLabel}.path is not a canonical baseline path`,
+    );
+    requireCondition(!promotedPaths.has(promoted.path), `${promotedLabel}.path is duplicated`);
+    promotedPaths.add(promoted.path);
+    requireCondition(
+      Number.isSafeInteger(promoted.bytes) && promoted.bytes > 0,
+      `${promotedLabel}.bytes must be positive`,
+    );
+    requireSha256(promoted.sha256, `${promotedLabel}.sha256`);
+  }
+  requireCondition(
+    promotedPaths.has(VISUAL_BASELINE_PATH),
+    `${label}.promotedBaselines must include the canonical Canyon baseline`,
+  );
+  const canonicalPromotedBaseline = value.promotedBaselines.find(
+    (entry) => entry.path === VISUAL_BASELINE_PATH,
+  );
 
   requireObject(value.ownerApproval, `${label}.ownerApproval`);
   const { approval: validatedOwnerApproval } = validateVisualOwnerApproval(
@@ -2124,11 +2163,11 @@ function validateVisualBaselineApprovalRecord(value, expectedVersion) {
   );
   requireExactKeys(
     value.ownerApproval,
-    ["approvedAt", "authentication", "candidate", "decision", "kind", "reviewer", "schemaVersion", "screenshot", "statement"],
+    ["approvedAt", "authentication", "baselines", "candidate", "decision", "kind", "reviewedFrames", "reviewer", "schemaVersion", "screenshot", "statement"],
     `${label}.ownerApproval`,
   );
   requireCondition(
-    value.ownerApproval.schemaVersion === 1
+    value.ownerApproval.schemaVersion === 2
       && value.ownerApproval.kind === "rivet-ridge-rally-visual-baseline-owner-approval"
       && value.ownerApproval.authentication === VISUAL_APPROVAL_AUTHENTICATION
       && value.ownerApproval.decision === "ACCEPT",
@@ -2136,7 +2175,7 @@ function validateVisualBaselineApprovalRecord(value, expectedVersion) {
   );
   requireTimestamp(value.ownerApproval.approvedAt, `${label}.ownerApproval.approvedAt`);
   requireCondition(
-    value.ownerApproval.statement === "I reviewed the exact Canyon Practice 500 capture against the approved concept art and accept it as the checked-in visual regression baseline.",
+    value.ownerApproval.statement === "I reviewed all eleven venue review frames covering Canyon Kickoff, Pine Run, Coastline Clash, Foundry Flight and Summit Showdown, and all five visual-regression baseline candidates listed in this record, against the approved concept art, and I accept those five candidates as the checked-in visual regression baselines. This acceptance covers only the exact bytes named by the SHA-256 values in this record.",
     `${label}.ownerApproval.statement does not record the required acceptance`,
   );
   requireExactKeys(value.ownerApproval.reviewer, ["name", "role"], `${label}.ownerApproval.reviewer`);
@@ -2158,8 +2197,8 @@ function validateVisualBaselineApprovalRecord(value, expectedVersion) {
     `${label}.ownerApproval.screenshot`,
   );
   requireCondition(
-    value.ownerApproval.screenshot.bytes === value.promotedBaseline.bytes
-      && value.ownerApproval.screenshot.sha256 === value.promotedBaseline.sha256,
+    value.ownerApproval.screenshot.bytes === canonicalPromotedBaseline.bytes
+      && value.ownerApproval.screenshot.sha256 === canonicalPromotedBaseline.sha256,
     `${label}.ownerApproval screenshot does not match the promoted baseline`,
   );
   requireCondition(
@@ -2259,14 +2298,15 @@ function validateVisualBaselineApprovalRecord(value, expectedVersion) {
   );
   requireCondition(
     approvedCapture.status === "PASS"
-      && approvedCapture.bytes === value.promotedBaseline.bytes
-      && approvedCapture.sha256 === value.promotedBaseline.sha256,
+      && approvedCapture.bytes === canonicalPromotedBaseline.bytes
+      && approvedCapture.sha256 === canonicalPromotedBaseline.sha256,
     `${label} owner-approved capture does not match the promoted baseline`,
   );
   return {
     approvedAt: value.ownerApproval.approvedAt,
     candidateCommit: value.ownerApproval.candidate.commit,
-    promotedBaseline: value.promotedBaseline,
+    promotedBaseline: canonicalPromotedBaseline,
+    promotedBaselines: value.promotedBaselines,
   };
 }
 

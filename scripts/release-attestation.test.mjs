@@ -38,6 +38,7 @@ const BASELINE_CANDIDATE_FIXTURES = [
   { id: "high-contrast", snapshotPath: "e2e/visual-regression.spec.ts-snapshots/race-high-contrast-chromium-darwin.png", specTitle: "high-contrast scaled HUD matches its checked-in visual baseline", project: "chromium", device: "Desktop Chrome" },
 ].map((state, index) => ({
   ...state,
+  viewport: state.project === "mobile-chrome" ? { width: 412, height: 839 } : { width: 1280, height: 720 },
   file: `baseline-candidates/${state.id}.png`,
   bytes: 100_000 + index,
   sha256: `${String(index + 1).repeat(2)}${"0".repeat(62)}`,
@@ -1320,17 +1321,17 @@ function visualBaselineApprovalRecord() {
   );
   const approvedCapture = captureManifest.captures.find((capture) => capture.file === VISUAL_CAPTURE_PATH);
   return {
-    schemaVersion: 2,
+    schemaVersion: 3,
     kind: "rivet-ridge-rally-visual-baseline-approval-record",
     authentication: "external-manual-trust-boundary",
     ownerApproval: {
-      schemaVersion: 1,
+      schemaVersion: 2,
       kind: "rivet-ridge-rally-visual-baseline-owner-approval",
       authentication: "external-manual-trust-boundary",
       decision: "ACCEPT",
       approvedAt: "2026-07-16T12:01:15.000Z",
       reviewer: { name: "Alex Rivera", role: "product-owner" },
-      statement: "I reviewed the exact Canyon Practice 500 capture against the approved concept art and accept it as the checked-in visual regression baseline.",
+      statement: "I reviewed all eleven venue review frames covering Canyon Kickoff, Pine Run, Coastline Clash, Foundry Flight and Summit Showdown, and all five visual-regression baseline candidates listed in this record, against the approved concept art, and I accept those five candidates as the checked-in visual regression baselines. This acceptance covers only the exact bytes named by the SHA-256 values in this record.",
       candidate: {
         commit: VISUAL_CAPTURE_COMMIT,
         aggregateSha256: candidateManifest.aggregateSha256,
@@ -1356,12 +1357,36 @@ function visualBaselineApprovalRecord() {
           runtimeBuild: approvedCapture.readiness.runtimeBuild,
         },
       },
+      reviewedFrames: captureManifest.captures.map((capture) => ({
+        file: capture.file,
+        bytes: capture.bytes,
+        sha256: capture.sha256,
+        trackId: capture.trackId,
+        phase: capture.phase,
+        mode: capture.mode,
+        distance: capture.distance,
+      })),
+      baselines: BASELINE_CANDIDATE_FIXTURES.map((candidate) => ({
+        id: candidate.id,
+        snapshotPath: candidate.snapshotPath,
+        specTitle: candidate.specTitle,
+        project: candidate.project,
+        device: candidate.device,
+        viewport: candidate.viewport,
+        file: candidate.file,
+        bytes: candidate.bytes,
+        sha256: candidate.sha256,
+      })),
     },
     evidence: {
       captureManifest: captureManifestReference,
       candidateManifest: candidateManifestReference,
     },
-    promotedBaseline: baseline,
+    promotedBaselines: BASELINE_CANDIDATE_FIXTURES.map((candidate) => (
+      candidate.id === "curved-canyon"
+        ? { id: candidate.id, path: baseline.path, bytes: baseline.bytes, sha256: baseline.sha256 }
+        : { id: candidate.id, path: candidate.snapshotPath, bytes: candidate.bytes, sha256: candidate.sha256 }
+    )),
   };
 }
 
@@ -2379,7 +2404,7 @@ test("rejects a visual approval record whose promoted hash differs from the owne
   const fixture = await buildFixture();
   context.after(() => rm(fixture.root, { recursive: true, force: true }));
   const visualRecord = visualBaselineApprovalRecord();
-  visualRecord.promotedBaseline.sha256 = "0".repeat(64);
+  visualRecord.promotedBaselines.find((entry) => entry.path === VISUAL_BASELINE_PATH).sha256 = "0".repeat(64);
   const visualReference = await writeFixtureFile(fixture.root, VISUAL_BASELINE_APPROVAL_PATH, visualRecord);
   const qaRecord = structuredClone(fixture.approvalRecords.qa);
   qaRecord.supportingEvidence = qaRecord.supportingEvidence.map((entry) =>

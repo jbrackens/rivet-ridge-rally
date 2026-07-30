@@ -8,7 +8,7 @@ const SCRIPT_DIRECTORY = dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = resolve(SCRIPT_DIRECTORY, "..");
 const APPROVAL_KIND = "rivet-ridge-rally-visual-baseline-owner-approval";
 const APPROVAL_AUTHENTICATION = "external-manual-trust-boundary";
-const APPROVAL_STATEMENT = "I reviewed the exact Canyon Practice 500 capture against the approved concept art and accept it as the checked-in visual regression baseline.";
+const APPROVAL_STATEMENT = "I reviewed all eleven venue review frames covering Canyon Kickoff, Pine Run, Coastline Clash, Foundry Flight and Summit Showdown, and all five visual-regression baseline candidates listed in this record, against the approved concept art, and I accept those five candidates as the checked-in visual regression baselines. This acceptance covers only the exact bytes named by the SHA-256 values in this record.";
 const CAPTURE_KIND = "five-track-controlled-visual-review";
 const BASELINE_FILE = "curved-baseline-candidate/canyon-kickoff-practice-1280x720.png";
 const SHA256_PATTERN = /^[0-9a-f]{64}$/u;
@@ -208,8 +208,31 @@ async function main() {
   const { baselineCapture, readiness } = validateCaptureManifest(captureManifest);
   const captureManifestSha256 = sha256(captureManifestContents);
 
+  // Every frame the owner is asked to look at is enumerated by hash, so the acceptance
+  // record describes the whole five-venue review rather than a single Canyon frame.
+  const reviewedFrames = captureManifest.captures.map((capture) => ({
+    file: capture.file,
+    bytes: capture.bytes,
+    sha256: capture.sha256,
+    trackId: capture.trackId,
+    phase: capture.phase,
+    mode: capture.mode,
+    distance: capture.distance,
+  }));
+  const baselines = captureManifest.baselineCandidates.map((candidate) => ({
+    id: candidate.id,
+    snapshotPath: candidate.snapshotPath,
+    specTitle: candidate.specTitle,
+    project: candidate.project,
+    device: candidate.device,
+    viewport: candidate.viewport,
+    file: candidate.file,
+    bytes: candidate.bytes,
+    sha256: candidate.sha256,
+  }));
+
   const draft = {
-    schemaVersion: 1,
+    schemaVersion: 2,
     kind: APPROVAL_KIND,
     authentication: APPROVAL_AUTHENTICATION,
     decision: "PENDING_OWNER_REVIEW",
@@ -233,13 +256,16 @@ async function main() {
       quality: baselineCapture.quality,
       readiness,
     },
+    reviewedFrames,
+    baselines,
   };
 
   await mkdir(dirname(outputPath), { recursive: true });
   await writeFile(outputPath, `${JSON.stringify(draft, null, 2)}\n`, { flag: "wx" });
   console.log(`Wrote non-acceptance visual approval draft: ${outputPath}`);
   console.log("Owner review is still required; this draft is intentionally rejected by the promotion tool until decision, timestamp, and reviewer are owner-authored.");
-  console.log("Required owner edits after review: set decision=ACCEPT, set approvedAt to the current UTC timestamp, set reviewer.name to the real product-owner name, and do not change candidate or screenshot hash fields.");
+  console.log("Required owner edits after review: set decision=ACCEPT, set approvedAt to the current UTC timestamp, set reviewer.name to the real product-owner name, and do not change any candidate, screenshot, reviewedFrames or baselines hash field.");
+  console.log(`Scope of this acceptance: ${reviewedFrames.length} review frames and ${baselines.length} promotion candidates, each bound by SHA-256.`);
 }
 
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) await main();

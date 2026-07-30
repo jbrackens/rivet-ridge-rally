@@ -171,8 +171,13 @@ export async function captureBaselineCandidates({ browser, devices, baseURL, onC
       // comparable with what toHaveScreenshot() produces at verification time.
       const contents = await page.screenshot({ animations: "disabled", scale: "css" });
       if (failures.length > 0) fail(`${state.id}: browser reported ${failures[0]}`);
-      results.push({ state, contents });
-      if (onCapture) await onCapture(state, contents);
+      // Recorded so promotion can reject a wrong-scale capture outright. Getting this wrong
+      // is exactly the failure R14 found: a device-pixel screenshot silently promoted
+      // against a CSS-pixel baseline.
+      const viewport = page.viewportSize();
+      if (!viewport) fail(`${state.id}: viewport size is unavailable`);
+      results.push({ state, contents, viewport });
+      if (onCapture) await onCapture(state, contents, viewport);
     } finally {
       await context.close();
     }

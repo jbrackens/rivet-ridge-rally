@@ -15,10 +15,9 @@ import {
 
 const SCRIPT_DIRECTORY = dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = resolve(SCRIPT_DIRECTORY, "..");
-const TARGET_PATH = "e2e/visual-regression.spec.ts-snapshots/race-curved-course-canyon-chromium-darwin.png";
 const APPROVAL_RECORD_PATH = "docs/design/RACE_CURVED_CANYON_BASELINE_APPROVAL.json";
 const APPROVAL_KIND = "rivet-ridge-rally-visual-baseline-owner-approval";
-const APPROVAL_STATEMENT = "I reviewed the exact Canyon Practice 500 capture against the approved concept art and accept it as the checked-in visual regression baseline.";
+const APPROVAL_STATEMENT = "I reviewed all eleven venue review frames covering Canyon Kickoff, Pine Run, Coastline Clash, Foundry Flight and Summit Showdown, and all five visual-regression baseline candidates listed in this record, against the approved concept art, and I accept those five candidates as the checked-in visual regression baselines. This acceptance covers only the exact bytes named by the SHA-256 values in this record.";
 const CAPTURE_KIND = "five-track-controlled-visual-review";
 const APPROVAL_AUTHENTICATION = "external-manual-trust-boundary";
 const APPROVAL_FRESHNESS_MS = 24 * 60 * 60 * 1_000;
@@ -46,6 +45,68 @@ const EXPECTED_BASELINE_IDS = Object.freeze([
   "portrait-race",
 ]);
 
+// The owner accepts a whole package, so the acceptance record must enumerate it. These are
+// shape checks only; the hashes are cross-checked against the capture manifest later, which
+// is what actually binds the acceptance to specific bytes.
+function validateApprovedReviewScope(value) {
+  requireCondition(Array.isArray(value.reviewedFrames), "owner approval reviewedFrames must be an array");
+  requireCondition(value.reviewedFrames.length === 11, "owner approval must enumerate all 11 review frames");
+  for (const frame of value.reviewedFrames) {
+    exactKeys(frame, [
+      "bytes",
+      "distance",
+      "file",
+      "mode",
+      "phase",
+      "sha256",
+      "trackId",
+    ], `owner approval reviewedFrames entry ${frame?.file}`);
+    validateRelativePath(frame.file, "owner approval reviewedFrames entry file");
+    requireCondition(
+      Number.isSafeInteger(frame.bytes) && frame.bytes > 0,
+      `owner approval reviewedFrames entry ${frame.file} bytes is invalid`,
+    );
+    requireSha(frame.sha256, `owner approval reviewedFrames entry ${frame.file} sha256`);
+  }
+  requireCondition(Array.isArray(value.baselines), "owner approval baselines must be an array");
+  requireCondition(
+    value.baselines.length === EXPECTED_BASELINE_IDS.length,
+    `owner approval must enumerate all ${EXPECTED_BASELINE_IDS.length} promotion candidates`,
+  );
+  const ids = value.baselines.map((entry) => entry?.id);
+  requireCondition(new Set(ids).size === ids.length, "owner approval baselines contains duplicate ids");
+  requireCondition(
+    JSON.stringify(ids.toSorted()) === JSON.stringify([...EXPECTED_BASELINE_IDS]),
+    "owner approval baselines ids do not match the expected set",
+  );
+  for (const entry of value.baselines) {
+    exactKeys(entry, [
+      "bytes",
+      "device",
+      "file",
+      "id",
+      "project",
+      "sha256",
+      "snapshotPath",
+      "specTitle",
+      "viewport",
+    ], `owner approval baselines entry ${entry?.id}`);
+    exactKeys(entry.viewport, ["height", "width"], `owner approval baselines entry ${entry.id} viewport`);
+    validateRelativePath(entry.file, `owner approval baselines entry ${entry.id} file`);
+    requireCondition(
+      typeof entry.snapshotPath === "string"
+        && entry.snapshotPath.startsWith(BASELINE_SNAPSHOT_PREFIX)
+        && !entry.snapshotPath.includes(".."),
+      `owner approval baselines entry ${entry.id} snapshotPath is not a canonical baseline path`,
+    );
+    requireCondition(
+      Number.isSafeInteger(entry.bytes) && entry.bytes > 0,
+      `owner approval baselines entry ${entry.id} bytes is invalid`,
+    );
+    requireSha(entry.sha256, `owner approval baselines entry ${entry.id} sha256`);
+  }
+}
+
 function validateBaselineCandidates(value) {
   requireCondition(Array.isArray(value), "capture manifest baselineCandidates must be an array");
   requireCondition(
@@ -70,7 +131,14 @@ function validateBaselineCandidates(value) {
       "snapshotPath",
       "specTitle",
       "status",
+      "viewport",
     ], label);
+    exactKeys(entry.viewport, ["height", "width"], `${label} viewport`);
+    requireCondition(
+      Number.isSafeInteger(entry.viewport.width) && entry.viewport.width > 0
+        && Number.isSafeInteger(entry.viewport.height) && entry.viewport.height > 0,
+      `${label} viewport must be positive integers`,
+    );
     requireCondition(entry.status === "PASS", `${label} status must be PASS`);
     requireCondition(
       typeof entry.snapshotPath === "string" && entry.snapshotPath.startsWith(BASELINE_SNAPSHOT_PREFIX),
@@ -241,15 +309,18 @@ export function validateVisualOwnerApproval(value, { enforceFreshness = true } =
   exactKeys(value, [
     "approvedAt",
     "authentication",
+    "baselines",
     "candidate",
     "decision",
     "kind",
+    "reviewedFrames",
     "reviewer",
     "schemaVersion",
     "screenshot",
     "statement",
   ], "owner approval");
-  requireCondition(value.schemaVersion === 1 && value.kind === APPROVAL_KIND, "owner approval schema identity does not match");
+  requireCondition(value.schemaVersion === 2 && value.kind === APPROVAL_KIND, "owner approval schema identity does not match");
+  validateApprovedReviewScope(value);
   requireCondition(
     value.authentication === APPROVAL_AUTHENTICATION,
     `owner approval authentication must be ${APPROVAL_AUTHENTICATION}`,
@@ -911,6 +982,29 @@ export function validateVisualCaptureManifest(
 
   const readiness = readinessProjection(baselineCapture.readiness);
   validateReadiness(readiness, approval.candidate.commit, "Canyon Practice 500 readiness");
+  // Bind the acceptance to exact bytes. Without this the owner could have reviewed one
+  // package and promotion could proceed from another.
+  const captureByFile = new Map(value.captures.map((entry) => [entry.file, entry]));
+  for (const frame of approval.reviewedFrames) {
+    const captured = captureByFile.get(frame.file);
+    requireCondition(captured !== undefined, `approved review frame is absent from the capture manifest: ${frame.file}`);
+    requireCondition(
+      captured.bytes === frame.bytes && captured.sha256 === frame.sha256,
+      `approved review frame does not match the capture manifest: ${frame.file}`,
+    );
+  }
+  const candidateById = new Map(value.baselineCandidates.map((entry) => [entry.id, entry]));
+  for (const entry of approval.baselines) {
+    const captured = candidateById.get(entry.id);
+    requireCondition(captured !== undefined, `approved baseline is absent from the capture manifest: ${entry.id}`);
+    requireCondition(
+      captured.bytes === entry.bytes
+        && captured.sha256 === entry.sha256
+        && captured.file === entry.file
+        && captured.snapshotPath === entry.snapshotPath,
+      `approved baseline does not match the capture manifest: ${entry.id}`,
+    );
+  }
   requireCondition(baselineCapture.file === approval.screenshot.path, "approved screenshot path does not match capture manifest");
   requireCondition(baselineCapture.bytes === approval.screenshot.bytes, "approved screenshot bytes do not match capture manifest");
   requireCondition(baselineCapture.sha256 === approval.screenshot.sha256, "approved screenshot SHA-256 does not match capture manifest");
@@ -967,6 +1061,46 @@ async function validateCaptureFiles(captureManifest, captureManifestRealPath) {
   requireCondition(
     verifiedFiles.size === EXPECTED_MATRIX.length,
     "capture bundle does not contain one verified screenshot for every fixed matrix entry",
+  );
+
+  // The promotion candidates get the same treatment as the review frames: no symlinks, no
+  // aliases, no hard links, no duplicate bytes, and a PNG whose real dimensions match the
+  // viewport it was captured at.
+  for (const [index, candidate] of captureManifest.baselineCandidates.entries()) {
+    const label = `capture manifest baselineCandidates[${index}] (${candidate.id})`;
+    requireCondition(!seenPaths.has(candidate.file), `${label} duplicates screenshot path ${candidate.file}`);
+    seenPaths.add(candidate.file);
+    const absolutePath = resolve(captureBundleDirectory, candidate.file);
+    requireCondition(isContainedPath(captureBundleDirectory, absolutePath), `${label} escapes the capture bundle`);
+    requireCondition(
+      relative(captureBundleDirectory, absolutePath).split(sep).join("/") === candidate.file,
+      `${label} path is not canonical within the capture bundle`,
+    );
+    await assertRepoPathHasNoSymlinks(absolutePath, label);
+    const entry = await lstat(absolutePath).catch(() => null);
+    requireCondition(entry?.isFile() === true && !entry.isSymbolicLink(), `${label} must be a regular file`);
+    const candidateRealPath = await realpath(absolutePath).catch(() => null);
+    requireCondition(candidateRealPath === absolutePath, `${label} must not resolve through an alias or symbolic link`);
+    requireCondition(!seenRealPaths.has(candidateRealPath), `${label} aliases another capture screenshot`);
+    seenRealPaths.add(candidateRealPath);
+    const fileIdentity = `${entry.dev}:${entry.ino}`;
+    requireCondition(!seenFileIdentities.has(fileIdentity), `${label} is a hard link to another capture screenshot`);
+    seenFileIdentities.add(fileIdentity);
+    const contents = await readRegularFile(absolutePath, label, { insideRepo: true });
+    requireCondition(contents.byteLength > 0 && contents.byteLength === candidate.bytes, `${label} byte count does not match the capture manifest`);
+    const hash = sha256(contents);
+    requireCondition(hash === candidate.sha256, `${label} SHA-256 does not match the capture manifest`);
+    requireCondition(!seenHashes.has(hash), `${label} duplicates another capture screenshot's bytes`);
+    seenHashes.add(hash);
+    inspectPngIntegrity(contents, label, {
+      width: candidate.viewport.width,
+      height: candidate.viewport.height,
+    });
+    verifiedFiles.set(candidate.file, { absolutePath, contents });
+  }
+  requireCondition(
+    verifiedFiles.size === EXPECTED_MATRIX.length + EXPECTED_BASELINE_IDS.length,
+    "capture bundle does not contain one verified file for every matrix entry and promotion candidate",
   );
   return verifiedFiles;
 }
@@ -1057,7 +1191,7 @@ async function main() {
   const verifiedCaptureFiles = await validateCaptureFiles(captureManifest, captureManifestRealPath);
   const approvedScreenshot = verifiedCaptureFiles.get(capture.file);
   requireCondition(approvedScreenshot !== undefined, "approved Canyon screenshot was not verified with the complete capture matrix");
-  const { absolutePath: screenshotPath, contents: screenshotContents } = approvedScreenshot;
+  const { contents: screenshotContents } = approvedScreenshot;
   requireCondition(screenshotContents.byteLength === capture.bytes, "approved screenshot byte count does not match capture manifest");
   requireCondition(sha256(screenshotContents) === capture.sha256, "approved screenshot SHA-256 does not match capture manifest");
 
@@ -1066,15 +1200,39 @@ async function main() {
   const sourceStatus = await git(["status", "--porcelain=v1", "--untracked-files=all"]);
   requireCondition(sourceStatus === "", "source must be clean before baseline promotion");
 
-  const targetPath = resolve(REPO_ROOT, TARGET_PATH);
+  // One promotion per approved candidate. Every target must be absent: promotion adds
+  // baselines and never overwrites one, which is why the superseded baselines were removed
+  // in their own reviewable commit rather than clobbered here.
+  const promotions = approval.baselines.map((entry) => {
+    const verified = verifiedCaptureFiles.get(entry.file);
+    requireCondition(verified !== undefined, `approved baseline ${entry.id} was not verified in the capture bundle`);
+    requireCondition(verified.contents.byteLength === entry.bytes, `approved baseline ${entry.id} byte count does not match`);
+    requireCondition(sha256(verified.contents) === entry.sha256, `approved baseline ${entry.id} SHA-256 does not match`);
+    return {
+      id: entry.id,
+      repoPath: entry.snapshotPath,
+      absolutePath: resolve(REPO_ROOT, entry.snapshotPath),
+      sourcePath: verified.absolutePath,
+      contents: verified.contents,
+      sha256: entry.sha256,
+      bytes: entry.bytes,
+    };
+  });
   const approvalRecordPath = resolve(REPO_ROOT, APPROVAL_RECORD_PATH);
-  await assertRepoPathHasNoSymlinks(dirname(targetPath), "baseline target parent");
   await assertRepoPathHasNoSymlinks(dirname(approvalRecordPath), "approval-record parent");
-  await assertAbsent(targetPath, "Canyon baseline target");
   await assertAbsent(approvalRecordPath, "canonical approval record");
+  for (const promotion of promotions) {
+    requireCondition(
+      isContainedPath(REPO_ROOT, promotion.absolutePath)
+        && relative(REPO_ROOT, promotion.absolutePath).split(sep).join("/") === promotion.repoPath,
+      `baseline target path is not canonical inside the repository: ${promotion.repoPath}`,
+    );
+    await assertRepoPathHasNoSymlinks(dirname(promotion.absolutePath), `baseline target parent for ${promotion.id}`);
+    await assertAbsent(promotion.absolutePath, `baseline target for ${promotion.id}`);
+  }
 
   const canonicalRecord = {
-    schemaVersion: 2,
+    schemaVersion: 3,
     kind: "rivet-ridge-rally-visual-baseline-approval-record",
     authentication: APPROVAL_AUTHENTICATION,
     ownerApproval: approval,
@@ -1093,46 +1251,61 @@ async function main() {
         document: loadedCandidate.manifest,
       },
     },
-    promotedBaseline: {
-      path: TARGET_PATH,
-      bytes: screenshotContents.byteLength,
-      sha256: sha256(screenshotContents),
-    },
+    promotedBaselines: promotions.map((promotion) => ({
+      id: promotion.id,
+      path: promotion.repoPath,
+      bytes: promotion.bytes,
+      sha256: promotion.sha256,
+    })),
   };
   const canonicalRecordContents = Buffer.from(`${JSON.stringify(canonicalRecord, null, 2)}\n`);
 
-  let wroteBaseline = false;
+  const writtenBaselines = [];
   let wroteApproval = false;
   try {
     requireCondition(Date.now() - approvedAt <= APPROVAL_FRESHNESS_MS, "owner approval expired before output mutation");
     await writeFile(approvalRecordPath, canonicalRecordContents, { flag: "wx" });
     wroteApproval = true;
-    await copyFile(screenshotPath, targetPath, fsConstants.COPYFILE_EXCL);
-    wroteBaseline = true;
-    const [writtenBaseline, writtenApproval] = await Promise.all([
-      readRegularFile(targetPath, "promoted Canyon baseline", { insideRepo: true }),
-      readRegularFile(approvalRecordPath, "canonical approval record", { insideRepo: true }),
-    ]);
-    requireCondition(sha256(writtenBaseline) === capture.sha256, "promoted baseline verification failed");
+    for (const promotion of promotions) {
+      await copyFile(promotion.sourcePath, promotion.absolutePath, fsConstants.COPYFILE_EXCL);
+      writtenBaselines.push(promotion);
+    }
+    // Read every output back off disk rather than trusting the copy.
+    for (const promotion of promotions) {
+      const written = await readRegularFile(promotion.absolutePath, `promoted baseline ${promotion.id}`, { insideRepo: true });
+      requireCondition(
+        sha256(written) === promotion.sha256,
+        `promoted baseline verification failed for ${promotion.id}`,
+      );
+    }
+    const writtenApproval = await readRegularFile(approvalRecordPath, "canonical approval record", { insideRepo: true });
     requireCondition(sha256(writtenApproval) === sha256(canonicalRecordContents), "canonical approval-record verification failed");
+
+    const expectedPaths = [...promotions.map((promotion) => promotion.repoPath), APPROVAL_RECORD_PATH].toSorted();
     const changedPaths = (await git(["status", "--porcelain=v1", "-z", "--untracked-files=all"]))
       .split("\0")
       .filter(Boolean)
       .map((entry) => ({ status: entry.slice(0, 2), path: entry.slice(3) }));
-    requireCondition(changedPaths.length === 2, "promotion changed more than its two fixed outputs");
+    requireCondition(
+      changedPaths.length === expectedPaths.length,
+      `promotion changed more than its ${expectedPaths.length} fixed outputs`,
+    );
+    // Add-only: every output must be a new untracked path. A modified tracked file means a
+    // baseline was overwritten, which promotion must never do.
     requireCondition(changedPaths.every((entry) => entry.status === "??"), "promotion modified an existing tracked path");
     requireCondition(
-      JSON.stringify(changedPaths.map((entry) => entry.path).toSorted())
-        === JSON.stringify([TARGET_PATH, APPROVAL_RECORD_PATH].toSorted()),
-      "promotion changed a path outside its two fixed outputs",
+      JSON.stringify(changedPaths.map((entry) => entry.path).toSorted()) === JSON.stringify(expectedPaths),
+      "promotion changed a path outside its fixed outputs",
     );
   } catch (error) {
-    if (wroteBaseline) await rm(targetPath, { force: true }).catch(() => undefined);
+    for (const promotion of writtenBaselines) {
+      await rm(promotion.absolutePath, { force: true }).catch(() => undefined);
+    }
     if (wroteApproval) await rm(approvalRecordPath, { force: true }).catch(() => undefined);
     throw error;
   }
 
-  console.log(`Promoted ${TARGET_PATH}`);
+  for (const promotion of promotions) console.log(`Promoted ${promotion.repoPath}`);
   console.log(`Recorded ${APPROVAL_RECORD_PATH}`);
   console.log("Commit only the promoted baseline and approval record, then tag and rerun the non-mutating visual suite.");
 }

@@ -175,7 +175,28 @@ npm run visual:capture -- --output-dir artifacts/visual-review/<exact-run>
 
 Latest visual-candidate rehearsal: `npm run visual:candidate` was attempted on 2026-07-18 and failed before writing candidate bytes because the working tree was not clean. A later clean-branch attempt reached the isolated `dist/` scan and exposed an overbroad `ghp_` byte-prefix check against the binary Canyon GLB. The follow-up `npm run test:release-manifest` passed 45/45 after adding the short-token-prefix regression. The latest clean `3422df7` `visual:candidate` produced a 33-file / 8,012,888-byte / 5,466,878-gzip-byte visual QA candidate with aggregate `65ecfd6d6593a711650689d1766d10ac7d24937900e01aa14f1728be57fe8e3c` and manifest SHA-256 `15c2d664c6e704b56c4a8e635ba0a68aa514215029e13bfe040e88dfa9ea9c8a`; `visual:capture` wrote `artifacts/visual-review/rc2-current-3422df7-20260719T092810Z/manifest.json`, passed 11/11, and recorded manifest SHA-256 `926b9fa9ea6565b31ea794f28ead36f41652175c37361896340e25e71bc49139`. The refreshed draft at `/tmp/rrr-canyon-owner-approval-draft-3422df7-20260719T093800Z.json` remains `PENDING_OWNER_REVIEW`. The correct next action is owner/legal visual review plus guarded baseline promotion, not another blind capture retry.
 
-The only authorized source mutation for the currently missing curved-Canyon baseline is:
+> **Promotion scope expanded 2026-07-30 (owner-approved gate-4 decision).** Promotion no
+> longer writes one Canyon baseline. It writes **all five** checked-in visual-regression
+> baselines — desktop race, curved Canyon bend, editor, portrait race, and the high-contrast
+> scaled HUD — from a single owner-approved package, so the owner reviews once and every
+> baseline traces to that one acceptance.
+>
+> Consequences an operator must know:
+>
+> * The owner approval now enumerates **11 review frames and 5 promotion candidates**, each
+>   bound by SHA-256, and its `statement` names that whole scope. An approval that lists only
+>   the Canyon capture is rejected.
+> * The guarded promotion diff is now **exactly six paths**: five baseline PNGs plus the
+>   approval record. It remains **add-only** — every output must be a new untracked path, and
+>   a modified tracked file aborts the run. That is why the four superseded baselines were
+>   removed in their own commit rather than overwritten.
+> * The baseline candidates come from `scripts/capture-baseline-candidates.mjs`, not from
+>   Playwright. `e2e/visual-regression.spec.ts` refuses to create or replace baselines, so
+>   `--update-snapshots` can never be used to regenerate them.
+> * Candidates are captured with `scale: "css"` and `animations: "disabled"`. Omitting the
+>   former silently produces device-pixel images that fail on dimensions (finding R14).
+
+The only authorized source mutation for the missing and superseded visual baselines is:
 
 ```sh
 npm run visual:promote:canyon -- \

@@ -778,7 +778,7 @@ try {
         browser,
         devices,
         baseURL: server.baseURL,
-        onCapture: async (state, contents) => {
+        onCapture: async (state, contents, viewport) => {
           const relativePath = `${BASELINE_PHASE}/${state.id}.png`;
           const absolutePath = resolve(outputRoot, relativePath);
           if (relative(outputRoot, absolutePath).split(sep).join("/") !== relativePath) {
@@ -792,6 +792,7 @@ try {
             specTitle: state.specTitle,
             project: state.project,
             device: state.device,
+            viewport,
             file: relativePath,
             bytes: contents.byteLength,
             sha256: sha256(contents),
