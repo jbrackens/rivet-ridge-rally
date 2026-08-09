@@ -102,7 +102,12 @@ async function waitForCanvasAttribute(page, attribute, value, timeout = 30_000) 
 }
 
 async function openFrozenRace(page, state, baseURL) {
-  const target = new URL(state.initialPath ?? "/?qa-visual-freeze=1", baseURL);
+  // The frozen-candidate server (visual-candidate-support.mjs) accepts the index page ONLY
+  // with exactly qa-visual-freeze=1 and qa-visual-distance=<integer> — nothing more, nothing
+  // less — and every other path must carry no query string. A param-less URL 404s. The app
+  // treats an explicit distance of 0 identically to an absent one: parseQaVisualDistance
+  // returns undefined for absent, and relocate(0) equals the player's natural start.
+  const target = new URL(state.initialPath ?? "/?qa-visual-freeze=1&qa-visual-distance=0", baseURL);
   const response = await page.goto(target.href, { waitUntil: "load", timeout: 60_000 });
   if (!response?.ok()) fail(`${state.id}: QA shell returned HTTP ${response?.status() ?? "unknown"}`);
   await waitForStableFonts(page);
@@ -138,7 +143,10 @@ async function openFrozenRace(page, state, baseURL) {
 }
 
 async function openEditor(page, state, baseURL) {
-  const response = await page.goto(new URL("/", baseURL).href, { waitUntil: "load", timeout: 60_000 });
+  // Same strict-server contract as openFrozenRace: the index page is served only with the
+  // exact freeze/distance query pair. The params are inert on the editor surface — the shell
+  // consults them only when a race starts.
+  const response = await page.goto(new URL("/?qa-visual-freeze=1&qa-visual-distance=0", baseURL).href, { waitUntil: "load", timeout: 60_000 });
   if (!response?.ok()) fail(`${state.id}: QA shell returned HTTP ${response?.status() ?? "unknown"}`);
   await page.getByRole("button", { name: "Skip training" }).click();
   await page.getByRole("button", { name: "Track Builder", exact: true }).click();
