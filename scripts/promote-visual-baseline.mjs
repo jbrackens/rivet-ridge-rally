@@ -154,6 +154,7 @@ function validateBaselineCandidates(value) {
 }
 
 const REQUIRED_CHECKS = Object.freeze([
+  "complete-baseline-candidate-set",
   "source-clean-before-and-after",
   "source-identity-stable",
   "source-matches-clean-qa-candidate",

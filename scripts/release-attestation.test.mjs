@@ -1255,6 +1255,7 @@ function visualCaptureManifest(candidateManifest, candidateReference, baseline) 
     { id: "runtime-source-commit-bound", passed: true, actual: { sourceCommit: VISUAL_CAPTURE_COMMIT } },
     { id: "browser-response-bodies-manifest-bound", passed: true, actual: { captureCount: captures.length } },
     { id: "complete-capture-matrix", passed: true, actual: { expected: matrix.length, captured: captures.length } },
+    { id: "complete-baseline-candidate-set", passed: true, actual: { expected: 5, captured: 5, ids: BASELINE_CANDIDATE_FIXTURES.map((entry) => entry.id) } },
     { id: "rival-assets-ready", passed: true, actual: { captureCount: 5 } },
   ];
   return {
