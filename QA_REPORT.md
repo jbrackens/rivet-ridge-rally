@@ -367,6 +367,44 @@ This section supersedes the scoped historical browser figures above for the exac
 
 Full evidence and classification: `docs/E2E_BASELINE_2026-07-26.md`.
 
+## 10b. Red-team corrective slice — 2026-08-12, working copy of `b2926d5`
+
+Scope: two defects raised by the 2026-08-12 adversarial review in `red-team-reports/2026-08-12-report.md` — evictable local saves with no durability request or disclosure (`evictable-local-saves-no-persist`), and a first-boot tutorial card that presented leaving training as a de-emphasized link (`front-loaded-14-step-tutorial`, partial). Nothing else in that report is addressed here.
+
+**Environment caveat, stated first because it bounds every result below.** These commands ran in a Linux container on Node `v22.22.2` / npm `10.9.7` — **not** the pinned Node `26.4.0` / npm `11.17.0` — against a working copy that excluded `art-source/`, `.git`, and the binary artifact tree. WebGL rendered through SwiftShader software rasterization. Nothing here is a candidate qualification, a performance result, or a substitute for the pinned-toolchain gates; those must be rerun on the owner's machine.
+
+**Executed and passing in that environment:**
+
+| Command | Result |
+|---|---|
+| `npm run typecheck` | PASS |
+| `npx eslint .` | PASS, zero findings |
+| `npx vitest run` | PASS — 34 files, **329 tests** (303 pre-change baseline plus 26 new) |
+| `npx vite build` | PASS |
+
+`npm run assets:verify` and `npm run test:e2e` were **NOT RUN**. The asset gate requires the `art-source/` Blender inputs that this working copy excluded; the Playwright suite requires hardware WebGL and the pinned build path. Their status is unchanged by this slice and remains as recorded elsewhere in this report.
+
+**New regression coverage (26 tests):** `src/game/persistence/__tests__/storageDurability.test.ts` covers grant reading without a request, request-once behavior, declined and unsupported browsers, throwing implementations, iPadOS desktop-platform detection, both standalone signals, and every durability state. `src/ui/screens/__tests__/supportStorageDurability.test.tsx` covers each disclosure variant, silence before durability is read, the data attribute, and preservation of the existing site-data warning.
+
+**Scoped browser evidence — Chromium 143 (SwiftShader), 1280×720, non-QA preview of the working-tree build.** A 15-check public-UI journey passed 15/15: intro card, skip parity, skip click through to the festival menu, Rider School reachability, support-screen disclosure, storage API response, and skip persistence across a reload, with zero console errors and zero page errors. This is a `DIAGNOSTIC ONLY` functional check on software rendering; it is not a frame-rate, fidelity, physical-device, or frozen-candidate result.
+
+**Intro-card geometry, measured before and after at six viewports.** The card already overflowed its scroll fold before this change; the skip action sat below the fold at the 1280×720 desktop baseline and on the Pixel 7 portrait profile.
+
+| Viewport | Overflow before | Overflow after | Skip width before → after |
+|---|---:|---:|---|
+| 1280×720 desktop baseline | 42 px | **0 px** | 56 px → **419 px** |
+| 1366×768 desktop | 0 px | 0 px | 56 px → 419 px |
+| 412×839 Pixel 7 portrait | 73 px | 70 px | 56 px → 318 px |
+| 320×568 short phone | 325 px | 323 px | 56 px → 262 px |
+| 320×568 at 140% UI scale | 637 px | **662 px** | 79 px → 240 px |
+| 900×500 short landscape | 226 px | 212 px | 56 px → 307 px |
+
+Every layout improved or held except 320×568 at 140% UI scale, which scrolls **25 px more** than before because the action became a full button with adjacent copy. That layout already required scrolling by design (§11 retains a scrollable short-phone action area); the skip target there measures 240×49 CSS pixels and remains reachable. Recorded as an accepted, disclosed trade rather than a silent regression. An interim revision of this slice raised the intro card's `max-height` globally and pushed the card past the viewport bottom at 320×568; that was caught by measurement and the override is now scoped to fine-pointer viewports above 780 px.
+
+**Unchanged by design:** first-boot routing still opens Rider School, the 12-lesson sequence and its gating are untouched, the `Skip training` accessible name is preserved for the twelve e2e specs that locate it, and lesson-state cards keep their existing geometry. Just-in-time heat/cooling coaching in the first Practice race — the remaining part of the review's onboarding finding — was **not** implemented; it changes normative tutorial scope and is an owner decision.
+
+**Physical device, manual accessibility, pinned-toolchain, e2e, and frozen-candidate evidence for this slice: `UNVERIFIED`.** The release decision is unchanged: **NOT READY**.
+
 ## 11. QA conclusion
 
 The resumed working-tree qualification establishes scoped browser and command-gate confidence, not release readiness. Focused Chromium functional, reliability, tutorial, editor, input, migration, persistence, and quality paths passed; campaign modes passed 18/18 in 27.7 minutes; the current rival pack gate passed 2/2 on isolated port 4176; desktop Firefox-plus-WebKit functional passed 10/10; WebKit lifecycle passed 6/6; the emulated touch matrix passed 6/6; and emulated touch tutorial intro passed 2/2. Typecheck, lint, all 452 tests/fixtures, asset verification, the zero-vulnerability high-severity audit, current `npm run build`, and a scoped non-QA live preview smoke passed on the working tree.

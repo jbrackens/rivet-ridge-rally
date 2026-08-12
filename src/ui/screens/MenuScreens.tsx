@@ -9,6 +9,11 @@ import {
   useAppStore,
 } from "../../app/store";
 import { TRACKS, getTrack } from "../../game/content/tracks";
+import {
+  readInstallEnvironment,
+  shouldSuggestHomeScreenInstall,
+  type StorageDurability,
+} from "../../game/persistence/storageDurability";
 import { formatKeyCode, getKeyBindingRejectionReason } from "../../game/input/keyLabels";
 import { formatTime } from "../format";
 import { RallyIcon } from "../icons/RallyIcon";
@@ -253,11 +258,42 @@ export function ModeScreen() {
   );
 }
 
+/**
+ * Plain-language durability disclosure. Browsers treat site storage as best-effort unless a
+ * grant exists, so the honest default is to tell the player their saves are deletable rather
+ * than to imply the device keeps them forever.
+ */
+function describeStorageDurability(durability: StorageDurability): { title: string; detail: string } | null {
+  if (durability === "persisted") {
+    return {
+      title: "Saves are protected on this device.",
+      detail: "This browser granted persistent storage, so it will not delete your progress, tracks, or replays to reclaim space.",
+    };
+  }
+  if (durability === "best-effort") {
+    return {
+      title: "Saves are best-effort on this device.",
+      detail: "This browser has not granted persistent storage, so it may delete progress, tracks, and replays to reclaim space. Safari also removes site data after seven days without a visit.",
+    };
+  }
+  if (durability === "unsupported") {
+    return {
+      title: "This browser does not report storage durability.",
+      detail: "Treat local saves as temporary and export any custom track you want to keep.",
+    };
+  }
+  return null;
+}
+
 export function SupportScreen() {
   const navigate = useAppStore((state) => state.navigate);
   const resetLocalProgress = useAppStore((state) => state.resetLocalProgress);
+  const storageDurability = useAppStore((state) => state.storageDurability);
+  const [installEnvironment] = useState(readInstallEnvironment);
   const [resetPending, setResetPending] = useState(false);
   const [resetNotice, setResetNotice] = useState("");
+  const durability = describeStorageDurability(storageDurability);
+  const suggestHomeScreen = shouldSuggestHomeScreenInstall(storageDurability, installEnvironment);
   const buildLabel = `${__RRR_BUILD_IDENTITY__.commit.slice(0, 12)}${__RRR_BUILD_IDENTITY__.dirty ? " · working tree" : ""}`;
 
   return (
@@ -294,6 +330,14 @@ export function SupportScreen() {
             <h2 id="privacy-heading">Privacy</h2>
             <p>Progress, settings, personal race replays, custom tracks, and recoverable damaged-track records are stored in this browser on this device. A service worker caches game files for offline play. The game does not intentionally upload those saved records.</p>
             <p>The eventual hosting provider may process ordinary web-request information such as an IP address and user agent. The operator identity, host, request-log policy, retention period, and deletion-response commitment have not been selected or published.</p>
+            {durability ? (
+              <p className="support-durability" data-storage-durability={storageDurability}>
+                <strong>{durability.title}</strong> {durability.detail}
+                {suggestHomeScreen
+                  ? " On iPhone and iPad, adding Rivet Ridge Rally to your Home Screen from the Share menu keeps its own timer and is not covered by that seven-day rule."
+                  : null}
+              </p>
+            ) : null}
             <p><strong>Clearing browser site data permanently removes local progress and tracks.</strong> Export any custom tracks you need from Track Builder before clearing it.</p>
           </article>
 

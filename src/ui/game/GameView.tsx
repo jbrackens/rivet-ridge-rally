@@ -1022,6 +1022,7 @@ export function GameView({ tutorial = false }: { tutorial?: boolean }) {
               <button className="button-primary tutorial-start" onClick={() => setTutorialStarted(true)}>Start lesson 1</button>
               <button ref={tutorialSettingsButtonRef} onClick={openSettings}>Settings and controls</button>
               <button className="tutorial-skip" onClick={() => exitTutorial("skip")}>Skip training</button>
+              <p className="tutorial-skip-note">Rider School stays on the main menu, so you can start it any time.</p>
             </>
           ) : tutorialStep < tutorialSteps.length ? (
             <>

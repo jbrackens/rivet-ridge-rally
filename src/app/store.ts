@@ -30,6 +30,11 @@ import {
   type CustomTrackData,
   type PersistenceFailure,
 } from "../game/persistence/database";
+import {
+  readStorageDurability,
+  requestStorageDurability,
+  type StorageDurability,
+} from "../game/persistence/storageDurability";
 import type { EditorModuleCategory } from "../game/editor/modules";
 
 interface ActiveRace {
@@ -70,6 +75,7 @@ interface AppState {
   bootMessage: string;
   recoveredSave: boolean;
   persistenceStatus: PersistenceStatus;
+  storageDurability: StorageDurability;
   settings: GameSettings;
   progress: CampaignProgress;
   activeRace: ActiveRace | null;
@@ -195,6 +201,33 @@ function persistSettingsInBackground(base: GameSettings, next: GameSettings): vo
   });
 }
 
+let durabilityRequestStarted = false;
+
+/**
+ * Records the current durability grant during boot. This never prompts, so it is safe to
+ * run before the player has done anything worth keeping.
+ */
+function readStorageDurabilityInBackground(): void {
+  void readStorageDurability().then((durability) => {
+    useAppStore.setState((state) => (
+      state.storageDurability === "unknown" ? { storageDurability: durability } : {}
+    ));
+  });
+}
+
+/**
+ * Asks the browser to keep this site's data once, after the first confirmed write. Waiting
+ * for real progress means Chromium has engagement to judge and any prompting browser asks
+ * about data the player has actually created. Saving never depends on the answer.
+ */
+function requestStorageDurabilityOnce(): void {
+  if (durabilityRequestStarted) return;
+  durabilityRequestStarted = true;
+  void requestStorageDurability().then((durability) => {
+    useAppStore.setState({ storageDurability: durability });
+  });
+}
+
 function persistProgressInBackground(
   base: CampaignProgress,
   next: CampaignProgress,
@@ -212,6 +245,7 @@ function persistProgressInBackground(
         ? await resetDatabaseProgress(nextSnapshot)
         : await saveProgress(baseSnapshot, nextSnapshot);
       lastAppliedProgressSnapshot = structuredClone(merged);
+      requestStorageDurabilityOnce();
       if (progressResetRevision === resetRevisionSnapshot) {
         useAppStore.setState((state) => ({
           progress: mergeProgressChanges(nextSnapshot, merged, state.progress),
@@ -347,6 +381,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   bootMessage: "Preparing the paddock…",
   recoveredSave: false,
   persistenceStatus: { mode: "persistent", retrying: false },
+  storageDurability: "unknown",
   settings: DEFAULT_SETTINGS,
   progress: createDefaultProgress(),
   activeRace: null,
@@ -363,6 +398,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     set({ bootMessage: "Loading rider data…" });
     try {
       const { settings, progress, recovered } = await loadGameData();
+      readStorageDurabilityInBackground();
       profileLoadedFromPersistence = true;
       profileWritesBlocked = false;
       pendingProgressReplacementRevision = null;
