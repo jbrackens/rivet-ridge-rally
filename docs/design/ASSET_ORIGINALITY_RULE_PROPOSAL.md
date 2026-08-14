@@ -143,3 +143,52 @@ reference images.
    regenerates product bytes and would invalidate the frozen package mid-flight.
 3. If the motive is to unblock a specific tool, read that tool's output-licence terms **first**.
    A rewrite that admits a tool whose terms fail the commercial-use requirement helps nobody.
+
+---
+
+## Addendum — Tripo's actual licence terms, read 2026-08-13
+
+Checked because the proposal requires any generative tool's output licence to permit
+commercial use, and because the motivating tool was Tripo. Source: the binding terms at
+`https://www.tripo3d.ai/terms`, **last updated 2025-07-11**, not the marketing blog.
+
+**This is a factual reading, not legal advice.** Legal review is already an open owner gate
+and this does not close it.
+
+### What the terms say
+
+| Question | Free tier | Paid tier |
+|---|---|---|
+| Who owns the output | **Tripo retains all rights** (§5.2.1) | **User retains ownership** (§5.2.2) |
+| Commercial use | **Not granted** | Permitted, with limits on redistributing outputs to third parties (§3.2) |
+| Attribution required | No | No |
+| Rights survive cancellation | — | Yes, for already-generated outputs; Tripo may delete them from its databases on termination (§10.5) |
+
+### Three findings that matter for this decision
+
+1. **Free-tier output is unusable for this game.** Tripo retains all rights, so a free-tier
+   model could not ship regardless of how the originality rule is rewritten. Only a paid tier
+   satisfies the proposal's commercial-use requirement.
+
+2. **The marketing pages contradict the terms.** Tripo's own blog describes free-tier output as
+   Creative Commons Attribution 4.0 — commercially usable with attribution. The binding terms
+   say Tripo retains all rights. Where they disagree, the terms govern. Anything relied on for
+   a release decision should come from the terms page, with a dated copy saved.
+
+3. **There is no IP indemnity, and the indemnity runs the other way.** Tripo disclaims
+   warranties on generated content (§4), and the user must indemnify **Tripo** if an output
+   infringes a third party. So if a generated bike resembles a real manufacturer's design, the
+   exposure is entirely the project's — and it would also have to defend Tripo.
+
+### Consequence for this proposal
+
+Finding 3 **strengthens the similarity-check requirement** proposed above rather than being an
+argument against the rewrite. Under the current Blender-only rule a human chooses every shape,
+which is an implicit safeguard. Under a generative rule with no vendor indemnity, the recorded
+similarity check is the *only* protection standing between the project and the exposure Tripo
+has contractually declined. It should be treated as mandatory, not advisory, and its result
+recorded per asset.
+
+If the rewrite is accepted, the tool-licence clause should additionally require recording the
+**tier and the terms version** in force at generation time, because rights differ by tier and
+the terms are versioned.
