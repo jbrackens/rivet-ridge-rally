@@ -4,9 +4,9 @@ import type {
   TrackObstacle,
   TrackPlacementRotation,
 } from "../content/tracks";
+import { LANE_POSITIONS as LANE_CENTERS } from "../simulation";
 
 const DEFAULT_CONTACT_LENGTH = 8;
-const LANE_CENTERS = [-4.5, -1.5, 1.5, 4.5] as const;
 const BARRIER_BLOCK_DEPTH = 0.72;
 const SHORT_BARRIER_BLOCK_DEPTH = 0.5;
 const SHORT_BARRIER_BLOCK_WIDTH_RATIO = 0.92;

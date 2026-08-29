@@ -1,3 +1,7 @@
+import {
+  FROZEN_READINESS,
+  frozenSceneContract,
+} from "../scripts/lib/frozen-scene-inventory.mjs";
 import { expect, test } from "@playwright/test";
 
 test.beforeEach(({ browserName }, testInfo) => {
@@ -58,62 +62,22 @@ async function openFrozenRace(
   await page.getByRole("button", { name: /Practice/ }).click();
   const raceCanvas = page.getByLabel("Live 3D race on Canyon Kickoff");
   await expect(raceCanvas).toBeVisible();
-  await expect(raceCanvas).toHaveAttribute("data-visual-state", "frozen");
-  await expect(raceCanvas).toHaveAttribute("data-bike-asset", "ready", { timeout: 15_000 });
-  await expect(raceCanvas).toHaveAttribute("data-canyon-kit-asset", "ready", { timeout: 15_000 });
-  await expect(raceCanvas).toHaveAttribute("data-canyon-kit-cooling-gate-style", "per-lane-open-arch");
-  await expect(raceCanvas).toHaveAttribute("data-canyon-kit-cooling-gate-arch-count", "12");
-  await expect(raceCanvas).toHaveAttribute("data-environment-asset", "ready", { timeout: 15_000 });
-  await expect(raceCanvas).toHaveAttribute("data-cooling-gate-venue-pocket-count", "4");
-  await expect(raceCanvas).toHaveAttribute("data-cooling-gate-venue-style", "bilateral");
-  await expect(raceCanvas).toHaveAttribute("data-cooling-gate-watchtower-count", "4");
-  await expect(raceCanvas).toHaveAttribute(
-    "data-cooling-gate-watchtower-style",
-    "staffed-elevated",
-  );
-  await expect(raceCanvas).toHaveAttribute(
-    "data-cooling-gate-watchtower-spectator-count",
-    "16",
-  );
-  await expect(raceCanvas).toHaveAttribute("data-festival-pocket-style", "tiered-canyon");
-  await expect(raceCanvas).toHaveAttribute(
-    "data-festival-pocket-count",
-    options.expectedFestivalPocketCount ?? "26",
-  );
-  await expect(raceCanvas).toHaveAttribute(
-    "data-festival-pocket-tier-count",
-    options.expectedFestivalTierCount ?? "104",
-  );
-  await expect(raceCanvas).toHaveAttribute("data-festival-pocket-tier-rows", "4");
-  await expect(raceCanvas).toHaveAttribute("data-course-edge-safety-style", "continuous-canyon");
-  await expect(raceCanvas).toHaveAttribute("data-course-edge-safety-batch-count", "1");
-  await expect(raceCanvas).toHaveAttribute(
-    "data-course-edge-safety-block-count",
-    options.expectedSafetyBlockCount ?? "1320",
-  );
-  await expect(raceCanvas).toHaveAttribute("data-start-grid-style", "numbered-four-lane");
-  await expect(raceCanvas).toHaveAttribute("data-start-grid-stencil-count", "4");
-  await expect(raceCanvas).toHaveAttribute("data-start-grid-batch-count", "2");
-  await expect(raceCanvas).toHaveAttribute("data-dirt-texture-detail-style", "layered-rut-pebble-v3");
-  await expect(raceCanvas).toHaveAttribute("data-dirt-texture-resolution", "512x512");
-  await expect(raceCanvas).toHaveAttribute("data-dirt-height-texture-resolution", "512x512");
-  await expect(raceCanvas).toHaveAttribute("data-canyon-route-banner-style", "route-following-textured-sponsor-v2");
-  await expect(raceCanvas).toHaveAttribute("data-canyon-route-banner-count", "76");
-  await expect(raceCanvas).toHaveAttribute("data-canyon-route-banner-pole-count", "76");
-  await expect(raceCanvas).toHaveAttribute("data-canyon-route-banner-texture-variant-count", "4");
-  await expect(raceCanvas).toHaveAttribute("data-canyon-route-crowd-style", "route-following-rail-bleachers-v2");
-  await expect(raceCanvas).toHaveAttribute("data-canyon-route-crowd-group-count", "22");
-  await expect(raceCanvas).toHaveAttribute("data-canyon-route-crowd-spectator-count", "198");
-  await expect(raceCanvas).toHaveAttribute("data-canyon-route-crowd-tier-count", "44");
-  await expect(raceCanvas).toHaveAttribute("data-canyon-cactus-style", "branched-saguaro");
-  await expect(raceCanvas).toHaveAttribute("data-canyon-cactus-batch-count", "1");
-  await expect(raceCanvas).toHaveAttribute("data-canyon-cactus-instance-count", "24");
-  await expect(raceCanvas).toHaveAttribute("data-canyon-shoulder-dressing-style", "route-following-cut-bank");
-  await expect(raceCanvas).toHaveAttribute("data-canyon-shoulder-ribbon-count", "2");
-  await expect(raceCanvas).toHaveAttribute("data-canyon-shoulder-dressing-batch-count", "4");
-  await expect(raceCanvas).toHaveAttribute("data-canyon-shoulder-shelf-count", "78");
-  await expect(raceCanvas).toHaveAttribute("data-canyon-shoulder-rock-count", "184");
-  await expect(raceCanvas).toHaveAttribute("data-canyon-shoulder-agave-count", "52");
+  // The scene contract lives in scripts/lib/frozen-scene-inventory.mjs so this
+  // gate and the capture script that produces the frames an owner signs cannot
+  // drift apart. It used to be 41 assertions here against four waits there.
+  for (const [attribute, value] of FROZEN_READINESS) {
+    await expect(raceCanvas).toHaveAttribute(attribute, value, { timeout: 15_000 });
+  }
+  for (const [attribute, value] of frozenSceneContract({
+    ...(options.expectedFestivalPocketCount === undefined
+      ? {} : { festivalPocketCount: options.expectedFestivalPocketCount }),
+    ...(options.expectedFestivalTierCount === undefined
+      ? {} : { festivalPocketTierCount: options.expectedFestivalTierCount }),
+    ...(options.expectedSafetyBlockCount === undefined
+      ? {} : { courseEdgeSafetyBlockCount: options.expectedSafetyBlockCount }),
+  })) {
+    await expect(raceCanvas).toHaveAttribute(attribute, value);
+  }
   await expect(page.locator(".game-shell")).toHaveAttribute(
     "data-race-gate-phase",
     "racing",

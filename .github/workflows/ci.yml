@@ -1,10 +1,23 @@
 name: CI
 
-# Minimal mechanical gate for agent-authored PRs: typecheck (TS7 native),
-# lint (eslint via the TS6 API shim), and the unit suite. The heavier
-# release machinery (assets:verify, release manifest/attestation, e2e,
-# visual regression) stays in the repo's own evidence flow — it is
-# environment-pinned (npm 11.17.0 / Node 26) and owner-gated by design.
+# Mechanical gate for agent-authored PRs.
+#
+# `vitest.config.ts` scopes `include` to `src/**`, so the seven `node --test`
+# suites under `scripts/` are invisible to `npx vitest run`. They were also
+# absent here, which meant 2,916 lines of release-attestation fixtures alone
+# executed nowhere in CI. Six of the seven are hermetic — no Blender, no
+# browser, no network, no toolchain pin — and were measured passing on this
+# runner's Node 22: attestation 71/71 in 1.9 s, and production-smoke-support
+# plus production-smoke-flow, service-worker-install, release-scope-audit and
+# frozen-scene-inventory 44/44 in 0.6 s, with `assets:verify` clean.
+#
+# `test:release-manifest` is the seventh and stays excluded: it asserts the
+# Node 26.4.0 / npm 11.17.0 pin itself, so it fails closed on this runner by
+# design. Restoring it needs its own pinned job, not this one.
+#
+# e2e, visual regression, performance, soak and production smoke stay in the
+# repo's owner-gated evidence flow — those need a GPU, a real browser, or a
+# frozen candidate.
 
 on:
   pull_request:
@@ -43,4 +56,17 @@ jobs:
 
       - name: Unit tests
         run: npx vitest run
+
+      # Verifies the committed hero, rival, Canyon and production-art GLBs and
+      # manifests against their recorded byte counts and SHA-256 digests. Reads
+      # only what is in the repository; needs no Blender and no art-source tree.
+      - name: Asset integrity
+        run: npm run assets:verify
+
+      # The two hermetic `node --test` suites that `vitest run` cannot see.
+      - name: Release attestation fixtures
+        run: npm run test:release-attestation
+
+      - name: Production smoke, service-worker and release-scope fixtures
+        run: npm run test:production-smoke-support
 

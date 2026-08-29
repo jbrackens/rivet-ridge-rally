@@ -405,6 +405,88 @@ Every layout improved or held except 320×568 at 140% UI scale, which scrolls **
 
 **Physical device, manual accessibility, pinned-toolchain, e2e, and frozen-candidate evidence for this slice: `UNVERIFIED`.** The release decision is unchanged: **NOT READY**.
 
+## 10c. Personal ghost and default text legibility — 2026-08-29, working copy of `b4916ab`
+
+Scope: two findings from `red-team-reports/2026-08-12-gameplay-report.md` — replays being write-only with no playback or ghost (`replays-are-write-only-no-ghost`), and default HUD/menu text falling under Valve's Steam Deck legibility floor (`hud-text-below-deck-legibility-floor`). Nothing else in that report is addressed here; in particular the CRITICAL `solo-targets-set-48pct-off-competent-pace` finding and `ai-top-speed-capped-below-player` are **untouched**, so the difficulty ceiling this ghost is meant to compose with does not exist yet.
+
+**Environment caveat, stated first because it bounds every result below.** These commands ran on macOS `26.5.2` arm64 with Node `v22.23.1` / npm `10.9.8` — **not** the pinned Node `26.4.0` / npm `11.17.0`, the same drift already recorded in the 2026-07-25 reconciliation notice. Nothing here is a candidate qualification, a performance result, a physical-device result, or a substitute for the pinned-toolchain gates.
+
+**Executed on the working tree:**
+
+| Command | Result |
+|---|---|
+| `npm run typecheck` | PASS |
+| `npm run lint` | PASS, zero findings |
+| `npx vitest run` | PASS — 36 files, **342 tests** (329 pre-change baseline plus 13 new) |
+| `npm run test` (full) | **44 of 45** — one pre-existing failure, see below |
+| `VITE_QA_MODE=1 npm run build` | PASS |
+
+The single `npm run test` failure is `release-manifest › qualifies the installed npm package tree against a detached fixture`. It was **confirmed pre-existing** by re-running the same fixture with this slice's changes stashed, where it fails identically. It is the documented fail-closed behaviour of the provenance guard under toolchain drift, not a defect introduced here.
+
+**New regression coverage (13 unit tests plus 3 browser cases).** `src/game/replay/__tests__/ghost.test.ts` covers the fold: interpolation between recorded samples, discrete state held from the earlier sample rather than blended, clamping before the grid and at the terminal sample, refusal of an empty log and a non-finite time, and the distance-indexed split including the point past which no honest delta exists. `src/game/persistence/__tests__/ghostReplayLoad.test.ts` covers retrieval: fastest-run selection, course isolation, legacy schema-1 skipping, fall-through past a corrupt fastest run, and the empty-course answer.
+
+**Scoped browser evidence — Chromium 143 headless, `@playwright/test` 1.61.1, non-QA-mode assertions against a `VITE_QA_MODE=1` production build served from `127.0.0.1:4173`.**
+
+| Spec | Result |
+|---|---|
+| `e2e/personal-ghost.spec.ts` | PASS 2/2 |
+| `e2e/text-legibility.spec.ts` | PASS 1/1 |
+| `e2e/core-flow.spec.ts` | PASS 26/26, including the `title-screen` visual snapshot, which the type-scale change did **not** disturb |
+| `e2e/accessibility-controls.spec.ts` | 2 failures in the 27.4-minute batch, both resolved — see below |
+
+`personal-ghost` proves the whole chain rather than its parts: a Practice run on Canyon Kickoff is recorded and stored, a second run on the same course reports `data-ghost="ready"` with a positive `data-ghost-finish-ms`, and the HUD renders a live signed delta (observed as `Ghost +0.52` at lap 1). A run stored on Canyon Kickoff correctly yields `data-ghost="none"` on Pine Run.
+
+**Both accessibility failures were investigated rather than re-baselined.**
+
+- `renderer accessibility cues toggle live and fixed-step caps report dropped time` — a 75-second timeout inside the long batch. It **passes in isolation in 1.1 minutes** against the same served bytes. This is the budget-exhaustion pattern `playwright.config.ts` already documents, not a defect.
+- `short-phone tutorial retains a touch-scrollable action area at 140% UI scale` — **a genuine regression introduced by this slice**, caught by the existing suite. Raising `.tutorial-progress > span` to the 12-pixel floor overflowed the twelve lesson markers on a 320×568 viewport at 140% scale, breaking a §11 requirement. The floor is now scoped to viewports above 780 pixels and the compact numeral is retained below it; the exemption and its reasoning are recorded in `GAME_SPEC.md` §11 rather than taken silently. Re-verified PASS in 46.4 seconds against a fresh build, and the legibility gate still passes with the exemption in place.
+
+**Not run, and unchanged by this slice:** `npm run assets:verify` was exercised only as the `prebuild` step of the QA-mode build; Firefox, WebKit, and the three mobile/tablet Playwright projects were **NOT** run for the two new specs, which are Chromium-only by construction; `npm run test:e2e` was not run in full. Physical device, manual accessibility, manual screen-reader, pinned-toolchain, and frozen-candidate evidence for this slice: **`UNVERIFIED`**.
+
+**Owner decisions this slice does not make.** The ghost is feature scope added during RC hardening at explicit owner instruction; it is not a defect fix. The type-scale change moves rendered text on every menu and HUD surface, and the rc.3 visual gate remains unsigned, so this slice **enlarges** what an owner visual review must cover rather than reducing it. The release decision is unchanged: **NOT READY**.
+
+## 10d. kxb adoption, tier one — 2026-08-29, working copy of `b4916ab`
+
+Scope: seven changes that alter **no rendered frame**, drawn from a full re-review of `kappaxbeta/kxb` against this codebase. The animation and rendering proposals from that review are deliberately **not** here — RRR's limbs are welded rigid at author time by `consolidate_region_by_material`, so kxb's IK, clip format and skinned playback have no chain to walk and no skeleton to bake onto. Nothing in this slice touches the rider, materials, camera, or scene geometry.
+
+Environment as §10c: macOS `26.5.2` arm64, Node `v22.23.1` / npm `10.9.8` — **not** the pinned Node `26.4.0` / npm `11.17.0`.
+
+| # | Change | Evidence |
+|---|---|---|
+| 1 | `.github/workflows/ci.yml` now runs `assets:verify`, `test:release-attestation` and `test:production-smoke-support` | Those four `node --test` suites ran **nowhere**: CI had four steps and `vitest.config.ts` scopes `include` to `src/**`. Measured hermetic on this runner — attestation 71/71 in 1.9 s, smoke/service-worker/scope 44/44 in 0.6 s, `assets:verify` exit 0. `test:release-manifest` stays out: it asserts the toolchain pin and fails closed off-pin by design. |
+| 2 | ESLint `no-restricted-imports` / `no-restricted-globals` over the pure layer | The layer was already clean — `simulation.ts` imports only `./types`, zero browser globals across simulation, content, replay, `aiRules`, `obstacleContacts`, `racePresentation`, `tutorialLessonGate` — but only verifiable by reading. Lands green; verified to **bite** by temporarily importing `three` into `simulation.ts` and observing the named refusal. |
+| 3 | One shared frozen-scene contract, `scripts/lib/frozen-scene-inventory.mjs` | `e2e/visual-regression.spec.ts` asserted **41** canvas attributes; `scripts/capture-baseline-candidates.mjs` — which produces the PNGs an owner reviews and `promote-visual-baseline.mjs` copies into the snapshot directory — waited on **four**. An owner could therefore sign a frame captured in a scene the gate would reject, and the promotion chain compared everything about those files except the state they were taken in. Both now read one table. 7 new fixtures. |
+| 4 | One `LANE_POSITIONS`, imported by its four former copies | `[-4.5, -1.5, 1.5, 4.5]` was redeclared in `simulation/types.ts`, `engine/obstacleContacts.ts`, `editor/validation.ts`, `editor/toTrackDefinition.ts` and `ui/editor/EditorScene.ts` with none importing another, each copy deciding barrier occupancy, placement overlap, authored lateral position or ribbon geometry. |
+| 5 | `src/game/editor/__tests__/moduleCoverage.test.ts` | `obstacleKind()` returns `null` for an unmapped module and the conversion loop `continue`s, so a new editor module with no mapping would be placed, drawn, validated, saved — and silently absent from the race. All 25 shipped ids are covered; verified to bite by removing the `sky-kicker` mapping and observing it named in the failure. |
+| 6 | `src/game/engine/__tests__/poseSeparation.test.ts` | Existing pose tests assert ordering only, and only within the airborne family. Measured from the shipped solver at 20 m/s: grounded-tuck and airborne-neutral produce a **bit-identical** torso (−11.8889°) and arms (8.5600°), separated only by 6.3° of raw leg angle — **5.04°** under the test's weighted metric. One pair is tighter still: slow-grounded vs airborne-nose-down at **2.85°**. The next-closest is airborne-up vs rough-landing at **5.59°**. Landed as a ratchet at the measured floor, with the collision recorded as an explicit defect assertion that the fix must break. |
+| 7 | Editor undo gains a gesture `mark` | `HISTORY_LIMIT = 50`, and the name field, laps field and difficulty slider each pushed one step per input event: a 42-character name spent 42 of the 50 slots and one difficulty sweep spent 4, so a single gesture could consume most of an author's build history while the footer counted it up in front of them. Gestures now also end on blur, so two drags of one control are two actions rather than one. The inspector steppers remain uncoalesced and are recorded as a known gap in `GAME_SPEC.md` §9.1. |
+
+**Executed on the working tree:** `npm run typecheck` PASS · `npm run lint` PASS, zero findings · `npx vitest run` PASS **39 files / 355 tests** (342 before this slice, plus 13) · `npm run test:release-attestation` 71/71 · `npm run test:production-smoke-support` **44/44** (37 before, plus 7) · `npm run assets:verify` PASS · `VITE_QA_MODE=1 npm run build` PASS. Playwright Chromium: `editor-coverage.spec.ts -g "continuous gesture"` PASS.
+
+`npm run test` remains **44 of 45** on the single pre-existing `release-manifest` fixture, unchanged and re-confirmed by stash as toolchain drift rather than a defect.
+
+**Two proposals from that review were declined on inspection, not implemented and then reverted.** Deleting five of the seven entries in `rampImpulse()` was proposed as removing duplicates of a canonical table; there is no canonical table. No built-in track sets `rampImpulse` — the sole occurrence in `tracks.ts` is the type declaration — so every built-in ramp uses `PHYSICS.defaultRampImpulse: 8`, and that function is the *only* source of per-module launch strength for custom tracks. The deletion would have moved `sky-kicker` 11.2 → 8 and `ramp-large` 9.5 → 8, silently changing every authored track and invalidating stored personal bests on user content. A `tsconfig.rules.json` over the editor paths was also declined: `editor/validation.ts` imports from `persistence/database`, whose first line is `import Dexie`, which pulls the DOM lib in transitively.
+
+**Not run:** the visual-regression spec cannot execute — `e2e/visual-regression.spec.ts-snapshots/` is still absent, so it guards nothing — and `capture-baseline-candidates.mjs` runs only inside the owner-gated frozen-candidate workflow. **Change 3 is therefore verified statically only** (typecheck, lint, and 7 fixtures asserting both consumers read the shared table and neither re-declares an attribute inline); neither consumer was executed against a browser. Firefox, WebKit and the three mobile/tablet Playwright projects were not run. Physical device, manual accessibility, pinned-toolchain and frozen-candidate evidence: **`UNVERIFIED`**.
+
+### Adversarial review of this slice, and what it caught
+
+The slice was reviewed against the working tree before being reported complete. Fourteen findings were confirmed. Recorded here rather than quietly fixed, because one of them was a shipped-gate break of exactly the class this branch has recorded twice before.
+
+**BLOCKER — the slice broke `assets:verify`, and the first draft of this section claimed it passed.** Adding `scripts/frozen-scene-inventory.test.mjs` to `test:production-smoke-support` changed `package.json` from 3,478 to 3,518 bytes. All three schema-v2 asset manifests hash-bind `package.json`, so `assets:verify` failed — and it is `prebuild`, so `npm run build`, the entire Playwright suite, and the CI step this very slice added were all broken with it. This is the lesson `9bd9b3f` already wrote down: *"on this project package.json is release-bound, so ANY script or dependency edit is a product-bytes change that requires assets:build and a fresh assets:verify before commit."* The gate batch run after the edit did not include `assets:verify`, so the break was invisible until review. Fixed by `npm run assets:build`, whose diff is hash-only — six lines across three manifests, `package.json`'s bytes and SHA-256, **no GLB, texture, or other asset binary altered** — and re-verified with the exit code captured directly rather than read off a following command: `assets:verify exit = 0`.
+
+**Two MAJOR defects in the undo mark, both introduced by this slice, both fixed.** (1) The mark survived the Open and Import history resets, so a gesture on the previous document governed the first edit on the newly opened one; because the push is gated on the mark, that first edit recorded no step and could not be undone at all. (2) The coalescing window had no end, so two separate drags of one control — or two runs of typing separated by a completed save — folded into a single step, and one undo could travel back past a value already written to disk. Fixed with one `resetHistory()` helper used at all three reset sites, an `endGesture()` terminator on blur (and pointer-up for the range control), and gesture-end on every completed save. Both are covered by new Chromium journeys.
+
+**Corrections to this section's own claims.** The pose figures mixed two metrics: 6.3° is a raw leg delta while 2.85° and 5.59° are weighted separations, and under one metric the grounded/airborne pair is 5.04°, so exactly one pair is tighter, not several. The "one drag or a 42-character name evicted an author's whole history" line overstated its own worst case — 4 slots and 42 slots respectively against 50 — and pointed at the two controls that were fixed rather than at the uncoalesced inspector steppers, which are the case that genuinely evicts a full history and are now recorded as a known gap in `GAME_SPEC.md` §9.1. The `.github/workflows/ci.yml` comment miscounted the suites it documents (seven, not four; six hermetic, not three) and quoted a superseded 37/37.
+
+**Two further corrections.** `raceContract.test.ts` re-implemented `GameEngine`'s derivation instead of importing it, so it would have stayed green if the shipped derivation changed; `deriveRaceContract` is now exported from `aiRules.ts`, called by the engine, and exercised directly by the test. The `commit(update, mark?)` refusal path — an update returning `null` — was unreachable: every call site returns an object and refusals early-return before `commit`. It has been removed from the code, the spec sentence, and this section rather than left as a capability nothing exercises.
+
+**Documentation obligations then met:** `ARCHITECTURE.md` now records the enforced pure-layer boundary, the single `LANE_POSITIONS` owner, `deriveRaceContract`, the shared frozen-scene contract, and the mark as history state; `docs/OPERATIONS.md` lists the seven Node fixture suites and what CI runs; `README.md` carries the current 515-check total and names the release-manifest pin failure.
+
+**Re-verified after every fix, exit codes captured individually:** `assets:verify` 0 · `typecheck` 0 · `lint` 0, zero findings · `npx vitest run` 39 files / 355 tests · `test:release-attestation` 71/71 · `test:production-smoke-support` 44/44. The three asset manifests are modified by the re-bind and are part of this slice's diff.
+
+The release decision is unchanged: **NOT READY**. The CRITICAL 2026-08-12 finding — Canyon finishing 48% inside its target, Ace capped below the player's turbo speed — is untouched by this slice and remains the finding that decides whether a visual baseline is worth signing.
+
 ## 11. QA conclusion
 
 The resumed working-tree qualification establishes scoped browser and command-gate confidence, not release readiness. Focused Chromium functional, reliability, tutorial, editor, input, migration, persistence, and quality paths passed; campaign modes passed 18/18 in 27.7 minutes; the current rival pack gate passed 2/2 on isolated port 4176; desktop Firefox-plus-WebKit functional passed 10/10; WebKit lifecycle passed 6/6; the emulated touch matrix passed 6/6; and emulated touch tutorial intro passed 2/2. Typecheck, lint, all 452 tests/fixtures, asset verification, the zero-vulnerability high-severity audit, current `npm run build`, and a scoped non-QA live preview smoke passed on the working tree.

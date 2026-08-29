@@ -1,4 +1,4 @@
-import type { Difficulty } from "../../app/types";
+import type { Difficulty, RaceMode } from "../../app/types";
 import type { LaneIndex, ObstacleKind } from "../content/tracks";
 import {
   type RaceSimulation,
@@ -170,14 +170,63 @@ export function isRampObstacle(kind?: ObstacleKind): boolean {
   return getObstaclePolicy(kind).environment.surface === "ramp";
 }
 
+/**
+ * The course shape every rider in one race must agree on.
+ *
+ * Checkpoint count and lap count decide when a lap closes and when a rider is
+ * finished, so a field racing a different contract than the player is not
+ * racing the same course — it is being classified against a different one. The
+ * two used to be derived for the player and written as literals here, and they
+ * agreed only because AI fields are built solely for Rival and Mastery, which
+ * run on built-in tracks that all fall through to the same defaults. The first
+ * rival on an authored course with four checkpoints, or on a three-lap custom
+ * track, would have silently disagreed.
+ */
+export interface RaceContract {
+  readonly checkpointCount: number;
+  readonly totalLaps: number;
+}
+
+/**
+ * What a built-in campaign course races under.
+ *
+ * No shipped track defines an `authoredCourse`, so every built-in race resolves
+ * to exactly these numbers today — which is why passing a derived contract is a
+ * provable no-op on current content rather than a behaviour change.
+ */
+export const DEFAULT_RACE_CONTRACT: RaceContract = Object.freeze({
+  checkpointCount: 3,
+  totalLaps: 2,
+});
+
+/**
+ * Derive the one contract a race is run under.
+ *
+ * Exported so the engine and its tests read the same function rather than two
+ * copies of the same expression — a re-implementation in a test asserts that
+ * the copy is right, and stays green when the shipped derivation changes.
+ */
+export function deriveRaceContract(
+  track: { readonly authoredCourse?: { readonly checkpoints: readonly unknown[] } | undefined },
+  options: { readonly mode: RaceMode; readonly customTrack?: { readonly laps: number } | undefined },
+): RaceContract {
+  return {
+    checkpointCount: track.authoredCourse?.checkpoints.length ?? DEFAULT_RACE_CONTRACT.checkpointCount,
+    totalLaps: options.mode === "tutorial"
+      ? 1
+      : (options.customTrack?.laps ?? DEFAULT_RACE_CONTRACT.totalLaps),
+  };
+}
+
 export function createAiSimulationOptions(
   lane: LaneIndex,
   forwardPosition: number,
   initialHeat: number,
+  contract: RaceContract = DEFAULT_RACE_CONTRACT,
 ): SimulationOptions {
   return {
-    checkpointCount: 3,
-    totalLaps: 2,
+    checkpointCount: contract.checkpointCount,
+    totalLaps: contract.totalLaps,
     initialHeat,
     initialLane: lane,
     initialForwardPosition: forwardPosition,

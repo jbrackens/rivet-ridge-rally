@@ -325,8 +325,8 @@
     },
     "packageManifest": {
       "path": "package.json",
-      "bytes": 3478,
-      "sha256": "76dec75d1a994a55cdee7030a047ec3e74cc7d2d0c3ec6be5cf2355bed0cf7a8"
+      "bytes": 3518,
+      "sha256": "a5ab79563ec38134e932e15ccfc832e2facd0c29ed662d7083aa610cb6cec454"
     }
   },
   "runtimeSupport": {

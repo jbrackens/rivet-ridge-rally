@@ -23,8 +23,8 @@ import {
   startLifecycleResource,
   stopLifecycleResource,
 } from "../../game/qa/lifecycleDiagnostics";
+import { LANE_POSITIONS as LANE_X } from "../../game/simulation";
 
-const LANE_X = [-4.5, -1.5, 1.5, 4.5] as const;
 const INITIAL_ROUTE_VIEW_POSITION = 62;
 const PREVIEW_PLACEMENT_ID = "__editor-placement-preview__";
 const EDITOR_ROUTE_HALF_WIDTH = 7.5;

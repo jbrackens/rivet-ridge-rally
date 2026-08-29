@@ -106,7 +106,7 @@ npm run audit
 npm run build
 ```
 
-`npm run test` executes Vitest plus the Node release-manifest, release-attestation, production-smoke-support, production-smoke-flow, and service-worker-install fixtures. `npm run test:coverage` is a separate Vitest-only coverage report; it does not cover the Node fixtures or replace browser coverage.
+`npm run test` executes Vitest plus the Node release-manifest, release-attestation, production-smoke-support, production-smoke-flow, service-worker-install, release-scope-audit, and frozen-scene-inventory fixtures. `.github/workflows/ci.yml` runs the six hermetic ones plus `assets:verify`; `test:release-manifest` is excluded there because it asserts the Node/npm pin and fails closed off-pin. `npm run test:coverage` is a separate Vitest-only coverage report; it does not cover the Node fixtures or replace browser coverage.
 
 After every required pre-tag gate and the guarded owner review/promotion pass, create the annotated local tag `v1.0.0-rc.3` at that exact commit and verify that the tag peels to the recorded commit. (The historical `v1.0.0-rc.2` procedure below is retained for the record; `rc.2` is retired as a candidate identity and its tag must not be moved.) Performance, soak, and production smoke are post-tag gates: their evidence binds the annotated tag and the format-2 manifest, so they cannot run as qualifying pre-tag evidence. Do not move or reuse a published tag. The manifest guard requires that exact annotated tag at `HEAD` and a clean tree:
 

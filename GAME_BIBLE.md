@@ -77,6 +77,8 @@ Three additional polished example tracks must be created with the shipping edito
 - Beating the third-place target unlocks that track's Rival Main Race.
 - Production targets are calibrated against a clean standard-Ride two-lap reference with human margin rather than an impossible maximum-speed fantasy. Current Solo targets are 190, 208, 224, 239, and 259 seconds in campaign order; tighter values require recorded full-course deterministic qualification.
 
+- Your own fastest stored run for that exact course rides alongside you as a translucent ghost, with a signed gap measured where you are on the track rather than on a shared clock. It is a record, not a rival: it cannot touch you, cannot be finished ahead of or behind in any standing, and changes nothing about qualification. The point is that the target stops being a fixed number and becomes the last version of yourself — which keeps tightening for as long as the player keeps improving, on the courses that already exist.
+
 ### Rival Main Race
 
 - A readable AI field using normal route followers and pressure-building pursuers.
@@ -88,6 +90,7 @@ Three additional polished example tracks must be created with the shipping edito
 - Available for every unlocked track.
 - Supports learning lines and mechanics without campaign pressure.
 - Provides quick restart and return paths.
+- Carries the personal ghost, because learning a line is exactly where riding against your own best run helps most.
 
 ### Summit mastery
 

@@ -16,8 +16,17 @@
 // Navigation deliberately mirrors `openFrozenRace()` in the spec rather than using the
 // `__RRR_QA__.startTrack` shortcut the review-frame capture uses, so the promoted bytes come
 // from the same journey the verifying test takes.
+//
+// The *scene* that journey has to arrive at is no longer mirrored — it is imported. Mirroring
+// it by hand is what let this script wait on four attributes while the spec asserted 41, so a
+// frame could be captured and signed in a state the gate would reject. See
+// ./lib/frozen-scene-inventory.mjs.
 
-const RACE_CANVAS_LABEL = "Live 3D race on Canyon Kickoff";
+import {
+  FROZEN_READINESS,
+  frozenSceneContract,
+  RACE_CANVAS_LABEL,
+} from "./lib/frozen-scene-inventory.mjs";
 const SNAPSHOT_DIR = "e2e/visual-regression.spec.ts-snapshots";
 
 // Mirrors the projects in playwright.config.ts. `device` is resolved against Playwright's
@@ -122,12 +131,16 @@ async function openFrozenRace(page, state, baseURL) {
   await page.getByRole("button", { name: /Practice/ }).click();
 
   await page.getByLabel(RACE_CANVAS_LABEL).waitFor({ state: "visible", timeout: 30_000 });
-  for (const [attribute, value] of [
-    ["data-visual-state", "frozen"],
-    ["data-bike-asset", "ready"],
-    ["data-canyon-kit-asset", "ready"],
-    ["data-environment-asset", "ready"],
-  ]) await waitForCanvasAttribute(page, attribute, value);
+  // The same scene contract e2e/visual-regression.spec.ts asserts, from one
+  // shared table. This used to be these four readiness attributes alone, which
+  // meant a frame could be captured — and signed by an owner — in a scene the
+  // gate would reject on its next run.
+  for (const [attribute, value] of FROZEN_READINESS) {
+    await waitForCanvasAttribute(page, attribute, value);
+  }
+  for (const [attribute, value] of frozenSceneContract()) {
+    await waitForCanvasAttribute(page, attribute, value);
+  }
   if (state.expectVisualDistance) {
     await waitForCanvasAttribute(page, "data-visual-distance", state.expectVisualDistance);
   }

@@ -21,7 +21,12 @@ import {
   type TrackObstacle,
 } from "../content/tracks";
 import { customTrackToDefinition } from "../editor/toTrackDefinition";
-import type { CustomTrackData } from "../persistence/database";
+import {
+  customReplayCourseKey,
+  getCustomTrackReplayRevision,
+  loadBestReplay,
+  type CustomTrackData,
+} from "../persistence/database";
 import { AudioManager } from "../audio/AudioManager";
 import {
   CANYON_KIT_URL,
@@ -32,7 +37,8 @@ import {
 } from "../assets/compressedAssetLoader";
 import { InputManager, type InputDevice } from "../input/InputManager";
 import { formatKeyCode } from "../input/keyLabels";
-import { ReplayRecorder } from "../replay/replayCodec";
+import { ghostTimeAtDistance, sampleGhostAt } from "../replay/ghost";
+import { ReplayRecorder, type ReplayFrame } from "../replay/replayCodec";
 import {
   observeWebglContext,
   releaseWebglContext,
@@ -55,6 +61,8 @@ import {
   advanceAiRaceProgress,
   chooseAiLane,
   createAiSimulationOptions,
+  deriveRaceContract,
+  type RaceContract,
   getAiConsistency,
   getAiDifficultyProfile,
   getAiDriveControl,
@@ -97,6 +105,42 @@ import {
 
 const PLAYER_COLOR = 0x19b8b0;
 const PLAYER_ACCENT = 0xf15f50;
+/**
+ * The ghost reads as the player's own machine drained of colour, so it is never
+ * mistaken for a rival: same silhouette, no team identity, and translucent
+ * enough that it can be ridden through without hiding the track behind it.
+ */
+const GHOST_COLOR = 0x8fd8e6;
+const GHOST_ACCENT = 0xbfe9f2;
+const GHOST_OPACITY = 0.34;
+/** Modes that race the clock, and so are the modes a personal ghost belongs in. */
+const GHOST_MODES: readonly RaceMode[] = ["solo", "practice", "custom"];
+
+/**
+ * The course a ghost may be loaded for, or null when this race gets none.
+ *
+ * Rival and mastery races are excluded because they already field five rivals;
+ * a seventh body on the same course would cost readability for a comparison the
+ * live classification already makes. The tutorial is excluded because it teaches
+ * rather than times. A custom race keys on the exact authored revision, so
+ * editing a track retires its ghost instead of racing one ridden on a course
+ * that no longer exists.
+ */
+function resolveGhostCourseKey(options: GameEngineOptions): string | null {
+  if (!GHOST_MODES.includes(options.mode)) return null;
+  if (options.mode === "custom") {
+    const customTrack = options.customTrack;
+    if (!customTrack) return null;
+    try {
+      return customReplayCourseKey(customTrack.id, getCustomTrackReplayRevision(customTrack));
+    } catch {
+      // An unencodable revision means the ghost cannot be bound to this exact
+      // course; racing without one is correct and the race still starts.
+      return null;
+    }
+  }
+  return options.trackId;
+}
 const NAVY = 0x061c32;
 const YELLOW = 0xf7cc3d;
 const COOLING = 0x1ddfe6;
@@ -361,6 +405,15 @@ export interface EngineHudState {
   elapsedMs: number;
   targetMs: number;
   savedBestMs?: number | undefined;
+  /**
+   * Signed milliseconds against the personal ghost at the player's current
+   * distance. Negative is ahead. Undefined means there is no ghost to compare
+   * against; null means there is one but the player has ridden past everything
+   * it reached, so no honest delta exists.
+   */
+  ghostDeltaMs?: number | null | undefined;
+  /** The finish time of the ghost being raced, when one is loaded. */
+  ghostFinishMs?: number | undefined;
   heat: number;
   overheated: boolean;
   bikePhase: BikePhase;
@@ -3235,6 +3288,13 @@ export class GameEngine {
   private quality: Exclude<GameSettings["quality"], "auto">;
   private readonly existingBestMs: number | undefined;
   private readonly targetMs: number;
+  /**
+   * The course shape the player and every rival race under, derived once.
+   *
+   * Passed to the AI field as well as the player's own simulation so the two
+   * cannot drift — see `RaceContract` in ./aiRules for why that matters.
+   */
+  private readonly raceContract: RaceContract;
   private readonly onHud: (state: EngineHudState) => void;
   private readonly onFinishStart: () => void;
   private readonly onFinish: (result: RaceResult, replay: RaceReplayHandoff) => void;
@@ -3256,6 +3316,19 @@ export class GameEngine {
   private readonly visualQualificationFreeze: boolean;
   private preparation: Promise<void> = Promise.resolve();
   private readonly aiRiders: AiRider[] = [];
+  /**
+   * The personal ghost: a presentation-only rider folded from a stored replay.
+   *
+   * It holds no simulation and is never consulted by one — per the architecture
+   * rule that Three.js objects are presentation and never authoritative
+   * gameplay state, the ghost cannot collide, cannot be classified, and cannot
+   * influence the player's race in any way except by being visible.
+   */
+  private readonly ghostCourseKey: string | null;
+  private ghostGroup: THREE.Group | null = null;
+  private ghostFrames: readonly ReplayFrame[] | null = null;
+  private ghostFinishMs: number | null = null;
+  private ghostDeltaMs: number | null = null;
   private readonly timer = new THREE.Timer();
   private readonly performanceWindow: PerformanceWindow = {
     elapsed: 0,
@@ -3394,6 +3467,7 @@ export class GameEngine {
     this.settings = options.settings;
     this.quality = resolveQuality(options.settings.quality);
     this.existingBestMs = options.existingBestMs;
+    this.ghostCourseKey = resolveGhostCourseKey(options);
     this.targetMs = options.mode === "mastery"
       ? getMasteryTargetMs(this.track.soloTargetMs, options.masteryLevel ?? 0)
       : this.track.soloTargetMs;
@@ -3401,9 +3475,10 @@ export class GameEngine {
     this.onFinishStart = options.onFinishStart ?? (() => undefined);
     this.onFinish = options.onFinish;
     this.onFatal = options.onFatal;
+    this.raceContract = deriveRaceContract(this.track, options);
     this.simulation = new RaceSimulation({
-      checkpointCount: this.track.authoredCourse?.checkpoints.length ?? 3,
-      totalLaps: options.mode === "tutorial" ? 1 : (options.customTrack?.laps ?? 2),
+      checkpointCount: this.raceContract.checkpointCount,
+      totalLaps: this.raceContract.totalLaps,
       initialHeat: import.meta.env.VITE_QA_MODE === "1"
         && new URLSearchParams(window.location.search).has("qa-near-overheat")
         ? 99
@@ -3470,6 +3545,7 @@ export class GameEngine {
       this.createWorld();
       this.createDustPool();
       this.createAiField();
+      this.createGhostRider();
       this.applyQaVisualDistance();
       this.applyRendererAccessibility();
       this.resize();
@@ -5129,6 +5205,8 @@ export class GameEngine {
       );
     }
 
+    this.updateGhost(state, delta, reducedMotion);
+
     for (const ai of this.aiRiders) {
       const bike = ai.simulation.snapshot.bike;
       const crashed = bike.phase === "crashed";
@@ -5801,6 +5879,12 @@ export class GameEngine {
       elapsedMs: state.race.elapsedSeconds * 1_000,
       targetMs: this.targetMs,
       savedBestMs: this.existingBestMs,
+      ...(this.ghostFrames
+        ? {
+            ghostDeltaMs: this.ghostDeltaMs,
+            ...(this.ghostFinishMs === null ? {} : { ghostFinishMs: this.ghostFinishMs }),
+          }
+        : {}),
       heat: state.bike.heat,
       overheated: state.bike.overheated,
       bikePhase: state.bike.phase,
@@ -9076,6 +9160,158 @@ export class GameEngine {
     this.addCourseAnchored(landmark);
   }
 
+  /**
+   * Build the ghost body and begin loading the run it will replay.
+   *
+   * The body is created synchronously and hidden, while the stored replay is
+   * fetched off the main path. Creating Three.js objects on the async
+   * continuation instead would risk building into a scene that has since been
+   * disposed, and delaying the race until IndexedDB answers would make a missing
+   * ghost cost the player a slower start.
+   */
+  private createGhostRider(): void {
+    const courseKey = this.ghostCourseKey;
+    if (courseKey === null) {
+      this.canvas.dataset.ghost = "not-applicable";
+      return;
+    }
+
+    const group = this.createBike(GHOST_COLOR, GHOST_ACCENT, true, "PB");
+    group.name = "personal-ghost";
+    group.scale.setScalar(1.3);
+    group.visible = false;
+    group.traverse((object) => {
+      if (!(object instanceof THREE.Mesh)) return;
+      // A ghost casts no shadow and takes no depth: it is a record of a ride,
+      // not a body on the course, and writing depth would let it hide track the
+      // player has to read through it.
+      object.castShadow = false;
+      object.receiveShadow = false;
+      object.renderOrder = 3;
+      const materials = Array.isArray(object.material) ? object.material : [object.material];
+      for (const material of materials) {
+        material.transparent = true;
+        material.opacity = GHOST_OPACITY;
+        material.depthWrite = false;
+        // Every material is retinted, not just the body and accent. Tinting two
+        // of the six leaves the frame, metal and tyres at their near-black
+        // values, and at a third opacity those read as a dark smudge over the
+        // track rather than as a rider. A single cool tint plus a little
+        // emissive keeps the silhouette legible at distance, where the ghost is
+        // most of the time and where the track behind it is brightest.
+        if (material instanceof THREE.MeshStandardMaterial) {
+          material.color.setHex(GHOST_COLOR);
+          material.emissive.setHex(GHOST_ACCENT);
+          material.emissiveIntensity = 0.35;
+          material.metalness = 0;
+          material.roughness = 1;
+        }
+      }
+    });
+    this.ghostGroup = group;
+    this.scene.add(group);
+    this.canvas.dataset.ghost = "loading";
+
+    void loadBestReplay(courseKey)
+      .then((ghost) => {
+        if (this.disposed || ghost === null) {
+          this.canvas.dataset.ghost = ghost === null ? "none" : "disposed";
+          return;
+        }
+        this.ghostFrames = ghost.frames;
+        this.ghostFinishMs = ghost.finishTimeMs;
+        this.canvas.dataset.ghost = "ready";
+        this.canvas.dataset.ghostFinishMs = String(ghost.finishTimeMs);
+      })
+      .catch(() => {
+        // Persistence has already published the failure through its own channel.
+        // A race without a ghost is the correct degraded outcome, not an error
+        // the rider needs to see mid-start.
+        this.canvas.dataset.ghost = "unavailable";
+      });
+  }
+
+  /**
+   * Place the ghost for this frame and recompute the split delta.
+   *
+   * Presentation only: nothing here writes simulation state, and the ghost's
+   * position is read from the decoded log rather than from any live rider.
+   */
+  private updateGhost(state: SimulationState, delta: number, reducedMotion: boolean): void {
+    const group = this.ghostGroup;
+    const frames = this.ghostFrames;
+    if (!group || !frames) {
+      this.ghostDeltaMs = null;
+      return;
+    }
+
+    const sample = sampleGhostAt(frames, state.race.elapsedSeconds);
+    if (!sample) {
+      group.visible = false;
+      this.ghostDeltaMs = null;
+      return;
+    }
+
+    const ghostSeconds = ghostTimeAtDistance(frames, state.bike.forwardPosition);
+    this.ghostDeltaMs = ghostSeconds === null
+      ? null
+      : Math.round((state.race.elapsedSeconds - ghostSeconds) * 1_000);
+
+    const steeringRoll = resolveRiderPresentationRoll(
+      LANE_POSITIONS[sample.lane],
+      sample.lanePosition,
+      sample.phase,
+      0,
+      reducedMotion,
+    );
+    const routeHeight = this.authoredRouteHeight(
+      sample.forwardPosition % this.track.courseLength,
+      sample.lanePosition,
+    );
+    // The pose rig reads a BikeState, and a decoded frame carries every field it
+    // consults except the three the recorder does not store. Those are supplied
+    // as rest values rather than guessed: a ghost that invented a recovery
+    // animation it never rode would be a fiction, not a record.
+    const ghostBike: BikeState = {
+      ...state.bike,
+      forwardPosition: sample.forwardPosition,
+      lane: sample.lane,
+      lanePosition: sample.lanePosition,
+      speed: sample.speed,
+      heat: sample.heat,
+      overheated: sample.overheated,
+      phase: sample.phase,
+      height: sample.height,
+      verticalVelocity: 0,
+      pitch: sample.pitch,
+      wheelie: sample.wheelie,
+      recoveryProgress: 0,
+      lastLanding: null,
+      crashCause: null,
+      surface: sample.surface,
+    };
+    const ghostPose = this.setRiderPose(group, ghostBike, steeringRoll, reducedMotion, delta);
+    this.setRiderPresentation(
+      group,
+      sample.forwardPosition,
+      sample.lanePosition,
+      0.72 + routeHeight + sample.height,
+      resolveBikePresentationPitch(
+        sample.phase,
+        sample.pitch,
+        sample.wheelie,
+        ghostPose.landingCompression,
+        reducedMotion,
+      ),
+      steeringRoll,
+    );
+    group.visible = true;
+    if (sample.phase !== "crashed") {
+      group.userData.frontWheel.rotation.x -= delta * sample.speed * 1.7;
+      group.userData.backWheel.rotation.x -= delta * sample.speed * 1.7;
+    }
+  }
+
   private createAiField(): void {
     if (!(["rival", "mastery"] as RaceMode[]).includes(this.mode)) return;
     for (const [index, entrant] of AI_FIELD.entries()) {
@@ -9093,7 +9329,7 @@ export class GameEngine {
         riderName: entrant.name,
         group,
         behavior: index === 4 ? "pursuer" : "route",
-        simulation: new RaceSimulation(createAiSimulationOptions(lane, progress, index * 7)),
+        simulation: new RaceSimulation(createAiSimulationOptions(lane, progress, index * 7, this.raceContract)),
         targetLane: lane,
         previousLaneCommand: 0,
         routeTimerSeconds: index * 0.1,

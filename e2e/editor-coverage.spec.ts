@@ -720,3 +720,59 @@ test("UI import rejects corrupt, oversized, incompatible, invalid, and external-
     "Track file is incompatible or invalid: Thumbnail must be an embedded image data URL.",
   );
 });
+
+test("a continuous gesture costs one undo step, not one per input event", async ({ page }) => {
+  // Against HISTORY_LIMIT = 50, a typed 42-character name used to push 42 steps
+  // and one Difficulty sweep four, so a single gesture could consume most of an
+  // author's build history. Each gesture is now one action.
+  await expect(page.getByText("0 / 50 actions", { exact: true })).toBeVisible();
+
+  const difficulty = page.getByLabel("Difficulty");
+  const name = page.getByLabel("Track name");
+  const startingDifficulty = await difficulty.inputValue();
+  const startingName = await name.inputValue();
+
+  for (const value of ["2", "3", "4", "5"]) await difficulty.fill(value);
+  await expect(difficulty).toHaveValue("5");
+  await expect(page.getByText("1 / 50 actions", { exact: true })).toBeVisible();
+
+  // A different control is a different gesture, so it earns its own step.
+  await name.fill("");
+  await name.pressSequentially("Ridgeline");
+  await expect(name).toHaveValue("Ridgeline");
+  await expect(page.getByText("2 / 50 actions", { exact: true })).toBeVisible();
+
+  // One undo returns to before the whole naming gesture, not into it.
+  await page.getByRole("button", { name: "Undo", exact: true }).click();
+  await expect(page.getByText("1 / 50 actions", { exact: true })).toBeVisible();
+  await expect(name).toHaveValue(startingName);
+
+  // The difficulty drag is still exactly one step behind that.
+  await page.getByRole("button", { name: "Undo", exact: true }).click();
+  await expect(page.getByText("0 / 50 actions", { exact: true })).toBeVisible();
+  await expect(difficulty).toHaveValue(startingDifficulty);
+});
+
+test("two separate gestures on one control are two undo steps", async ({ page }) => {
+  // The coalescing window is keyed on the control, so without an explicit end
+  // it never closed: a second drag of Difficulty folded into the first, and one
+  // undo travelled back past a value the author had already settled on.
+  await expect(page.getByText("0 / 50 actions", { exact: true })).toBeVisible();
+  const difficulty = page.getByLabel("Difficulty");
+  const name = page.getByLabel("Track name");
+
+  await difficulty.fill("2");
+  await difficulty.fill("3");
+  await expect(page.getByText("1 / 50 actions", { exact: true })).toBeVisible();
+
+  // Leaving the control ends the gesture.
+  await name.click();
+  await difficulty.fill("4");
+  await difficulty.fill("5");
+  await expect(difficulty).toHaveValue("5");
+  await expect(page.getByText("2 / 50 actions", { exact: true })).toBeVisible();
+
+  // One undo returns to the end of the FIRST gesture, not past it.
+  await page.getByRole("button", { name: "Undo", exact: true }).click();
+  await expect(difficulty).toHaveValue("3");
+});

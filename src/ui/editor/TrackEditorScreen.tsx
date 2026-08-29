@@ -365,12 +365,76 @@ export function TrackEditorScreen() {
     }
   }, []);
 
-  const commit = useCallback((update: (current: CustomTrackData) => CustomTrackData) => {
+  /**
+   * The gesture the last history step belongs to, or null after a discrete one.
+   *
+   * A slider drag and a run of keystrokes in the name field are each *one*
+   * thing an author did, but they arrive as one `commit` per input event.
+   * Against `HISTORY_LIMIT = 50` a 42-character name spent 42 of the 50 slots
+   * and one Difficulty sweep spent 4, so a single gesture could consume most of
+   * an author's build history while the footer counted it up in front of them.
+   *
+   * The inspector's placement fields and stepper buttons are NOT yet marked, so
+   * they still cost one action per press — the Height stepper's -4..40 range in
+   * 0.5 steps is 88 of them. That gap is recorded in GAME_SPEC.md §9.1 rather
+   * than left to be discovered.
+   */
+  const lastMarkRef = useRef<string | null>(null);
+
+  /**
+   * Apply an edit, and decide whether it earns its own undo step.
+   *
+   * `mark` names a continuous gesture: consecutive commits carrying the same
+   * mark collapse into the first one's step, so undo returns the author to
+   * before the drag rather than to the middle of it. Anything without a mark is
+   * a discrete action and always pushes, which is the previous behaviour and
+   * remains the default.
+   *
+   */
+  /**
+   * Clear every piece of history state together.
+   *
+   * The gesture mark IS history state, so a reset that clears `past` and
+   * `future` but leaves the mark set lets a gesture from the previous document
+   * govern the first edit on the new one — and because the push is gated on the
+   * mark, that first edit records no step at all and cannot be undone. Kept as
+   * one helper so a fourth reset site cannot reintroduce the asymmetry.
+   */
+  const resetHistory = useCallback(() => {
+    setPast([]);
+    setFuture([]);
+    lastMarkRef.current = null;
+  }, []);
+
+  /**
+   * End the current gesture, so the next edit on the same control starts a new
+   * undo step.
+   *
+   * Without this the coalescing window never closes: the mark is keyed on the
+   * control alone, so two separate drags of Difficulty — or two runs of typing
+   * separated by a save — would fold into one step, and a single undo would
+   * travel back past a value the author had already written to disk.
+   */
+  const endGesture = useCallback(() => {
+    lastMarkRef.current = null;
+  }, []);
+
+  const commit = useCallback((
+    update: (current: CustomTrackData) => CustomTrackData,
+    mark?: string,
+  ) => {
     if (saveInFlightRef.current) return;
+    // Decided outside the updater: React may invoke a state updater more than
+    // once, and a ref written inside one would coalesce against itself.
+    const continues = mark !== undefined && mark === lastMarkRef.current;
+    lastMarkRef.current = mark ?? null;
     setTrack((current) => {
-      setPast((history) => [...history.slice(-(HISTORY_LIMIT - 1)), structuredClone(current)]);
-      setFuture([]);
-      return { ...update(current), updatedAt: NOW() };
+      const next = update(current);
+      if (!continues) {
+        setPast((history) => [...history.slice(-(HISTORY_LIMIT - 1)), structuredClone(current)]);
+        setFuture([]);
+      }
+      return { ...next, updatedAt: NOW() };
     });
   }, []);
 
@@ -407,6 +471,7 @@ export function TrackEditorScreen() {
 
   const undo = () => {
     if (saveInFlightRef.current) return;
+    lastMarkRef.current = null;
     const previous = past.at(-1);
     if (!previous) return;
     setFuture((items) => [structuredClone(track), ...items].slice(0, HISTORY_LIMIT));
@@ -416,6 +481,7 @@ export function TrackEditorScreen() {
 
   const redo = () => {
     if (saveInFlightRef.current) return;
+    lastMarkRef.current = null;
     const next = future[0];
     if (!next) return;
     setPast((items) => [...items, structuredClone(track)].slice(-HISTORY_LIMIT));
@@ -443,10 +509,11 @@ export function TrackEditorScreen() {
       clearPendingTestRideSave(saved.id);
       setTrack(result.track);
       setPersistedBase(structuredClone(result.track));
-      if (result.conflictCopy) {
-        setPast([]);
-        setFuture([]);
-      }
+      // Any completed save ends the gesture. Otherwise the next drag of the
+      // same control continues the pre-save one, is never pushed, and one undo
+      // reverts past the state that was just persisted.
+      endGesture();
+      if (result.conflictCopy) resetHistory();
       await refreshLibrary();
       setNotice(result.conflictCopy
         ? `A newer saved version was preserved. Your draft was saved as “${result.track.name}”.`
@@ -606,8 +673,7 @@ export function TrackEditorScreen() {
       const imported = importCustomTrack(await file.text());
       const suffix = " Copy";
       const copyName = `${imported.name.slice(0, CUSTOM_TRACK_NAME_MAX_CHARS - suffix.length).trimEnd()}${suffix}`;
-      setPast([]);
-      setFuture([]);
+      resetHistory();
       setTrack({ ...imported, id: crypto.randomUUID(), name: copyName, createdAt: NOW(), updatedAt: NOW() });
       setPersistedBase(null);
       setSelectedPlacementId(null);
@@ -715,7 +781,7 @@ export function TrackEditorScreen() {
       <h1 className="sr-only">Track Builder — {track.name}</h1>
       <header className="editor-toolbar" inert={confirmation !== null} aria-hidden={confirmation !== null ? true : undefined}>
         <button className="editor-home" onClick={() => navigate("title")} aria-label="Back to festival menu" disabled={saveInFlight}><RallyIcon kind="back" /> <span>Track Builder</span></button>
-        <input aria-label="Track name" value={track.name} maxLength={CUSTOM_TRACK_NAME_MAX_CHARS} disabled={saveInFlight} onChange={(event) => commit((current) => ({ ...current, name: event.target.value }))} />
+        <input aria-label="Track name" value={track.name} maxLength={CUSTOM_TRACK_NAME_MAX_CHARS} disabled={saveInFlight} onChange={(event) => commit((current) => ({ ...current, name: event.target.value }), "name")} onBlur={endGesture} />
         <button onClick={undo} disabled={saveInFlight || past.length === 0} aria-label="Undo"><RallyIcon kind="undo" /></button>
         <button onClick={redo} disabled={saveInFlight || future.length === 0} aria-label="Redo"><RallyIcon kind="redo" /></button>
         <span className="toolbar-spacer" />
@@ -853,8 +919,7 @@ export function TrackEditorScreen() {
                   {item.thumbnail ? <img src={item.thumbnail} alt="" /> : <span className="library-placeholder" />}
                   <div><strong>{item.name}</strong><small>{item.laps} laps · difficulty {item.difficultyEstimate}</small></div>
                   <button disabled={saveInFlight} onClick={() => {
-                    setPast([]);
-                    setFuture([]);
+                    resetHistory();
                     setTrack(structuredClone(item));
                     setPersistedBase(structuredClone(item));
                     setSelectedPlacementId(null);
@@ -968,8 +1033,8 @@ export function TrackEditorScreen() {
             <output aria-label="Track lap count">{track.laps} {track.laps === 1 ? "lap" : "laps"}</output>
             <button type="button" aria-label="Increase laps" onClick={() => nudgeLaps(1)} disabled={track.laps >= 9}><StepperIcon kind="right" /></button>
           </div>
-          <label>Laps <input type="number" min="1" max="9" value={track.laps} onChange={(event) => commit((current) => ({ ...current, laps: Math.max(1, Math.min(9, Number(event.target.value))) }))} /></label>
-          <label>Difficulty <input type="range" min="1" max="5" value={track.difficultyEstimate} onChange={(event) => commit((current) => ({ ...current, difficultyEstimate: Number(event.target.value) }))} /><span>{track.difficultyEstimate} / 5</span></label>
+          <label>Laps <input type="number" min="1" max="9" value={track.laps} onChange={(event) => commit((current) => ({ ...current, laps: Math.max(1, Math.min(9, Number(event.target.value))) }), "laps")} onBlur={endGesture} /></label>
+          <label>Difficulty <input type="range" min="1" max="5" value={track.difficultyEstimate} onChange={(event) => commit((current) => ({ ...current, difficultyEstimate: Number(event.target.value) }), "difficulty")} onBlur={endGesture} onPointerUp={endGesture} /><span>{track.difficultyEstimate} / 5</span></label>
           <button className="clear-track" onClick={requestClearTrack}>Clear all…</button>
           </section>
           <section className={`validation-panel ${validation.valid ? "valid" : "invalid"}`}><h3>{validation.valid ? "✓ Route complete" : "! Route needs work"}</h3>{validation.errors.map((error) => <p key={error}>{error}</p>)}{validation.warnings.map((warning) => <p key={warning} className="warning">{warning}</p>)}</section>

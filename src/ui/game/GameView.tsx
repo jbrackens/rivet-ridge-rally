@@ -23,7 +23,7 @@ import {
   startLifecycleResource,
   stopLifecycleResource,
 } from "../../game/qa/lifecycleDiagnostics";
-import { formatTime } from "../format";
+import { formatGhostDelta, formatTime } from "../format";
 import { RallyIcon } from "../icons/RallyIcon";
 import { TouchControlIcon, type TouchControlIconKind } from "./TouchControlIcon";
 import {
@@ -45,6 +45,8 @@ const INITIAL_HUD: EngineHudState = {
   elapsedMs: 0,
   targetMs: 0,
   savedBestMs: undefined,
+  ghostDeltaMs: undefined,
+  ghostFinishMs: undefined,
   heat: 0,
   overheated: false,
   bikePhase: "grounded",
@@ -924,6 +926,16 @@ export function GameView({ tutorial = false }: { tutorial?: boolean }) {
           <span>Target</span>
           <strong>{mode === "practice" || mode === "custom" || tutorial ? "Free ride" : formatTime(hud.targetMs)}</strong>
           {mode === "solo" ? <small>Saved best <b>{hud.savedBestMs === undefined ? "No time" : formatTime(hud.savedBestMs)}</b></small> : null}
+          {hud.ghostDeltaMs !== undefined ? (
+            <small
+              className="ghost-delta"
+              data-ghost-delta={
+                hud.ghostDeltaMs === null ? "none" : hud.ghostDeltaMs < 0 ? "ahead" : "behind"
+              }
+            >
+              Ghost <b>{formatGhostDelta(hud.ghostDeltaMs)}</b>
+            </small>
+          ) : null}
         </div>
         {(tutorial ? tutorialStarted : raceGatePhase === "racing") ? (
           <button

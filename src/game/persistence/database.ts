@@ -8,7 +8,11 @@ import {
   validateCustomTrack,
   validateLegacyCustomTrack,
 } from "../editor/validation";
-import { REPLAY_FORMAT_VERSION, validateReplay } from "../replay/replayCodec";
+import {
+  REPLAY_FORMAT_VERSION,
+  validateReplay,
+  type ReplayFrame,
+} from "../replay/replayCodec";
 import type {
   CampaignProgress,
   GameSettings,
@@ -1923,6 +1927,18 @@ export function getCustomTrackReplayRevision(track: CustomTrackData): string {
   return `v${track.schemaVersion}-${track.updatedAt}-${fnv1a64(serialized)}`;
 }
 
+/**
+ * The course key a custom replay is filed and retrieved under.
+ *
+ * Written once and shared by the writer and the ghost reader deliberately: the
+ * key binds a replay to an exact authored revision, so a format that differed
+ * between saving and loading would silently retrieve nothing and read to the
+ * player as "my ghost disappeared" rather than as a defect.
+ */
+export function customReplayCourseKey(customTrackId: string, revision: string): string {
+  return `custom:${customTrackId}:${revision}`;
+}
+
 function newestReplayFirst(
   first: Pick<StoredReplayRecord, "id" | "createdAt">,
   second: Pick<StoredReplayRecord, "id" | "createdAt">,
@@ -1951,7 +1967,7 @@ export async function saveReplay(
     const parsedCustomTrack = customTrackSchema.parse(customTrack);
     customTrackId = parsedCustomTrack.id;
     customTrackRevision = getCustomTrackReplayRevision(parsedCustomTrack);
-    courseKey = `custom:${customTrackId}:${customTrackRevision}`;
+    courseKey = customReplayCourseKey(customTrackId, customTrackRevision);
   } else if (customTrack !== undefined) {
     throw new Error("A built-in replay cannot be bound to a custom course.");
   }
@@ -2008,5 +2024,70 @@ export async function saveReplay(
         await gameDatabase.replays.bulkDelete([...removals]);
       }
     });
+  });
+}
+
+export interface GhostReplay {
+  readonly courseKey: string;
+  readonly finishTimeMs: number;
+  readonly frames: readonly ReplayFrame[];
+}
+
+/**
+ * The fastest stored replay for one course, decoded for ghost playback.
+ *
+ * This is the read half the replay system never had: every finish was recorded,
+ * pruned and validated, and nothing ever loaded one back.
+ *
+ * Three deliberate refusals:
+ *
+ * - **A corrupt record is skipped, not raised.** A ghost is an enhancement to a
+ *   race that is about to start, so an undecodable row yields null and the race
+ *   runs without one. A database-level failure still propagates and is published
+ *   like every other persistence operation, so the caller must treat this as
+ *   throwing and start the race regardless.
+ * - **Legacy schema-1 records are skipped.** They predate `courseKey`, so
+ *   IndexedDB omits them from this index anyway — and that is the right answer
+ *   rather than something to work around, because a replay that is not bound to
+ *   an exact course revision cannot be proven to have been ridden on the course
+ *   about to be raced.
+ * - **Ties break on the earlier recording.** Two runs to the same millisecond
+ *   are the same achievement, and preferring the older one keeps a ghost stable
+ *   across sessions instead of swapping for an equal run.
+ */
+export async function loadBestReplay(courseKey: string): Promise<GhostReplay | null> {
+  return capturePersistenceFailure("replay", async () => {
+    const records = await gameDatabase.replays
+      .where("courseKey")
+      .equals(courseKey)
+      .toArray();
+
+    const candidates = records
+      .filter((record): record is ReplayRecord => record.schemaVersion === 2)
+      .filter((record) => record.codecVersion === REPLAY_FORMAT_VERSION)
+      .filter((record) => Number.isSafeInteger(record.result?.finishTimeMs))
+      .sort((first, second) => {
+        const byTime = first.result.finishTimeMs - second.result.finishTimeMs;
+        return byTime !== 0 ? byTime : first.createdAt - second.createdAt;
+      });
+
+    for (const record of candidates) {
+      try {
+        const frames = validateReplay(record.samples);
+        if (frames.length === 0) continue;
+        return {
+          courseKey: record.courseKey,
+          finishTimeMs: record.result.finishTimeMs,
+          frames,
+        };
+      } catch {
+        // A record that will not decode is skipped rather than surfaced: the
+        // next-fastest run is a better ghost than none, and saveReplay already
+        // validated on the way in, so this is corruption at rest rather than a
+        // defect the player can act on.
+        continue;
+      }
+    }
+    return null;
   });
 }
