@@ -3339,6 +3339,8 @@ export class GameEngine {
     frameTimeMs: 0,
   };
   private readonly cameraTarget = new THREE.Vector3();
+  /** Eased field of view, driven toward a speed-scaled kick each frame. */
+  private cameraFov = CAMERA_PRESENTATION_PROFILES.desktop.fov;
   private readonly cameraLookTarget = new THREE.Vector3();
   private readonly sunTarget = new THREE.Object3D();
   private readonly courseRoute: CoursePresentationRoute;
@@ -5291,6 +5293,19 @@ export class GameEngine {
       this.cameraLookTarget,
     );
     this.camera.lookAt(this.cameraLookTarget);
+    // Speed FOV kick: the field of view widens as speed rises so velocity reads
+    // in the body rather than only on the HUD clock — the motion-feedback lever
+    // (GRAPHICS_EVOLUTION_PLAN.md §2). Keyed on speed, which already carries
+    // turbo, and eased so it swells and settles rather than snapping. Suppressed
+    // under reduced motion, alongside the existing camera speed lift. At a frozen
+    // start (speed 0) the kick is zero, so visual-review captures are unaffected.
+    const fovKickT = clamp((bike.speed - 12) / 10, 0, 1);
+    const targetFov = presentation.fov + (reducedMotion ? 0 : fovKickT * fovKickT * (3 - 2 * fovKickT) * 7);
+    this.cameraFov += (targetFov - this.cameraFov) * (reducedMotion ? 1 : 1 - Math.exp(-delta * 4));
+    if (Math.abs(this.camera.fov - this.cameraFov) > 0.01) {
+      this.camera.fov = this.cameraFov;
+      this.camera.updateProjectionMatrix();
+    }
     if (this.sunLight) {
       this.courseRoute.sample(
         bike.forwardPosition - 24,
