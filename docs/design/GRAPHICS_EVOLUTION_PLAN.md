@@ -314,3 +314,72 @@ Three rules, so this plan cannot quietly become a series of unreviewed baseline 
 1. **Every phase promotes baselines once, at its end**, under `GAME_SPEC.md:389` side-by-side review. Not per commit.
 2. **Every phase that touches the frame reports a GPU-millisecond delta on the physical phone**, from the Phase 0 harness. A phase that cannot show its cost does not ship.
 3. **Obstacle-silhouette contrast and HUD legibility are pass/fail acceptance criteria** from Phase 4 onward, because that is the specific risk `GRAPHICS_TOOLCHAIN.md` named when it deferred post-processing, and reversing a decision means answering its reasoning, not ignoring it.
+
+---
+
+## 9. Overnight autonomous run — 2026-08-31 → 09-01 (capture-the-flag)
+
+Owner directive: "capture the flag mode, keep going until 9am CEST." Agents-only,
+owner as sole approver. Everything below is committed to `agent/rc2-launch-
+hardening` and pushed. Every change was capture-verified or gate-verified; no
+change was committed on a claim I could not show.
+
+### Landed (5 commits)
+
+| Commit | What | Evidence |
+|---|---|---|
+| `04adec6` | **Authored display grade** replacing stock ACES — Khronos PBR Neutral base + punch (S-contrast, saturation, warm/cool split). `?tone=custom\|neutral\|agx\|aces` switch. | 4-variant Canyon capture; custom clearly most premium, agx milky, aces washed. typecheck/lint/vitest/assets:verify all 0. |
+| `b6d8a55` | **Cinematic vignette** — subtle radial corner darkening added to the HUD scrim. Frames the scene, reinforces HUD legibility. | Before/after capture; tasteful, zero cost/bytes. |
+| `a4eaaab` | **Speed FOV kick** — camera widens 52°→~59° with speed (eased, reduced-motion-suppressed, zero at frozen start). Velocity in the body. | Stationary vs at-speed capture; base/frozen unaffected. 106 engine tests pass. |
+| `dcdcff1` | **ASSET_LICENSES reconciliation** — 15 stale rows (hero pipeline, package.json, 3 manifests, 2 art PNGs, concept source) updated to shipped bytes/SHA. AGENTS.md §3 compliance. | Full re-scan: 0 stale tracked rows. assets:verify=0. |
+| `0ff5d51` | **GPU frame timing** — `EXT_disjoint_timer_query_webgl2` wrapper, exposed on HUD + canvas `data-gpu-frame-ms`. The measurement Phase 0 was blocked on. | `data-gpu-timing="available"`, zero console errors in a real WebGL2 context. 358 tests pass. |
+
+The grade is the marquee win — it lifts every frame. Vignette and FOV compound
+it. Net effect: a noticeably more premium, more dynamic-feeling game, with **zero
+new bytes and zero asset churn**.
+
+### Tried and rejected (honestly, so they are not re-attempted)
+
+- **Exponential (FogExp2) fog** — imperceptible versus the tuned linear fog. The
+  camera is low and the track is long, so exp2 hazes the mid-track as much as the
+  distance, which is exactly why the original author used linear with a protected
+  `near` plane. Reverted. Real atmosphere gain needs a custom height-fog shader
+  (Phase 4-class, risky), not a swap.
+- **Hero light boost / low-tier enable** — imperceptible on the desktop frames;
+  the rear chase camera does not see the spotlights' effect, and sun+hemisphere
+  dominate. Low-tier enable adds unmeasurable mobile GPU cost. Reverted.
+- **WebP for the two big PNGs (3.56 MB → 0.26 MB, measured)** — **blocked by a
+  governance control, not infeasible.** `verify-production-art.mjs` requires
+  shipped generative art to carry a C2PA `caBX` provenance chunk (a PNG feature);
+  WebP strips it. This is an owner decision (see below), not something to bypass
+  overnight. Fully reverted, tree clean.
+
+### Deferred as owner-gated (not attempted overnight)
+
+- **Rider anatomy / rig segmentation.** The bike renders genuinely well; the
+  rider is the blocky element. Two paths, both deferred: (a) elbow/knee
+  segmentation touches ~10 synchronized fail-closed surfaces (node contract, pose
+  solver, validator caps, e2e triangle pins, manifest, ASSET_LICENSES) and its
+  payoff is motion-transient; (b) reshaping the rider geometry has 20k triangles
+  of headroom (rider is 9,868 of a 30,000 cap) but is subjective and churns the
+  hero GLB (new hashes → invalidates the release package, needs a re-sign). Both
+  are the exact thing the owner is the approver for and rejected once. Blender
+  rebuild + preview render is confirmed working headless, so this is ready to do
+  **with the owner in the loop**, fast, via the preview-render feedback cycle.
+
+### Owner decisions that now gate further progress
+
+1. **Tone mode** — pick the final `?tone=` (custom shipped as default; neutral is
+   the tamer alternative). One capture away.
+2. **Provenance format for compressed art** — to unlock the measured 3.3 MB WebP
+   win, either accept C2PA-in-WebP (XMP), relax the `caBX` requirement for
+   re-encoded derivatives of already-provenanced sources, or keep PNG. This is
+   the single biggest byte lever and it is a governance call.
+3. **Rider approach** — segmentation vs geometry reshape vs leave-as-is, and
+   acceptance that either regen invalidates the current release package.
+
+### Clean resume point
+
+Tree is clean, all gates green, 5 commits pushed. The grade's `?tone=` switch and
+the GPU timer are the two hooks a next session builds on: the variant loop to
+finalise the look, and the first real GPU number to gate any Phase-2+ render cost.
