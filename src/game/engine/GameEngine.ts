@@ -38,6 +38,7 @@ import {
 import { InputManager, type InputDevice } from "../input/InputManager";
 import { formatKeyCode } from "../input/keyLabels";
 import { ghostTimeAtDistance, sampleGhostAt } from "../replay/ghost";
+import { applyToneMapping, resolveToneMode } from "./render/toneCurve";
 import { ReplayRecorder, type ReplayFrame } from "../replay/replayCodec";
 import {
   observeWebglContext,
@@ -3511,7 +3512,7 @@ export class GameEngine {
     let compressedAssetLoader: CompressedAssetLoader | null = null;
     try {
       this.renderer.outputColorSpace = THREE.SRGBColorSpace;
-      this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
+      applyToneMapping(this.renderer, resolveToneMode(window.location.search));
       this.renderer.toneMappingExposure = this.visualProfile.exposure;
       this.renderer.shadowMap.enabled = this.quality !== "low";
       this.renderer.shadowMap.type = THREE.PCFShadowMap;
