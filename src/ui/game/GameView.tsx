@@ -63,6 +63,7 @@ const INITIAL_HUD: EngineHudState = {
   fps: 0,
   frameTimeMs: 0,
   drawCalls: 0,
+  gpuFrameMs: null,
   droppedSimulationMs: 0,
   tutorialLesson: {
     activeLessonIndex: null,

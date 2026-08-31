@@ -39,6 +39,7 @@ import { InputManager, type InputDevice } from "../input/InputManager";
 import { formatKeyCode } from "../input/keyLabels";
 import { ghostTimeAtDistance, sampleGhostAt } from "../replay/ghost";
 import { applyToneMapping, resolveToneMode } from "./render/toneCurve";
+import { GpuFrameTimer } from "./render/gpuTimer";
 import { ReplayRecorder, type ReplayFrame } from "../replay/replayCodec";
 import {
   observeWebglContext,
@@ -431,6 +432,8 @@ export interface EngineHudState {
   fps: number;
   frameTimeMs: number;
   drawCalls: number;
+  /** GPU frame time in ms when the timer-query extension is available, else null. */
+  gpuFrameMs: number | null;
   droppedSimulationMs: number;
   tutorialLesson: TutorialLessonGateSnapshot;
   demonstrated: {
@@ -3331,6 +3334,8 @@ export class GameEngine {
   private ghostFinishMs: number | null = null;
   private ghostDeltaMs: number | null = null;
   private readonly timer = new THREE.Timer();
+  private gpuTimer: GpuFrameTimer | null = null;
+  private gpuFrameMs: number | null = null;
   private readonly performanceWindow: PerformanceWindow = {
     elapsed: 0,
     frames: 0,
@@ -3511,6 +3516,8 @@ export class GameEngine {
     }
 
     this.webglContext = this.renderer.getContext();
+    this.gpuTimer = new GpuFrameTimer(this.webglContext);
+    this.canvas.dataset.gpuTiming = this.gpuTimer.available ? "available" : "unavailable";
     let compressedAssetLoader: CompressedAssetLoader | null = null;
     try {
       this.renderer.outputColorSpace = THREE.SRGBColorSpace;
@@ -3765,6 +3772,8 @@ export class GameEngine {
     this.disposed = true;
     this.running = false;
     cancelAnimationFrame(this.animationFrame);
+    this.gpuTimer?.dispose();
+    this.gpuTimer = null;
     this.resizeObserver?.disconnect();
     this.resizeObserver = null;
     this.input.disconnect();
@@ -5345,7 +5354,10 @@ export class GameEngine {
         this.heroFillLight.position,
       );
     }
+    this.gpuTimer?.begin();
     this.renderer.render(this.scene, this.camera);
+    this.gpuTimer?.end();
+    this.gpuFrameMs = this.gpuTimer?.readMs() ?? null;
   }
 
   private authoredRouteHeight(localDistance: number, lateralPosition: number): number {
@@ -5829,6 +5841,7 @@ export class GameEngine {
   }
 
   private emitHud(state: SimulationState): void {
+    if (this.gpuFrameMs !== null) this.canvas.dataset.gpuFrameMs = String(this.gpuFrameMs);
     const playerProgress = state.bike.forwardPosition;
     const position = 1 + this.aiRiders.filter(
       (ai) => ai.simulation.snapshot.bike.forwardPosition > playerProgress,
@@ -5917,6 +5930,7 @@ export class GameEngine {
       fps: this.performanceWindow.fps,
       frameTimeMs: this.performanceWindow.frameTimeMs,
       drawCalls: this.renderer.info.render.calls,
+      gpuFrameMs: this.gpuFrameMs,
       droppedSimulationMs: this.droppedSimulationMs,
       tutorialLesson,
       demonstrated: { ...this.demonstrated },
