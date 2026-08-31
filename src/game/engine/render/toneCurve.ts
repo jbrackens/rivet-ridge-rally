@@ -17,18 +17,28 @@ import * as THREE from "three";
  * applied by the renderer to every material automatically, so it needs no
  * post-processing pipeline.
  *
- * A `?tone=` URL parameter selects among the base modes so the same frozen
- * frame can be captured under each and compared — the look variant loop the
- * owner approved (GRAPHICS_EVOLUTION_PLAN.md §3.2). The shipped default is the
- * authored `custom` curve; the owner picks the final one from the captures.
+ * A `?tone=` URL parameter selects among the base modes and the authored grade
+ * variants, so the same frozen frame can be captured under each and compared —
+ * the look variant loop the owner approved (GRAPHICS_EVOLUTION_PLAN.md §3.2).
+ * The shipped default is `custom` (the balanced grade); the variants exist so
+ * the owner can preview a menu and pick the final one. Each variant is a LUT
+ * expressed as code: auditable, and carrying no image bytes.
  */
 
-export type ToneMode = "custom" | "neutral" | "agx" | "aces" | "none";
+/** The authored grade variants, each composed over Khronos PBR Neutral. */
+export type ToneVariant =
+  | "custom"
+  | "custom-warm"
+  | "custom-cool"
+  | "custom-vivid"
+  | "custom-soft"
+  | "custom-punch";
+
+export type ToneMode = ToneVariant | "neutral" | "agx" | "aces" | "none";
 
 const DEFAULT_TONE_MODE: ToneMode = "custom";
 
-const TONE_MAPPING: Readonly<Record<ToneMode, THREE.ToneMapping>> = {
-  custom: THREE.CustomToneMapping,
+const BASE_MAPPING: Readonly<Record<"neutral" | "agx" | "aces" | "none", THREE.ToneMapping>> = {
   neutral: THREE.NeutralToneMapping,
   agx: THREE.AgXToneMapping,
   aces: THREE.ACESFilmicToneMapping,
@@ -36,68 +46,105 @@ const TONE_MAPPING: Readonly<Record<ToneMode, THREE.ToneMapping>> = {
 };
 
 /**
- * The authored grade, composed over Khronos PBR Neutral.
+ * Each variant is the grade applied *after* Khronos PBR Neutral, in the
+ * renderer's tone-mapping stage (exposure-scaled linear in, display-linear out,
+ * before the sRGB transfer). The constants are the tuning surface.
  *
- * Runs in the renderer's tone-mapping stage: it receives exposure-scaled linear
- * colour and returns display-linear colour before the sRGB transfer. The
- * constants are the tuning surface — a LUT expressed as code so it stays
- * auditable and carries no image bytes.
+ * - `custom` — balanced: gentle S-contrast, +10% saturation, mild warm/cool split.
+ * - `custom-warm` — sunnier: stronger warm highlights, a touch more lift.
+ * - `custom-cool` — crisper: cool cast, slightly higher contrast.
+ * - `custom-vivid` — punchier colour: +18% saturation.
+ * - `custom-soft` — gentle/filmic: lower contrast, less saturation.
+ * - `custom-punch` — dramatic: stronger S-curve and saturation together.
  */
-const AUTHORED_CUSTOM_TONE_MAPPING = /* glsl */ `
+const VARIANT_GLSL: Readonly<Record<ToneVariant, string>> = {
+  "custom": `
+    color = ( color - 0.42 ) * 1.06 + 0.42;
+    float luma = dot( color, vec3( 0.2126, 0.7152, 0.0722 ) );
+    color = mix( vec3( luma ), color, 1.10 );
+    float hi = smoothstep( 0.25, 0.9, luma );
+    color *= mix( vec3( 0.985, 1.0, 1.03 ), vec3( 1.03, 1.0, 0.965 ), hi );`,
+  "custom-warm": `
+    color = ( color - 0.44 ) * 1.05 + 0.45;
+    float luma = dot( color, vec3( 0.2126, 0.7152, 0.0722 ) );
+    color = mix( vec3( luma ), color, 1.09 );
+    float hi = smoothstep( 0.2, 0.92, luma );
+    color *= mix( vec3( 0.99, 0.995, 1.0 ), vec3( 1.06, 1.005, 0.94 ), hi );`,
+  "custom-cool": `
+    color = ( color - 0.4 ) * 1.09 + 0.4;
+    float luma = dot( color, vec3( 0.2126, 0.7152, 0.0722 ) );
+    color = mix( vec3( luma ), color, 1.10 );
+    float hi = smoothstep( 0.25, 0.9, luma );
+    color *= mix( vec3( 0.965, 1.0, 1.05 ), vec3( 1.0, 1.005, 1.01 ), hi );`,
+  "custom-vivid": `
+    color = ( color - 0.42 ) * 1.07 + 0.42;
+    float luma = dot( color, vec3( 0.2126, 0.7152, 0.0722 ) );
+    color = mix( vec3( luma ), color, 1.18 );
+    float hi = smoothstep( 0.25, 0.9, luma );
+    color *= mix( vec3( 0.985, 1.0, 1.03 ), vec3( 1.03, 1.0, 0.965 ), hi );`,
+  "custom-soft": `
+    color = ( color - 0.44 ) * 1.02 + 0.45;
+    float luma = dot( color, vec3( 0.2126, 0.7152, 0.0722 ) );
+    color = mix( vec3( luma ), color, 1.04 );
+    float hi = smoothstep( 0.2, 0.95, luma );
+    color *= mix( vec3( 0.995, 1.0, 1.01 ), vec3( 1.015, 1.0, 0.99 ), hi );`,
+  "custom-punch": `
+    color = ( color - 0.42 ) * 1.12 + 0.42;
+    float luma = dot( color, vec3( 0.2126, 0.7152, 0.0722 ) );
+    color = mix( vec3( luma ), color, 1.16 );
+    float hi = smoothstep( 0.22, 0.9, luma );
+    color *= mix( vec3( 0.975, 1.0, 1.04 ), vec3( 1.04, 1.0, 0.955 ), hi );`,
+};
+
+function customGlsl(variant: ToneVariant): string {
+  return `
 vec3 CustomToneMapping( vec3 color ) {
-  // Base: Khronos PBR Neutral — built for direct screen output, preserves the
-  // saturation and albedo the ACES film RRT would desaturate and crush.
   color = NeutralToneMapping( color );
-
-  // Gentle S-contrast around a lifted pivot, so shadows shape without crushing.
-  color = ( color - 0.42 ) * 1.06 + 0.42;
-
-  // Saturation lift so teal/coral read punchy at chase distance.
-  float luma = dot( color, vec3( 0.2126, 0.7152, 0.0722 ) );
-  color = mix( vec3( luma ), color, 1.10 );
-
-  // Mild warm-highlight / cool-shadow split for a sunny, premium read.
-  float hi = smoothstep( 0.25, 0.9, luma );
-  color *= mix( vec3( 0.985, 1.0, 1.03 ), vec3( 1.03, 1.0, 0.965 ), hi );
-
+${VARIANT_GLSL[variant]}
   return clamp( color, 0.0, 1.0 );
+}`;
 }
-`;
 
 const PLACEHOLDER = "vec3 CustomToneMapping( vec3 color ) { return color; }";
 
-let installed = false;
+let installedVariant: ToneVariant | null = null;
 
 /**
- * Install the authored `CustomToneMapping` into Three's shared shader chunk.
+ * Install a grade variant into Three's shared shader chunk.
  *
- * Idempotent, and a global one-time edit: Three compiles every material against
- * the shared `tonemapping_pars_fragment` chunk, so replacing the no-op
- * placeholder once teaches every shader the authored curve. Calling twice would
- * try to replace a string that is no longer present, which the guard prevents.
+ * Three compiles every material against the shared `tonemapping_pars_fragment`
+ * chunk, so replacing the no-op `CustomToneMapping` placeholder once teaches
+ * every shader the authored curve. Installing is one-shot per page: the first
+ * call replaces the placeholder, later calls are ignored (the placeholder is
+ * gone). In production only the default `custom` is ever installed; the variant
+ * argument exists for the capture loop, where each page loads a single variant.
  */
-export function installAuthoredToneCurve(): void {
-  if (installed) return;
+export function installAuthoredToneCurve(variant: ToneVariant = "custom"): void {
+  if (installedVariant !== null) return;
   const chunk = THREE.ShaderChunk.tonemapping_pars_fragment;
   if (!chunk.includes(PLACEHOLDER)) {
     // The Three build changed the placeholder shape; fail soft rather than
     // corrupt the chunk. The renderer still works with a stock base mode.
-    installed = true;
+    installedVariant = variant;
     return;
   }
   THREE.ShaderChunk.tonemapping_pars_fragment = chunk.replace(
     PLACEHOLDER,
-    AUTHORED_CUSTOM_TONE_MAPPING.trim(),
+    customGlsl(variant).trim(),
   );
-  installed = true;
+  installedVariant = variant;
+}
+
+function isToneVariant(value: string): value is ToneVariant {
+  return value in VARIANT_GLSL;
 }
 
 /**
  * Which tone mode this run should use, from an optional `?tone=` override.
  *
- * Defaults to the authored curve. An unrecognised value falls back to the
- * default rather than throwing, because this is a capture affordance, not a
- * validated input path.
+ * Defaults to the shipped grade. An unrecognised value falls back to the default
+ * rather than throwing, because this is a capture affordance, not a validated
+ * input path.
  */
 export function resolveToneMode(search: string): ToneMode {
   let requested: string | null;
@@ -106,15 +153,22 @@ export function resolveToneMode(search: string): ToneMode {
   } catch {
     requested = null;
   }
-  if (requested && requested in TONE_MAPPING) return requested as ToneMode;
+  if (!requested) return DEFAULT_TONE_MODE;
+  if (isToneVariant(requested)) return requested;
+  if (requested in BASE_MAPPING) return requested as ToneMode;
   return DEFAULT_TONE_MODE;
 }
 
 /**
- * Apply a tone mode to the renderer, installing the authored curve if the mode
- * needs it. Leaves `toneMappingExposure` untouched — that stays per-venue.
+ * Apply a tone mode to the renderer, installing the authored grade if the mode
+ * is one of the custom variants. Leaves `toneMappingExposure` untouched — that
+ * stays per-venue.
  */
 export function applyToneMapping(renderer: THREE.WebGLRenderer, mode: ToneMode): void {
-  if (mode === "custom") installAuthoredToneCurve();
-  renderer.toneMapping = TONE_MAPPING[mode];
+  if (isToneVariant(mode)) {
+    installAuthoredToneCurve(mode);
+    renderer.toneMapping = THREE.CustomToneMapping;
+    return;
+  }
+  renderer.toneMapping = BASE_MAPPING[mode];
 }
