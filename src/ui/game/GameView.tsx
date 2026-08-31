@@ -911,6 +911,7 @@ export function GameView({ tutorial = false }: { tutorial?: boolean }) {
         className="game-surface"
         inert={pauseDialogOpen || finishing ? true : undefined}
         aria-hidden={pauseDialogOpen || finishing ? true : undefined}
+        style={{ "--speed-vignette": String(Math.min(Math.max(hud.speed / 20, 0), 1)) } as CSSProperties}
       >
       <h1 className="sr-only">{tutorial ? `${track.name} training` : `${track.name} ${runLabel ?? mode} race`}</h1>
       <canvas
@@ -920,6 +921,7 @@ export function GameView({ tutorial = false }: { tutorial?: boolean }) {
         aria-label={`Live 3D race on ${track.name}`}
       />
       <div className="race-vignette" aria-hidden="true" />
+      <div className="race-speed-vignette" aria-hidden="true" />
       <header className="race-hud">
         <div className={`position-block ${runLabel ? "run-label" : ""}`}><span>{runLabel ? "Run" : "Position"}</span><strong>{runLabel ?? `${hud.position} / ${hud.fieldSize}`}</strong></div>
         <div className="timing-block"><span>Lap <b>{hud.lap}</b> / {hud.totalLaps}</span><strong>{formatTime(hud.elapsedMs)}</strong></div>

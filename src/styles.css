@@ -676,6 +676,8 @@ kbd {
 html[data-high-contrast="true"] { --muted: #e6eef2; --navy: #001322; --navy-2: #052942; }
 html[data-high-contrast="true"] button, html[data-high-contrast="true"] input, html[data-high-contrast="true"] select { border-color: #d9e6ec; }
 html[data-high-contrast="true"] .race-vignette { background: linear-gradient(180deg, #00182dcc 0, transparent 24%, transparent 60%, #00101ee8 100%); }
+.race-speed-vignette { pointer-events: none; position: absolute; inset: 0; background: radial-gradient(ellipse 66% 72% at 50% 46%, transparent 40%, #010509 100%); opacity: calc(var(--speed-vignette, 0) * 0.4); transition: opacity .28s ease; }
+html[data-reduced-motion="true"] .race-speed-vignette { opacity: 0 !important; }
 html[data-colorblind-safe="true"] .heat-track > span { background: repeating-linear-gradient(110deg, var(--teal) 0 .65rem, #8bd9a3 .65rem 1.3rem, var(--yellow) 1.3rem 1.95rem, var(--coral) 1.95rem 2.6rem); }
 html[data-reduced-motion="true"] *, html[data-reduced-motion="true"] *::before, html[data-reduced-motion="true"] *::after { scroll-behavior: auto !important; animation-duration: .001ms !important; animation-iteration-count: 1 !important; transition-duration: .001ms !important; }
 html[data-reduced-motion="true"] .screen-surface,
