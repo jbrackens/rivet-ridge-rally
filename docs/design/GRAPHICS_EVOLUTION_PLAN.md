@@ -383,3 +383,38 @@ new bytes and zero asset churn**.
 Tree is clean, all gates green, 5 commits pushed. The grade's `?tone=` switch and
 the GPU timer are the two hooks a next session builds on: the variant loop to
 finalise the look, and the first real GPU number to gate any Phase-2+ render cost.
+
+## 10. Cinematic grade run — owner-gate #1 resolved (2026-09-01)
+
+The owner rejected the first six `custom-*` variants and the three `cine-teal/
+noir/golden` follow-ups as "too subtle — they all look the same", then asked for
+a "moodier / cinematic" look. Root cause: every one of those grades was a small
+nudge (±6 % contrast/saturation) of the same bright daylight LUT.
+
+Method (multi-agent, ultracode):
+- **Design panel** — 10 agents, one per film reference (Blade Runner 2049, Mad
+  Max, The Matrix, Sin City, Dune, John Wick, Se7en, O Brother, Sicario, Tron),
+  each authoring a *bold* GLSL grade (real desaturation, deep contrast, strong
+  casts, exposure drops), then a hardening pass to validate the GLSL and push any
+  timid ones. All 10 compiled and rendered on the Canyon frame.
+- **Judge panel** — 3 diverse lenses (cinematographer, game-UX/legibility,
+  brand) scored all 11 looks from the render montage. Consensus top-3: Dusk
+  Patrol (Sicario), Neon Night (John Wick), Dystopian Dusk (Blade Runner).
+  Unanimous **avoid**: Basin City noir, Tron, Matrix — bold but legibility 1.7–2.0,
+  the lanes/rival bikes vanish at racing speed.
+- **Owner pick:** Neon Night, gated on "verify across all 5 venues first". The
+  five-venue pass found Neon Night's 0.62 exposure drop crushes the already-dark
+  **Foundry** (and Pine); a lifted **v2** (exposure 0.62 → 0.76, shadow pivot
+  0.30 → 0.33, palette unchanged) recovered legibility on the dark venues while
+  keeping the night mood everywhere.
+
+**Decision:** `DEFAULT_TONE_MODE = "cine-night"` (Neon Night v2). Shipped
+variants trimmed to a clean set: the `custom` family (previous bright look, still
+selectable via `?tone=custom…`) plus `cine-night` (default), `cine-dusk`
+(Sicario), `cine-blade` (Blade Runner). The other seven experimental grades were
+not shipped; their GLSL recipes live in the design/judge workflow transcripts and
+regenerate in seconds if a marketing-only look (e.g. noir) is later wanted.
+
+**Downstream consequence (owner-gated):** flipping the default changes every
+rendered frame, so the checked-in visual-regression baselines will fail until
+re-promoted through `visual:promote:canyon` — a governed step, not done here.

@@ -8,13 +8,16 @@ import { resolveToneMode } from "../toneCurve";
  * back to the shipped default rather than throw.
  */
 describe("resolveToneMode", () => {
-  it("defaults to the shipped custom grade with no override", () => {
-    expect(resolveToneMode("")).toBe("custom");
-    expect(resolveToneMode("?other=1")).toBe("custom");
+  it("defaults to the shipped cinematic night grade with no override", () => {
+    expect(resolveToneMode("")).toBe("cine-night");
+    expect(resolveToneMode("?other=1")).toBe("cine-night");
   });
 
   it("honours each grade variant", () => {
-    for (const mode of ["custom", "custom-warm", "custom-cool", "custom-vivid", "custom-soft", "custom-punch"]) {
+    for (const mode of [
+      "custom", "custom-warm", "custom-cool", "custom-vivid", "custom-soft", "custom-punch",
+      "cine-night", "cine-dusk", "cine-blade",
+    ]) {
       expect(resolveToneMode(`?tone=${mode}`)).toBe(mode);
     }
   });
@@ -26,8 +29,8 @@ describe("resolveToneMode", () => {
   });
 
   it("falls back to the default for an unrecognised or malformed value", () => {
-    expect(resolveToneMode("?tone=sepia")).toBe("custom");
-    expect(resolveToneMode("?tone=custom-neon")).toBe("custom");
-    expect(resolveToneMode("?tone=")).toBe("custom");
+    expect(resolveToneMode("?tone=sepia")).toBe("cine-night");
+    expect(resolveToneMode("?tone=custom-neon")).toBe("cine-night");
+    expect(resolveToneMode("?tone=")).toBe("cine-night");
   });
 });

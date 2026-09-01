@@ -20,9 +20,10 @@ import * as THREE from "three";
  * A `?tone=` URL parameter selects among the base modes and the authored grade
  * variants, so the same frozen frame can be captured under each and compared —
  * the look variant loop the owner approved (GRAPHICS_EVOLUTION_PLAN.md §3.2).
- * The shipped default is `custom` (the balanced grade); the variants exist so
- * the owner can preview a menu and pick the final one. Each variant is a LUT
- * expressed as code: auditable, and carrying no image bytes.
+ * The shipped default is `cine-night` — the moody/cinematic night grade the
+ * owner picked from that loop; the `custom` family remains selectable via
+ * `?tone=` as the previous bright look. Each variant is a LUT expressed as
+ * code: auditable, and carrying no image bytes.
  */
 
 /** The authored grade variants, each composed over Khronos PBR Neutral. */
@@ -32,11 +33,17 @@ export type ToneVariant =
   | "custom-cool"
   | "custom-vivid"
   | "custom-soft"
-  | "custom-punch";
+  | "custom-punch"
+  | "cine-night"
+  | "cine-dusk"
+  | "cine-blade";
 
 export type ToneMode = ToneVariant | "neutral" | "agx" | "aces" | "none";
 
-const DEFAULT_TONE_MODE: ToneMode = "custom";
+// The shipped default is the moody/cinematic night grade the owner selected from
+// the look variant loop (GRAPHICS_EVOLUTION_PLAN.md §9). `custom` and its family
+// remain available via `?tone=` as the previous bright look.
+const DEFAULT_TONE_MODE: ToneMode = "cine-night";
 
 const BASE_MAPPING: Readonly<Record<"neutral" | "agx" | "aces" | "none", THREE.ToneMapping>> = {
   neutral: THREE.NeutralToneMapping,
@@ -56,6 +63,16 @@ const BASE_MAPPING: Readonly<Record<"neutral" | "agx" | "aces" | "none", THREE.T
  * - `custom-vivid` — punchier colour: +18% saturation.
  * - `custom-soft` — gentle/filmic: lower contrast, less saturation.
  * - `custom-punch` — dramatic: stronger S-curve and saturation together.
+ *
+ * The `cine-*` family is the moodier/cinematic direction — real desaturation,
+ * deeper shadows, film-style split-toning, and a dim — authored per film
+ * reference and vetted by a legibility panel across all five venues:
+ * - `cine-night` — the shipped default. A John Wick night: desaturated, deep
+ *   shadows, teal/magenta split, exposure eased to 0.76 so already-dark venues
+ *   (Foundry, Pine) stay readable while the moody night identity holds.
+ * - `cine-dusk` — Sicario twilight: warm sun / cold sky split, low-key, the
+ *   most "film still" of the set.
+ * - `cine-blade` — Blade Runner 2049: teal shadows, amber-haze highlights, dim.
  */
 const VARIANT_GLSL: Readonly<Record<ToneVariant, string>> = {
   "custom": `
@@ -94,6 +111,33 @@ const VARIANT_GLSL: Readonly<Record<ToneVariant, string>> = {
     color = mix( vec3( luma ), color, 1.16 );
     float hi = smoothstep( 0.22, 0.9, luma );
     color *= mix( vec3( 0.975, 1.0, 1.04 ), vec3( 1.04, 1.0, 0.955 ), hi );`,
+  "cine-night": `
+    float luma = dot( color, vec3( 0.2126, 0.7152, 0.0722 ) );
+    color = mix( vec3( luma ), color, 0.42 );
+    color = ( color - 0.36 ) * 1.46 + 0.33;
+    float nightSplit = smoothstep( 0.0, 0.9, luma );
+    vec3 nightShadow = vec3( 1.04, 0.38, 1.22 );
+    vec3 nightHighlight = vec3( 0.38, 1.00, 1.34 );
+    color *= mix( nightShadow, nightHighlight, nightSplit );
+    color *= vec3( 0.88, 0.98, 1.16 );
+    color *= 0.76;`,
+  "cine-dusk": `
+    float luma = dot( color, vec3( 0.2126, 0.7152, 0.0722 ) );
+    color = mix( vec3( luma ), color, 0.45 );
+    color = ( color - 0.32 ) * 1.50 + 0.32;
+    float dusk = smoothstep( 0.0, 0.90, luma );
+    vec3 duskTint = mix( vec3( 0.52, 0.74, 1.28 ), vec3( 1.34, 1.00, 0.52 ), dusk );
+    color *= duskTint;
+    color *= 0.66;`,
+  "cine-blade": `
+    float luma = dot( color, vec3( 0.2126, 0.7152, 0.0722 ) );
+    color = mix( vec3( luma ), color, 0.40 );
+    color = ( color - 0.34 ) * 1.42 + 0.34;
+    float blade = smoothstep( 0.0, 0.9, luma );
+    color *= mix( vec3( 0.42, 0.78, 0.98 ), vec3( 1.42, 0.82, 0.34 ), blade );
+    float haze = smoothstep( 0.42, 1.0, luma );
+    color += vec3( 0.14, 0.08, 0.02 ) * haze;
+    color *= 0.78;`,
 };
 
 function customGlsl(variant: ToneVariant): string {
