@@ -367,16 +367,14 @@ new bytes and zero asset churn**.
   rebuild + preview render is confirmed working headless, so this is ready to do
   **with the owner in the loop**, fast, via the preview-render feedback cycle.
 
-### Owner decisions that now gate further progress
+### Owner decisions that gated further progress — all now resolved
 
-1. **Tone mode** — pick the final `?tone=` (custom shipped as default; neutral is
-   the tamer alternative). One capture away.
-2. **Provenance format for compressed art** — to unlock the measured 3.3 MB WebP
-   win, either accept C2PA-in-WebP (XMP), relax the `caBX` requirement for
-   re-encoded derivatives of already-provenanced sources, or keep PNG. This is
-   the single biggest byte lever and it is a governance call.
-3. **Rider approach** — segmentation vs geometry reshape vs leave-as-is, and
-   acceptance that either regen invalidates the current release package.
+1. **Tone mode** — resolved 2026-09-01, see §10 (`cine-night` shipped as default).
+2. **Provenance format for compressed art** — resolved 2026-09-02, see §11
+   (relaxed for provenanced derivatives).
+3. **Rider approach** — resolved 2026-09-02, see §11 (segment + IK, after Phase 1
+   atmosphere).
+4. **Phase-0 contract package** — resolved 2026-09-02, see §11 (adopted whole).
 
 ### Clean resume point
 
@@ -435,3 +433,43 @@ flicker is a **separate engine-robustness item** (filed as its own task, with a
 fast local repro) and it — not the owner sign-off — is what currently blocks a
 clean baseline capture. The eager shader-chunk-install commit attempted here was
 reverted because its premise (a tone-install timing bug) was disproven.
+
+## 11. Three gating decisions — resolved (2026-09-02)
+
+Put to the owner as recommendations (recommended option first, with the cost of
+each); all three accepted as recommended. Decisions 1 and 3 both re-bind the
+hash-bound contract docs, so the rc.3 review-package re-sign is absorbed **once**.
+
+> **OWNER DECISION 2026-09-02 — Phase-0 contract package: ADOPT NOW, WHOLE.**
+> Adopt the originality-rule proposal
+> (`ASSET_ORIGINALITY_RULE_PROPOSAL.md`); relax the Blender-version pin to a
+> recorded minimum; convert the zero-texture assertions to ≤3 budgets; widen the
+> extension `deepEqual` to a superset test admitting `KHR_texture_basisu`;
+> convert the exact e2e triangle equalities to `<=` budgets. No visual change by
+> itself; it is the enabling prerequisite for Phases 5–6.
+
+> **OWNER DECISION 2026-09-02 — Provenance: RELAX FOR PROVENANCED DERIVATIVES.**
+> The original generative PNG keeps its C2PA `caBX` chunk in-repo as the
+> provenance anchor. Shipped compressed derivatives (KTX2 panorama, AVIF title
+> background — the Phase 3 formats; WebP was only the overnight measurement) are
+> hash-bound to that source and exempt from carrying `caBX` themselves.
+> Preserves the rule's intent (proving the art's origin) without pretending a
+> format can carry data it cannot. Unlocks Phase 3's ~3 MB reclaim.
+
+> **OWNER DECISION 2026-09-02 — Rider: SEGMENT + IK, AFTER PHASE 1 ATMOSPHERE.**
+> The §3.1 path: 6 → 16 pivots (elbows, wrists, knees, ankles, chest, neck) plus
+> two-bone analytic IK so the rider folds on landings. Zero new triangles or
+> bytes. Sequenced after the venue-sky IBL and height fog, per §4's ordering.
+> Geometry reshape explicitly **not** scheduled (competes with Phase 6). Caps
+> 96→120 / 28→40 / 28→40; ~10 fail-closed surfaces touched.
+
+### Resulting work order
+
+1. **Phase 1 atmosphere** — replace the box-room `RoomEnvironment` IBL with a
+   procedural venue sky (also the suspected seat of the §10 load flicker: the
+   PBR environment/PMREM path), then the custom exp²-height fog with sun
+   inscatter, then the per-venue exposure/white-point retune and the two
+   tone-bypass surfaces (dust, contact shadow).
+2. **Governance changes** — the contract package and the provenance relaxation
+   (verifier edits), absorbing the rc.3 re-sign once.
+3. **Phase 2** — rider segmentation + IK, then the rest of the motion phase.
