@@ -416,5 +416,22 @@ not shipped; their GLSL recipes live in the design/judge workflow transcripts an
 regenerate in seconds if a marketing-only look (e.g. noir) is later wanted.
 
 **Downstream consequence (owner-gated):** flipping the default changes every
-rendered frame, so the checked-in visual-regression baselines will fail until
-re-promoted through `visual:promote:canyon` — a governed step, not done here.
+rendered frame, so the checked-in visual-regression baselines would need
+re-promoting through `visual:promote:canyon` — a governed, owner-attested step.
+
+**Baselines remain unpromoted — and the blocker is NOT the attestation.**
+Attempting the promotion surfaced a **pre-existing, tone-agnostic scene-render
+flicker under CPU load** (2026-09-02): the governed `visual:capture` gzip-hashes
+several MB per frame on the CPU while the browser renders, which self-induces
+heavy load and makes the frozen frame render in an anomalous lighting state
+(~20-30% of loads). Proof it is not the grade: the compiled GPU programs carry
+the night `CustomToneMapping` correctly even in an anomalous frame
+(`renderer.toneMapping===5`, night shader present), and the old bright `?tone=
+custom` default shows the **same** variance (no-load sat 0.471 stable → 0.44-0.63
+under load). Renderer-retention was ruled out (forcing a fresh renderer per engine
+did not change it). Likely the PBR environment/PMREM application racing the first
+frozen render under starvation. cine-night itself is correct and shipped; the
+flicker is a **separate engine-robustness item** (filed as its own task, with a
+fast local repro) and it — not the owner sign-off — is what currently blocks a
+clean baseline capture. The eager shader-chunk-install commit attempted here was
+reverted because its premise (a tone-install timing bug) was disproven.
