@@ -465,11 +465,29 @@ hash-bound contract docs, so the rc.3 review-package re-sign is absorbed **once*
 
 ### Resulting work order
 
-1. **Phase 1 atmosphere** — replace the box-room `RoomEnvironment` IBL with a
-   procedural venue sky (also the suspected seat of the §10 load flicker: the
-   PBR environment/PMREM path), then the custom exp²-height fog with sun
-   inscatter, then the per-venue exposure/white-point retune and the two
+1. **Phase 1 atmosphere** — ~~replace the box-room `RoomEnvironment` IBL with a
+   procedural venue sky~~ **DONE 2026-09-02** (`render/venueSky.ts`): each venue's
+   IBL is now a PMREM of a dome painted from its own `WorldVisualProfile`
+   colours plus a sun disc at the shared sun vector, with the dome's energy
+   *normalised per venue* to a common mean luminance — a fixed gain could not
+   work because a dim venue's dome is ~3× dimmer than a bright one's while the
+   room was constant (Foundry crushed to black at any fixed gain; normalised it
+   recovered 36.0 → 39.5 luma with edges intact). All venues now sit a
+   consistent ~4–8 luma under the flat room, on purpose. Then: the custom
+   exp²-height fog with sun inscatter, then the per-venue exposure/white-point
+   retune (the sanctioned place to set final brightness) and the two
    tone-bypass surfaces (dust, contact shadow).
+
+   **Flicker evidence from this change (feeds the filed task):** the §10
+   load flicker persists on the new IBL path (2 of 5 loads under CPU
+   saturation), so it was neither caused nor fixed here — but the anomalous
+   state's brightness *scaled with the environment energy* (89.8 luma on the
+   old room → 74.2 on the dimmer sky; the normal state stayed ~47 in both).
+   The anomaly is therefore "environment map applied at ~1.5–1.7× its intended
+   strength", which points at `scene.environmentIntensity` (the 0.58/0.48/0.34
+   tier scalar set in `createPbrEnvironment`) not being honoured on the first
+   compiled frame under load — a much narrower lead than "somewhere in
+   lighting".
 2. **Governance changes** — the contract package and the provenance relaxation
    (verifier edits), absorbing the rc.3 re-sign once.
 3. **Phase 2** — rider segmentation + IK, then the rest of the motion phase.

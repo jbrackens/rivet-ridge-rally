@@ -8,6 +8,12 @@
       "port": 5173
     },
     {
+      "name": "dev-qa",
+      "runtimeExecutable": "env",
+      "runtimeArgs": ["VITE_QA_MODE=1", "npx", "vite", "--port", "5199", "--strictPort"],
+      "port": 5199
+    },
+    {
       "name": "preview",
       "runtimeExecutable": "npm",
       "runtimeArgs": ["run", "preview", "--", "--port", "4173", "--strictPort"],

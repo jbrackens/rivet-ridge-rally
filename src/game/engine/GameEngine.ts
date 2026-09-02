@@ -1,5 +1,5 @@
 import * as THREE from "three";
-import { RoomEnvironment } from "three/examples/jsm/environments/RoomEnvironment.js";
+import { VENUE_SUN_POSITION, createVenueEnvironment } from "./render/venueSky";
 import type { GLTF } from "three/examples/jsm/loaders/GLTFLoader.js";
 import { mergeGeometries } from "three/examples/jsm/utils/BufferGeometryUtils.js";
 
@@ -3732,30 +3732,26 @@ export class GameEngine {
   }
 
   private createPbrEnvironment(): void {
-    let roomEnvironment: RoomEnvironment | null = null;
-    let pmremGenerator: THREE.PMREMGenerator | null = null;
+    // The IBL used to be Three's RoomEnvironment — a box room with area lights —
+    // handed to five outdoor venues, so every metal reflected a studio ceiling.
+    // It is now a per-venue procedural sky dome (render/venueSky.ts) built from
+    // the same WorldVisualProfile colours the painted backdrop uses, with a sun
+    // disc at the direct sun's direction. Same PMREM cost: one init-time render,
+    // nothing per frame. `data-pbr-environment` keeps its "pmrem" value because
+    // the hero-motion review harness pins it; the source is recorded alongside.
     try {
-      roomEnvironment = new RoomEnvironment();
-      pmremGenerator = new THREE.PMREMGenerator(this.renderer);
       const size = this.quality === "low" ? 64 : this.quality === "medium" ? 128 : 256;
-      this.environmentRenderTarget = pmremGenerator.fromScene(
-        roomEnvironment,
-        0.04,
-        0.1,
-        100,
-        { size },
-      );
+      this.environmentRenderTarget = createVenueEnvironment(this.renderer, this.visualProfile, size);
       this.scene.environment = this.environmentRenderTarget.texture;
       this.scene.environmentIntensity = this.quality === "high" ? 0.58 : this.quality === "medium" ? 0.48 : 0.34;
       this.canvas.dataset.pbrEnvironment = "pmrem";
+      this.canvas.dataset.pbrEnvironmentSource = "venue-sky";
     } catch {
       this.scene.environment = null;
       this.environmentRenderTarget?.dispose();
       this.environmentRenderTarget = null;
       this.canvas.dataset.pbrEnvironment = "direct-light-fallback";
-    } finally {
-      roomEnvironment?.dispose();
-      pmremGenerator?.dispose();
+      this.canvas.dataset.pbrEnvironmentSource = "none";
     }
   }
 
@@ -6252,7 +6248,9 @@ export class GameEngine {
     );
     this.scene.add(hemisphere);
     const sun = new THREE.DirectionalLight(this.visualProfile.sun, this.visualProfile.sunIntensity);
-    sun.position.set(-30, 42, 22);
+    // Shared with the IBL sky dome so the reflected sun disc sits where the
+    // shadows say the sun is (render/venueSky.ts).
+    sun.position.set(...VENUE_SUN_POSITION);
     sun.target = this.sunTarget;
     sun.castShadow = this.quality !== "low";
     const shadowSize = this.quality === "high" ? 2_048 : 1_024;
