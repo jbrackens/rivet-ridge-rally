@@ -1,4 +1,5 @@
 import * as THREE from "three";
+import { installHeightFog, resolveFogModel } from "./render/heightFog";
 import { VENUE_SUN_POSITION, createVenueEnvironment } from "./render/venueSky";
 import type { GLTF } from "three/examples/jsm/loaders/GLTFLoader.js";
 import { mergeGeometries } from "three/examples/jsm/utils/BufferGeometryUtils.js";
@@ -3522,6 +3523,14 @@ export class GameEngine {
     try {
       this.renderer.outputColorSpace = THREE.SRGBColorSpace;
       applyToneMapping(this.renderer, resolveToneMode(window.location.search));
+      // Authored fog rides the same shared-chunk mechanism as the tone curve and
+      // must be in place before any fog-enabled material compiles (scene build
+      // follows). `scene.fog` below stays a plain THREE.Fog so Three keeps
+      // feeding the per-venue colour/near/far uniforms; only the maths changed.
+      const fogModel = resolveFogModel(window.location.search);
+      this.canvas.dataset.fogModel = fogModel === "linear"
+        ? "linear"
+        : (installHeightFog(fogModel) ?? "linear");
       this.renderer.toneMappingExposure = this.visualProfile.exposure;
       this.renderer.shadowMap.enabled = this.quality !== "low";
       this.renderer.shadowMap.type = THREE.PCFShadowMap;

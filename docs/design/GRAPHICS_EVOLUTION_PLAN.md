@@ -473,10 +473,37 @@ hash-bound contract docs, so the rc.3 review-package re-sign is absorbed **once*
    work because a dim venue's dome is ~3× dimmer than a bright one's while the
    room was constant (Foundry crushed to black at any fixed gain; normalised it
    recovered 36.0 → 39.5 luma with edges intact). All venues now sit a
-   consistent ~4–8 luma under the flat room, on purpose. Then: the custom
-   exp²-height fog with sun inscatter, then the per-venue exposure/white-point
-   retune (the sanctioned place to set final brightness) and the two
-   tone-bypass surfaces (dust, contact shadow).
+   consistent ~4–8 luma under the flat room, on purpose. ~~Then: the custom
+   exp²-height fog with sun inscatter~~ **DONE 2026-09-03**
+   (`render/heightFog.ts`): all four `fog_*` shader chunks replaced once —
+   exp² distance, a world-height density term (haze pools at track level,
+   ridgelines and tall kit clear; instancing-aware), and a warm inscatter lobe
+   toward the shared sun vector. Strength is a preset menu selected by
+   `?fog=light|medium|heavy` (`?fog=linear` keeps stock fog for the A/B) — the
+   §3.2 variant loop.
+
+   > **OWNER DECISION 2026-09-03 — Fog: MEDIUM ships as default.** Haze starts
+   > ~19 m out on Canyon; a hazard at 60 m is ~16 % blended toward the fog
+   > colour (today 0 %), so the §8 obstacle-silhouette discipline holds. Heavy
+   > (~31 % at 60 m) is the bolder alternate, light is the "too subtle" one;
+   > both stay one URL parameter away.
+
+   **Why the §9 exp² swap was imperceptible — root cause found.** Two passes of
+   this module also measured *identical* to stock at mid-course (≤ 0.1 luma).
+   The curve was never the problem: the venues set `fogNear` at 66–105 m
+   because linear fog ramps harshly, but the chase camera sits 8.85 m behind the
+   bike looking down a curving course, so almost no *geometry* in frame is that
+   far away — and the distant mesas are the screen-space backdrop, which fog
+   never touches. Every fog model agreed on ≈ 0 for everything visible. exp²'s
+   soft ramp is exactly what lets the haze start much closer without the crush,
+   so the presets scale the near plane in (0.3 / 0.18 / 0.1 × `fogNear`) while
+   `fogFar` still governs full fog. The moment the near plane moved, the stats
+   moved monotonically across all venues (Pine linear → heavy: L45.8 → 50.0,
+   S0.418 → 0.381).
+
+   Remaining in item 1: the per-venue exposure/white-point retune (the
+   sanctioned place to set final brightness) and the two tone-bypass surfaces
+   (dust, contact shadow).
 
    **Flicker evidence from this change (feeds the filed task):** the §10
    load flicker persists on the new IBL path (2 of 5 loads under CPU
