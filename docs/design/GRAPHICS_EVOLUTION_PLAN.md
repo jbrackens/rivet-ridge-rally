@@ -501,9 +501,51 @@ hash-bound contract docs, so the rc.3 review-package re-sign is absorbed **once*
    moved monotonically across all venues (Pine linear → heavy: L45.8 → 50.0,
    S0.418 → 0.381).
 
-   Remaining in item 1: the per-venue exposure/white-point retune (the
-   sanctioned place to set final brightness) and the two tone-bypass surfaces
-   (dust, contact shadow).
+   **Items 1-2 finished 2026-09-05 — Phase 1 is complete.**
+
+   *Tone-bypass surfaces (item 2).* The plan named two; the audit found
+   **seventeen**. Under `cine-night` a bypassing material renders ~1.3x bright,
+   fully saturated and uncooled against a graded frame — clouds as white blobs,
+   banners and dust as stickers, which is the "pasted on" quality the grading
+   work exists to remove. Twelve are physical surfaces now graded (contact
+   shadow, dust, clouds, start-grid and lane paint, course guides, signage,
+   sponsor-banner fabric); five stay exempt as emissive gameplay signals (the
+   cooling gate glow, its three additive halos, the snowflake icon), because a
+   functional cue should read at constant intensity however dark the venue. The
+   decision is encoded in `render/toneBypass.ts` as two named constants, and
+   `toneBypass.test.ts` fails the build on a bare `toneMapped: true|false` — so
+   the *next* material has to pick a side rather than inheriting an accident.
+
+   *Per-venue exposure retune (item 1).* The venues' exposures were tuned
+   against stock ACES with a box-room IBL; measured against the shipped curve
+   they were badly out. Measuring the **track ribbon** (the strip the player
+   actually rides, sampled below the countdown panel — the whole-frame average
+   hides this behind sky and HUD) found the ridable surface crushing to black:
+
+   | venue | crush before | crush after | median before | median after | exposure |
+   |---|---|---|---|---|---|
+   | Canyon | 23.3 % | 10.3 % | 20 | 36 | 1.08 → 1.40 |
+   | Pine Run | 10.7 % | 8.6 % | 44 | 49 | 1.13 → 1.25 |
+   | Coastline | 7.7 % | 7.2 % | 44 | 47 | 1.17 → 1.25 |
+   | Foundry | 17.3 % | 11.0 % | 28 | 46 | 1.12 → 1.55 |
+   | Summit | **69.0 %** | 7.7 % | **4** | 35 | 1.08 → 1.73 |
+
+   Summit was a genuine legibility defect, not mood: 69 % of the ribbon below
+   luminance 8/255 with a **median pixel of 4** — the surface the player rides
+   carried no information. Its dirt palette (`0x8c684e`) is *lighter* than
+   Canyon's, so this was a lighting deficit rather than art. Direct light was
+   tested as the alternative lever and rejected on measurement: +47 % sun and
+   +41 % hemisphere only reached 36.9 % crush, where exposure reached 7.7 %.
+   Crush spread across the five venues collapsed from 9x (7.7-69 %) to 1.5x
+   (7.2-11 %) while each venue keeps its own colour identity.
+
+   *No per-venue white point.* The plan asked for one; measurement says it would
+   be a knob with nothing to do. Highlight clipping is flat across all five
+   venues (0.15 % of frame) and does not move with exposure, because the sky is
+   the screen-space backdrop and never reaches the tone-mapping stage — a white
+   point controls a shoulder that nothing is currently hitting. Recorded as
+   declined rather than built, under the §9 rule that an imperceptible pass does
+   not ship. Revisit if a future venue clips.
 
    **Flicker evidence from this change (feeds the filed task):** the §10
    load flicker persists on the new IBL path (2 of 5 loads under CPU

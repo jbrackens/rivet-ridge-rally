@@ -39,6 +39,7 @@ import {
 import { InputManager, type InputDevice } from "../input/InputManager";
 import { formatKeyCode } from "../input/keyLabels";
 import { ghostTimeAtDistance, sampleGhostAt } from "../replay/ghost";
+import { EMISSIVE_SIGNAL_TONE_MAPPED, WORLD_SURFACE_TONE_MAPPED } from "./render/toneBypass";
 import { applyToneMapping, resolveToneMode } from "./render/toneCurve";
 import { GpuFrameTimer } from "./render/gpuTimer";
 import { ReplayRecorder, type ReplayFrame } from "../replay/replayCodec";
@@ -729,7 +730,7 @@ const WORLD_VISUAL_PROFILES = {
     hemisphereIntensity: 1.12,
     sun: 0xffd6a0,
     sunIntensity: 3.7,
-    exposure: 1.08,
+    exposure: 1.4,
     treeDensity: 1,
     mesaDensity: 2.05,
     terraceHeight: 0.95,
@@ -744,7 +745,7 @@ const WORLD_VISUAL_PROFILES = {
     hemisphereIntensity: 1.55,
     sun: 0xffdfb0,
     sunIntensity: 3.15,
-    exposure: 1.13,
+    exposure: 1.25,
     treeDensity: 1.75,
     mesaDensity: 0.34,
     terraceHeight: 1,
@@ -759,7 +760,7 @@ const WORLD_VISUAL_PROFILES = {
     hemisphereIntensity: 1.65,
     sun: 0xffe5b5,
     sunIntensity: 3.3,
-    exposure: 1.17,
+    exposure: 1.25,
     treeDensity: 0.42,
     mesaDensity: 0.35,
     terraceHeight: 0.55,
@@ -774,7 +775,7 @@ const WORLD_VISUAL_PROFILES = {
     hemisphereIntensity: 1.25,
     sun: 0xffbb78,
     sunIntensity: 3.6,
-    exposure: 1.12,
+    exposure: 1.55,
     treeDensity: 0.16,
     mesaDensity: 0.12,
     terraceHeight: 0.78,
@@ -789,7 +790,7 @@ const WORLD_VISUAL_PROFILES = {
     hemisphereIntensity: 1.35,
     sun: 0xffd49e,
     sunIntensity: 3,
-    exposure: 1.08,
+    exposure: 1.73,
     treeDensity: 0.75,
     mesaDensity: 0.12,
     terraceHeight: 1.35,
@@ -1998,7 +1999,7 @@ function createCoolingGateGeometry(): THREE.ShapeGeometry {
 function createCoolingSnowflake(): THREE.InstancedMesh {
   const snowflake = new THREE.InstancedMesh(
     new THREE.BoxGeometry(1, 0.075, 0.055),
-    new THREE.MeshBasicMaterial({ color: 0xf8ffff, toneMapped: false }),
+    new THREE.MeshBasicMaterial({ color: 0xf8ffff, toneMapped: EMISSIVE_SIGNAL_TONE_MAPPED }),
     15,
   );
   const matrix = new THREE.Matrix4();
@@ -3367,7 +3368,7 @@ export class GameEngine {
       opacity: 0.3,
       alphaMap: createSoftShadowTexture(),
       depthWrite: false,
-      toneMapped: false,
+      toneMapped: WORLD_SURFACE_TONE_MAPPED,
     }),
   );
   private readonly dustPool: DustParticle[] = [];
@@ -6108,7 +6109,7 @@ export class GameEngine {
         alphaMap: dustTexture,
         depthWrite: false,
         side: THREE.DoubleSide,
-        toneMapped: false,
+        toneMapped: WORLD_SURFACE_TONE_MAPPED,
       });
       const mesh = new THREE.Mesh(geometry, material);
       mesh.visible = false;
@@ -6462,7 +6463,7 @@ export class GameEngine {
 
     const stencilMaterial = new THREE.MeshBasicMaterial({
       color: 0xf5edda,
-      toneMapped: false,
+      toneMapped: WORLD_SURFACE_TONE_MAPPED,
       polygonOffset: true,
       polygonOffsetFactor: -4,
     });
@@ -6500,7 +6501,7 @@ export class GameEngine {
       new THREE.BoxGeometry(0.72, 0.025, 0.5),
       new THREE.MeshBasicMaterial({
         color: 0xf5edda,
-        toneMapped: false,
+        toneMapped: WORLD_SURFACE_TONE_MAPPED,
         polygonOffset: true,
         polygonOffsetFactor: -4,
       }),
@@ -6705,13 +6706,13 @@ export class GameEngine {
     });
     const edgeMaterial = new THREE.MeshBasicMaterial({
       color: 0xffffff,
-      toneMapped: false,
+      toneMapped: WORLD_SURFACE_TONE_MAPPED,
       polygonOffset: true,
       polygonOffsetFactor: -1,
     });
     const laneMaterial = new THREE.MeshBasicMaterial({
       color: YELLOW,
-      toneMapped: false,
+      toneMapped: WORLD_SURFACE_TONE_MAPPED,
       polygonOffset: true,
       polygonOffsetFactor: -1,
     });
@@ -6749,7 +6750,7 @@ export class GameEngine {
     if (authoredCourse && authoredCourse.trackPieces.length > 0) {
       const authoredMaterial = new THREE.MeshBasicMaterial({
         vertexColors: true,
-        toneMapped: false,
+        toneMapped: WORLD_SURFACE_TONE_MAPPED,
         polygonOffset: true,
         polygonOffsetFactor: -2,
         side: THREE.DoubleSide,
@@ -6883,7 +6884,7 @@ export class GameEngine {
     this.ownedTextures.push(texture);
     const sign = new THREE.Mesh(
       new THREE.PlaneGeometry(Math.max(2.4, width * 0.56), 0.94),
-      new THREE.MeshBasicMaterial({ map: texture, toneMapped: false }),
+      new THREE.MeshBasicMaterial({ map: texture, toneMapped: WORLD_SURFACE_TONE_MAPPED }),
     );
     sign.position.set(0, height, 0.3);
     group.add(sign);
@@ -7052,7 +7053,7 @@ export class GameEngine {
     frame.position.set(0, -0.035, -0.035);
     const glow = new THREE.Mesh(
       geometry,
-      new THREE.MeshBasicMaterial({ color: COOLING, toneMapped: false }),
+      new THREE.MeshBasicMaterial({ color: COOLING, toneMapped: EMISSIVE_SIGNAL_TONE_MAPPED }),
     );
     glow.scale.set(visualWidth / 2.64, 1.08, 1);
     glow.position.z = 0.045;
@@ -7064,7 +7065,7 @@ export class GameEngine {
         opacity: 0.34,
         blending: THREE.AdditiveBlending,
         depthWrite: false,
-        toneMapped: false,
+        toneMapped: EMISSIVE_SIGNAL_TONE_MAPPED,
       }),
     );
     halo.scale.set(visualWidth / 2.64 * 1.09, 1.16, 1.08);
@@ -7078,7 +7079,7 @@ export class GameEngine {
         blending: THREE.AdditiveBlending,
         depthWrite: false,
         side: THREE.DoubleSide,
-        toneMapped: false,
+        toneMapped: EMISSIVE_SIGNAL_TONE_MAPPED,
       }),
     );
     panel.position.set(0, 1.08, 0.02);
@@ -7091,7 +7092,7 @@ export class GameEngine {
         blending: THREE.AdditiveBlending,
         depthWrite: false,
         side: THREE.DoubleSide,
-        toneMapped: false,
+        toneMapped: EMISSIVE_SIGNAL_TONE_MAPPED,
       }),
     );
     groundSpill.rotation.x = -Math.PI / 2;
@@ -7448,7 +7449,7 @@ export class GameEngine {
     this.ownedTextures.push(signTexture);
     const sign = new THREE.Mesh(
       new THREE.PlaneGeometry(6.6, 1.24),
-      new THREE.MeshBasicMaterial({ map: signTexture, toneMapped: false }),
+      new THREE.MeshBasicMaterial({ map: signTexture, toneMapped: WORLD_SURFACE_TONE_MAPPED }),
     );
     sign.position.set(0, 4.36, 0.28);
     group.add(sign);
@@ -7759,7 +7760,7 @@ export class GameEngine {
     const cloudCount = cloudGroupCount * 3;
     const clouds = new THREE.InstancedMesh(
       new THREE.SphereGeometry(1.7, 8, 5),
-      new THREE.MeshBasicMaterial({ color: 0xf8fbff, toneMapped: false }),
+      new THREE.MeshBasicMaterial({ color: 0xf8fbff, toneMapped: WORLD_SURFACE_TONE_MAPPED }),
       cloudCount,
     );
     const matrix = new THREE.Matrix4();
@@ -9037,7 +9038,7 @@ export class GameEngine {
     return new THREE.MeshBasicMaterial({
       map: texture,
       side: THREE.DoubleSide,
-      toneMapped: false,
+      toneMapped: WORLD_SURFACE_TONE_MAPPED,
     });
   }
 
@@ -9141,7 +9142,7 @@ export class GameEngine {
     const billboardCount = this.quality === "low" ? 2 : 4;
     const billboards = new THREE.InstancedMesh(
       new THREE.PlaneGeometry(5.2, 2.6),
-      new THREE.MeshBasicMaterial({ map: signTexture, side: THREE.DoubleSide, toneMapped: false }),
+      new THREE.MeshBasicMaterial({ map: signTexture, side: THREE.DoubleSide, toneMapped: WORLD_SURFACE_TONE_MAPPED }),
       billboardCount,
     );
     const billboardPosts = new THREE.InstancedMesh(
