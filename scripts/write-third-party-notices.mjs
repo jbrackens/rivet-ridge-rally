@@ -89,7 +89,7 @@ const components = [
     expectedVersion: '1.1.0',
     classification: 'embedded-runtime-package',
     declaredLicense: 'MIT',
-    use: 'Installed KTX2 parser and runtime copy embedded by Three.js',
+    use: 'Installed v1.1.0 parser/license source; Three.js embedded runtime copy self-identifies as KTX-Parse v1.0.1',
     files: [{ label: 'LICENSE', source: 'node_modules/ktx-parse/LICENSE' }],
   },
   {

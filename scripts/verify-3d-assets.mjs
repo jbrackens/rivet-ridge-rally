@@ -13,6 +13,14 @@ import {
 import { validateBytes } from "gltf-validator";
 import { MeshoptDecoder } from "meshoptimizer";
 
+if (process.env.RRR_ALLOW_RETIRED_FESTIVAL_VERIFY !== "1") {
+  throw new Error(
+    "The Festival Trail Bike verifier is retired and does not target the current public asset set. "
+      + "Use npm run assets:verify for the current hero/rival/Canyon assets. "
+      + "Set RRR_ALLOW_RETIRED_FESTIVAL_VERIFY=1 only inside a historical checkout that contains the predecessor files.",
+  );
+}
+
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const MODEL_PATH = path.join(ROOT, "public/assets/3d/festival-trail-bike.glb");
 const TEXTURE_PATH = path.join(ROOT, "public/assets/3d/festival-bike-albedo.ktx2");

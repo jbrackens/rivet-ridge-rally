@@ -3,21 +3,23 @@ import { relative, resolve, sep } from "node:path";
 import process from "node:process";
 import { chromium } from "playwright";
 
+import { validatePerformanceEvidence } from "../release-attestation.mjs";
+import { loadFormat2ReleaseManifest } from "../production-smoke-support.mjs";
 import {
   DEFAULT_BASE_URL,
   REPO_ROOT,
+  assertPerformanceEvidenceDirectoryPath,
+  assertPerformanceEvidenceOutputPath,
   browserDeviceEvidence,
   builtAssetEvidence,
   collectNetworkFailures,
   collectPageMessages,
   createPerformanceSession,
-  finishQaRace,
   hasFlag,
   heapEvidence,
   hostEvidence,
   measureEditor,
   measureRestart,
-  navigationEvidence,
   nodePerformance,
   openShell,
   readOption,
@@ -27,8 +29,9 @@ import {
   returnToTitleFromRace,
   setExplicitQuality,
   sourceIdentityEvidence,
-  startQaRace,
+  startProductRace,
   verifyServedBuild,
+  waitForRaceReady,
   writeJson,
 } from "./common.mjs";
 
@@ -38,52 +41,123 @@ const DESKTOP_FPS_FLOOR = 58;
 const DESKTOP_FRAME_WORK_P95_BUDGET_MS = 16.67;
 const MOBILE_FPS_FLOOR = 30;
 const MOBILE_FRAME_WORK_P95_BUDGET_MS = 33.33;
+const RIVAL_STRESS_CUE = "Front wheel clear — bump speed held";
 const argumentsList = process.argv.slice(2);
 
+function displayedRaceTimeMs(value) {
+  const match = /^(\d+):(\d{2})\.(\d{2})$/u.exec(value.trim());
+  if (!match) throw new Error(`Performance race clock is invalid: ${value}`);
+  return Number(match[1]) * 60_000 + Number(match[2]) * 1_000 + Number(match[3]) * 10;
+}
+
+async function proveRivalObstacleStress(page) {
+  await page.getByLabel("Live 3D race on Canyon Kickoff").focus();
+  await page.keyboard.press("ArrowRight", { delay: 100 });
+  await page.keyboard.down("w");
+  const driveStartedMs = displayedRaceTimeMs(await page.locator(".timing-block > strong").innerText());
+  const wheelieArmOffsetMs = 2_800;
+  await page.waitForFunction((armAtMs) => {
+    const text = document.querySelector(".timing-block > strong")?.textContent?.trim() ?? "";
+    const match = /^(\d+):(\d{2})\.(\d{2})$/u.exec(text);
+    if (!match) return false;
+    return Number(match[1]) * 60_000 + Number(match[2]) * 1_000 + Number(match[3]) * 10 >= armAtMs;
+  }, driveStartedMs + wheelieArmOffsetMs, { timeout: 10_000 });
+  await page.keyboard.down("ArrowUp");
+  try {
+    await page.locator(".caption-cue").filter({ hasText: RIVAL_STRESS_CUE }).waitFor({
+      state: "visible",
+      timeout: 5_000,
+    });
+  } finally {
+    await page.keyboard.up("ArrowUp").catch(() => undefined);
+  }
+  const raceElapsedMs = displayedRaceTimeMs(await page.locator(".timing-block > strong").innerText());
+  const raceGatePhase = await page.locator(".game-shell").getAttribute("data-race-gate-phase");
+  const recoveryPromptVisible = await page.locator(".recover-prompt").isVisible().catch(() => false);
+  if (raceElapsedMs > 5_000 || raceGatePhase !== "racing" || recoveryPromptVisible) {
+    throw new Error("Rival obstacle stress did not remain a controlled racing workload.");
+  }
+  return {
+    method: "public-ui-canyon-rival-timed-wheelie",
+    trackId: "canyon-kickoff",
+    mode: "rival",
+    lane: "lane-2-after-one-ArrowRight",
+    wheelieKey: "ArrowUp",
+    cue: RIVAL_STRESS_CUE,
+    cueDeadlineMs: 5_000,
+    driveStartedMs,
+    wheelieArmOffsetMs,
+    raceElapsedMs,
+    raceGatePhase,
+    recoveryPromptVisible,
+  };
+}
+
 if (hasFlag(argumentsList, "help")) {
-  console.log(`Usage: npm run perf:measure -- [options]\n\nOptions:\n  --base-url URL          QA preview URL (default ${DEFAULT_BASE_URL})\n  --output PATH           JSON output relative to the repository\n  --sample-seconds N      Rendering sample duration per viewport (default 5)\n  --quality LEVEL         Force low, medium, or high for both profiles\n  --screenshots-dir PATH  Optional screenshot directory\n  --headed                Run visible Chromium; required for release PASS\n  --help                   Show this help`);
+  console.log(`Usage: npm run perf:measure -- [options]\n\nOptions:\n  --base-url URL          Product preview URL (default ${DEFAULT_BASE_URL})\n  --manifest PATH         Format-2 release manifest (default artifacts/release-manifest.json)\n  --output PATH           JSON output under artifacts/candidate-evidence/\n  --sample-seconds N      Rendering sample duration per viewport (default 5)\n  --quality LEVEL         Force low, medium, or high for both profiles\n  --screenshots-dir PATH  Optional directory under artifacts/candidate-evidence/\n  --headed                Run visible Chromium; required for release PASS\n  --help                   Show this help`);
   process.exit(0);
 }
 
 const baseURL = readOption(argumentsList, "base-url", process.env.PERF_BASE_URL ?? DEFAULT_BASE_URL);
-const output = readOption(argumentsList, "output", "artifacts/performance/latest-measurement.json");
+const manifestReference = readOption(argumentsList, "manifest", "artifacts/release-manifest.json");
+const output = readOption(
+  argumentsList,
+  "output",
+  "artifacts/candidate-evidence/diagnostic/performance/latest-measurement.json",
+);
+assertPerformanceEvidenceOutputPath(output);
 const sampleSeconds = readPositiveNumber(argumentsList, "sample-seconds", 5);
 const qualityOverride = readOption(argumentsList, "quality", "");
 const screenshotsOption = readOption(argumentsList, "screenshots-dir", "");
-const screenshotsDirectory = screenshotsOption ? resolve(REPO_ROOT, screenshotsOption) : null;
+const screenshotsDirectory = screenshotsOption
+  ? assertPerformanceEvidenceDirectoryPath(screenshotsOption)
+  : null;
 const headed = hasFlag(argumentsList, "headed");
 if (qualityOverride && !["low", "medium", "high"].includes(qualityOverride)) {
   throw new Error("--quality must be low, medium, or high; auto is not admissible evidence.");
 }
 
+const measurementStartedAtIso = new Date().toISOString();
 const measurementStartedAt = nodePerformance.now();
 if (screenshotsDirectory) await mkdir(screenshotsDirectory, { recursive: true });
+
+let releaseManifest = null;
+let releaseManifestError = null;
+try {
+  ({ manifest: releaseManifest } = await loadFormat2ReleaseManifest(manifestReference));
+} catch (error) {
+  releaseManifestError = error;
+}
 
 const profiles = [
   {
     name: "desktop-1920x1080",
     scope: "representative-local-desktop",
     quality: qualityOverride || "high",
+    emulation: { hasTouch: false, isMobile: false },
     context: { viewport: { width: 1920, height: 1080 }, deviceScaleFactor: 1 },
   },
   {
     name: "mobile-390x844",
     scope: "emulated-mobile-local-technical-floor-not-physical-device-proof",
     quality: qualityOverride || "low",
+    emulation: { hasTouch: true, isMobile: true },
     context: { viewport: { width: 390, height: 844 }, deviceScaleFactor: 2, hasTouch: true, isMobile: true },
   },
 ];
 
 const evidence = {
-  schemaVersion: 2,
+  schemaVersion: 4,
   kind: "performance-measurement",
-  createdAt: new Date().toISOString(),
+  startedAt: measurementStartedAtIso,
+  completedAt: null,
+  createdAt: null,
   baseURL,
   browser: { name: "chromium", version: null, headless: !headed },
   host: hostEvidence(),
   configuration: {
     sampleSeconds,
-    qaModeRequired: true,
+    productBuildRequired: true,
     qualityPolicy: qualityOverride
       ? { type: "explicit-override", value: qualityOverride }
       : { type: "explicit-per-profile", desktop: "high", mobile: "low" },
@@ -148,7 +222,7 @@ if (evidence.harnessErrors.length === 0) {
   try {
     browser = await chromium.launch({
       headless: !headed,
-      args: ["--enable-precise-memory-info"],
+      args: ["--enable-precise-memory-info", "--mute-audio"],
     });
     evidence.browser.version = browser.version();
 
@@ -160,7 +234,9 @@ if (evidence.harnessErrors.length === 0) {
         scope: profile.scope,
         viewport: profile.context.viewport,
         deviceScaleFactor: profile.context.deviceScaleFactor,
+        emulation: profile.emulation,
         quality: { requested: profile.quality, selected: null, effective: null },
+        authoredHero: null,
         device: null,
         runtime: null,
         navigation: null,
@@ -169,6 +245,7 @@ if (evidence.harnessErrors.length === 0) {
         editor: null,
         rendering: null,
         stress: null,
+        stressProof: null,
         heaps: [],
         network: { shell: null, completeFlow: null, failedRequests: [], httpErrorResponses: [] },
         consoleMessages: [],
@@ -187,49 +264,47 @@ if (evidence.harnessErrors.length === 0) {
         profileEvidence.network.httpErrorResponses = networkFailures.httpErrorResponses;
         session = await createPerformanceSession(context, page);
 
-        profileEvidence.navigation = {
-          ...await openShell(page, baseURL),
-          timing: await navigationEvidence(page),
-        };
+        profileEvidence.navigation = await openShell(page, baseURL);
         profileEvidence.quality = await setExplicitQuality(page, profile.quality);
         profileEvidence.device = await browserDeviceEvidence(page);
-        profileEvidence.runtime = await page.evaluate((expectedVersion) => ({
-          title: document.title,
-          qaApiPresent: Object.prototype.hasOwnProperty.call(window, "__RRR_QA__"),
-          versionPresent: (document.body.textContent ?? "").includes(`v${expectedVersion}`),
-          build: window.__RRR_BUILD__ ?? null,
-        }), evidence.candidate.source.packageVersion);
+        profileEvidence.runtime = await page.evaluate((expectedVersion) => {
+          const versionPresent = (document.body.textContent ?? "").includes(`v${expectedVersion}`);
+          return {
+            title: document.title,
+            qaApiPresent: Object.prototype.hasOwnProperty.call(window, "__RRR_QA__"),
+            productPerformanceApiPresent: Object.prototype.hasOwnProperty.call(window, "__RRR_PERFORMANCE__"),
+            performanceCaptureHarnessPresent: Object.prototype.hasOwnProperty.call(window, "__RRR_PERF_CAPTURE__"),
+            version: versionPresent ? expectedVersion : null,
+            versionPresent,
+            build: window.__RRR_BUILD__ ?? null,
+          };
+        }, evidence.candidate.source.packageVersion);
         profileEvidence.network.shell = await resourceEvidence(page);
         profileEvidence.heaps.push({ stage: "shell", ...await heapEvidence(session) });
 
-        profileEvidence.firstRaceLoadMs = await startQaRace(page);
+        profileEvidence.firstRaceLoadMs = await startProductRace(page);
+        profileEvidence.authoredHero = await waitForRaceReady(page);
         profileEvidence.heaps.push({ stage: "first-race-ready", ...await heapEvidence(session) });
+        await page.getByLabel("Live 3D race on Canyon Kickoff").focus();
         await page.keyboard.down("w");
-        await page.keyboard.down("Space");
         try {
           profileEvidence.rendering = await renderingEvidence(page, sampleSeconds);
           profileEvidence.heaps.push({ stage: "after-render-sample", ...await heapEvidence(session) });
-          await finishQaRace(page);
         } finally {
           await page.keyboard.up("w").catch(() => undefined);
-          await page.keyboard.up("Space").catch(() => undefined);
         }
 
         profileEvidence.restartMs = await measureRestart(page);
         profileEvidence.heaps.push({ stage: "after-restart", ...await heapEvidence(session) });
         await returnToTitleFromRace(page);
-        await startQaRace(page, "rival");
-        await page.keyboard.press("ArrowRight");
-        await page.keyboard.down("w");
-        await page.keyboard.down("Shift");
-        await page.keyboard.down("Space");
+        await startProductRace(page, "rival");
         try {
+          profileEvidence.stressProof = await proveRivalObstacleStress(page);
           profileEvidence.stress = await renderingEvidence(page, sampleSeconds);
-          profileEvidence.heaps.push({ stage: "rival-ai-jump-crash-stress", ...await heapEvidence(session) });
+          profileEvidence.heaps.push({ stage: "rival-wheelie-obstacle-stress", ...await heapEvidence(session) });
         } finally {
           await page.keyboard.up("w").catch(() => undefined);
-          await page.keyboard.up("Shift").catch(() => undefined);
-          await page.keyboard.up("Space").catch(() => undefined);
+          await page.keyboard.up("ArrowUp").catch(() => undefined);
         }
         await returnToTitleFromRace(page);
         profileEvidence.editor = await measureEditor(page);
@@ -304,13 +379,14 @@ const criteria = [
     },
   },
   { id: "all-profiles-completed", passed: evidence.profiles.length === profiles.length && evidence.profiles.every((profile) => profile.completed), actual: evidence.profiles.filter((profile) => profile.completed).length },
+  { id: "authored-hero-measured", passed: evidence.profiles.length === profiles.length && evidence.profiles.every((profile) => profile.authoredHero?.bikeAsset === "ready" && profile.authoredHero?.root === "RRR_HeroBikeRider" && profile.authoredHero?.fallbackReason === null), actual: evidence.profiles.map((profile) => ({ name: profile.name, authoredHero: profile.authoredHero })) },
   { id: "explicit-quality-applied", passed: evidence.profiles.length === profiles.length && evidence.profiles.every((profile) => profile.quality.effective === profile.quality.requested && profile.quality.effective !== "auto"), actual: evidence.profiles.map((profile) => ({ name: profile.name, ...profile.quality })) },
-  { id: "qa-runtime-identity", passed: evidence.profiles.length === profiles.length && evidence.profiles.every((profile) => profile.runtime?.title === "Rivet Ridge Rally" && profile.runtime?.qaApiPresent === true && profile.runtime?.versionPresent === true), actual: evidence.profiles.map((profile) => ({ name: profile.name, runtime: profile.runtime })) },
+  { id: "production-runtime-identity", passed: evidence.profiles.length === profiles.length && evidence.profiles.every((profile) => profile.runtime?.title === "Rivet Ridge Rally" && profile.runtime?.qaApiPresent === false && profile.runtime?.productPerformanceApiPresent === false && profile.runtime?.performanceCaptureHarnessPresent === true && profile.runtime?.versionPresent === true), actual: evidence.profiles.map((profile) => ({ name: profile.name, runtime: profile.runtime })) },
   { id: "runtime-source-commit-binding", passed: Boolean(evidence.candidate.source?.commit) && evidence.profiles.length === profiles.length && evidence.profiles.every((profile) => profile.runtime?.build?.commit === evidence.candidate.source.commit && profile.runtime?.build?.dirty === false), actual: { sourceCommit: evidence.candidate.source?.commit ?? null, profiles: evidence.profiles.map((profile) => ({ name: profile.name, build: profile.runtime?.build ?? null })) } },
   { id: "no-failed-requests", passed: failedRequests.length === 0, actual: failedRequests.length },
   { id: "no-http-error-responses", passed: httpErrorResponses.length === 0, actual: httpErrorResponses.length },
   { id: "no-unexpected-console-or-page-messages", passed: unexpectedMessages.length === 0, actual: unexpectedMessages.length },
-  { id: "rendering-samples-complete", passed: evidence.profiles.length === profiles.length && evidence.profiles.every((profile) => (profile.rendering?.sampleCount ?? 0) > 0 && (profile.stress?.sampleCount ?? 0) > 0), actual: evidence.profiles.map((profile) => ({ name: profile.name, normal: profile.rendering?.sampleCount ?? 0, stress: profile.stress?.sampleCount ?? 0 })) },
+  { id: "rendering-samples-complete", passed: evidence.profiles.length === profiles.length && evidence.profiles.every((profile) => (profile.rendering?.frameWork?.sampleCount ?? 0) > 1 && profile.rendering?.frameWork?.overflowed === false && profile.rendering?.frameWork?.visibilityLost === false && (profile.stress?.frameWork?.sampleCount ?? 0) > 1 && profile.stress?.frameWork?.overflowed === false && profile.stress?.frameWork?.visibilityLost === false), actual: evidence.profiles.map((profile) => ({ name: profile.name, normal: profile.rendering?.frameWork?.sampleCount ?? 0, stress: profile.stress?.frameWork?.sampleCount ?? 0, normalVisibilityLost: profile.rendering?.frameWork?.visibilityLost ?? null, stressVisibilityLost: profile.stress?.frameWork?.visibilityLost ?? null })) },
   { id: "heap-samples-complete", passed: evidence.profiles.length === profiles.length && evidence.profiles.every((profile) => profile.heaps.length > 0 && profile.heaps.every((heap) => heap.available)), actual: evidence.profiles.map((profile) => ({ name: profile.name, expected: profile.heaps.length, available: profile.heaps.filter((heap) => heap.available).length })) },
   { id: "editor-test-ride-visible", passed: evidence.profiles.length === profiles.length && evidence.profiles.every((profile) => profile.editor?.testRideControlVisible === true), actual: evidence.profiles.map((profile) => ({ name: profile.name, visible: profile.editor?.testRideControlVisible ?? false })) },
   {
@@ -322,55 +398,86 @@ const criteria = [
   },
   {
     id: "desktop-normal-performance-budget",
-    passed: (desktopProfile?.rendering?.fps.mean ?? -Infinity) >= DESKTOP_FPS_FLOOR
-      && (desktopProfile?.rendering?.frameTimeMs.p95 ?? Infinity) <= DESKTOP_FRAME_WORK_P95_BUDGET_MS,
+    passed: (desktopProfile?.rendering?.frameWork?.meanFps ?? -Infinity) >= DESKTOP_FPS_FLOOR
+      && (desktopProfile?.rendering?.frameWork?.frameWorkMs.p95 ?? Infinity) <= DESKTOP_FRAME_WORK_P95_BUDGET_MS,
     required: { meanFpsAtLeast: DESKTOP_FPS_FLOOR, frameWorkP95MsAtMost: DESKTOP_FRAME_WORK_P95_BUDGET_MS },
-    actual: { meanFps: desktopProfile?.rendering?.fps.mean ?? null, frameWorkP95Ms: desktopProfile?.rendering?.frameTimeMs.p95 ?? null },
+    actual: { meanFps: desktopProfile?.rendering?.frameWork?.meanFps ?? null, frameWorkP95Ms: desktopProfile?.rendering?.frameWork?.frameWorkMs.p95 ?? null },
   },
   {
     id: "desktop-stress-performance-budget",
-    passed: (desktopProfile?.stress?.fps.mean ?? -Infinity) >= DESKTOP_FPS_FLOOR
-      && (desktopProfile?.stress?.frameTimeMs.p95 ?? Infinity) <= DESKTOP_FRAME_WORK_P95_BUDGET_MS,
+    passed: (desktopProfile?.stress?.frameWork?.meanFps ?? -Infinity) >= DESKTOP_FPS_FLOOR
+      && (desktopProfile?.stress?.frameWork?.frameWorkMs.p95 ?? Infinity) <= DESKTOP_FRAME_WORK_P95_BUDGET_MS,
     required: { meanFpsAtLeast: DESKTOP_FPS_FLOOR, frameWorkP95MsAtMost: DESKTOP_FRAME_WORK_P95_BUDGET_MS },
-    actual: { meanFps: desktopProfile?.stress?.fps.mean ?? null, frameWorkP95Ms: desktopProfile?.stress?.frameTimeMs.p95 ?? null },
+    actual: { meanFps: desktopProfile?.stress?.frameWork?.meanFps ?? null, frameWorkP95Ms: desktopProfile?.stress?.frameWork?.frameWorkMs.p95 ?? null },
   },
   {
     id: "emulated-mobile-normal-technical-floor",
-    passed: (mobileProfile?.rendering?.fps.mean ?? -Infinity) >= MOBILE_FPS_FLOOR
-      && (mobileProfile?.rendering?.frameTimeMs.p95 ?? Infinity) <= MOBILE_FRAME_WORK_P95_BUDGET_MS,
+    passed: (mobileProfile?.rendering?.frameWork?.meanFps ?? -Infinity) >= MOBILE_FPS_FLOOR
+      && (mobileProfile?.rendering?.frameWork?.frameWorkMs.p95 ?? Infinity) <= MOBILE_FRAME_WORK_P95_BUDGET_MS,
     required: { meanFpsAtLeast: MOBILE_FPS_FLOOR, frameWorkP95MsAtMost: MOBILE_FRAME_WORK_P95_BUDGET_MS },
-    actual: { meanFps: mobileProfile?.rendering?.fps.mean ?? null, frameWorkP95Ms: mobileProfile?.rendering?.frameTimeMs.p95 ?? null, physicalDeviceProof: false },
+    actual: { meanFps: mobileProfile?.rendering?.frameWork?.meanFps ?? null, frameWorkP95Ms: mobileProfile?.rendering?.frameWork?.frameWorkMs.p95 ?? null, physicalDeviceProof: false },
   },
   {
     id: "emulated-mobile-stress-technical-floor",
-    passed: (mobileProfile?.stress?.fps.mean ?? -Infinity) >= MOBILE_FPS_FLOOR
-      && (mobileProfile?.stress?.frameTimeMs.p95 ?? Infinity) <= MOBILE_FRAME_WORK_P95_BUDGET_MS,
+    passed: (mobileProfile?.stress?.frameWork?.meanFps ?? -Infinity) >= MOBILE_FPS_FLOOR
+      && (mobileProfile?.stress?.frameWork?.frameWorkMs.p95 ?? Infinity) <= MOBILE_FRAME_WORK_P95_BUDGET_MS,
     required: { meanFpsAtLeast: MOBILE_FPS_FLOOR, frameWorkP95MsAtMost: MOBILE_FRAME_WORK_P95_BUDGET_MS },
-    actual: { meanFps: mobileProfile?.stress?.fps.mean ?? null, frameWorkP95Ms: mobileProfile?.stress?.frameTimeMs.p95 ?? null, physicalDeviceProof: false },
+    actual: { meanFps: mobileProfile?.stress?.frameWork?.meanFps ?? null, frameWorkP95Ms: mobileProfile?.stress?.frameWork?.frameWorkMs.p95 ?? null, physicalDeviceProof: false },
   },
 ];
-const failedCriteria = criteria.filter((criterion) => !criterion.passed);
 evidence.durationMs = Math.round(nodePerformance.now() - measurementStartedAt);
-evidence.automatedGate = {
-  status: failedCriteria.length === 0 ? "PASS" : "FAIL",
-  criteria,
-  failedCriteria: failedCriteria.map((criterion) => criterion.id),
-  manualBudgetReviewRequired: true,
-  mobileEvidenceScope: "emulated/local technical floor; physical-device acceptance remains required",
-};
-evidence.status = evidence.automatedGate.status;
+evidence.completedAt = new Date().toISOString();
+evidence.createdAt = evidence.completedAt;
+
+function refreshAutomatedGate() {
+  const harnessCriterion = criteria.find((criterion) => criterion.id === "no-harness-error");
+  harnessCriterion.passed = evidence.harnessErrors.length === 0;
+  harnessCriterion.actual = evidence.harnessErrors.length;
+  const failedCriteria = criteria.filter((criterion) => !criterion.passed);
+  evidence.automatedGate = {
+    status: failedCriteria.length === 0 ? "PASS" : "FAIL",
+    criteria,
+    failedCriteria: failedCriteria.map((criterion) => criterion.id),
+    manualBudgetReviewRequired: true,
+    mobileEvidenceScope: "emulated/local technical floor; physical-device acceptance remains required",
+  };
+  evidence.status = evidence.automatedGate.status;
+  return failedCriteria;
+}
+
+let failedCriteria = refreshAutomatedGate();
+if (failedCriteria.length === 0) {
+  try {
+    if (releaseManifest === null) {
+      throw releaseManifestError ?? new Error("Format-2 release manifest validation did not complete.");
+    }
+    validatePerformanceEvidence(
+      evidence,
+      { commit: releaseManifest.source.commit, tag: releaseManifest.source.tag },
+      releaseManifest.version,
+      releaseManifest,
+    );
+  } catch (error) {
+    recordHarnessError("release-contract-validation", error);
+    failedCriteria = refreshAutomatedGate();
+  }
+}
 
 const outputPath = await writeJson(output, evidence);
+const releaseContractError = evidence.harnessErrors.find((error) => error.stage === "release-contract-validation") ?? null;
 console.log(JSON.stringify({
   outputPath,
   status: evidence.status,
   failedCriteria: evidence.automatedGate.failedCriteria,
+  releaseContractError,
+  harnessErrors: evidence.harnessErrors,
   profiles: evidence.profiles.map((profile) => ({
     name: profile.name,
     quality: profile.quality,
+    authoredHero: profile.authoredHero,
     firstRaceLoadMs: profile.firstRaceLoadMs,
-    fpsMean: profile.rendering?.fps.mean,
-    frameTimeP95Ms: profile.rendering?.frameTimeMs.p95,
+    fpsMean: profile.rendering?.frameWork?.meanFps,
+    frameWorkP95Ms: profile.rendering?.frameWork?.frameWorkMs.p95,
     drawCallsMax: profile.rendering?.drawCalls.max,
     restartMs: profile.restartMs,
     editorOpenMs: profile.editor?.openMs,

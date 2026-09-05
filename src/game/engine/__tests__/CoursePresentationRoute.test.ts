@@ -61,7 +61,11 @@ function customTrackDefinition(
 function copyOrientation(
   orientation: CoursePresentationOrientation,
 ): CoursePresentationOrientation {
-  return { ...orientation };
+  return {
+    ...orientation,
+    yaw: orientation.yaw === 0 ? 0 : orientation.yaw,
+    upX: orientation.upX === 0 ? 0 : orientation.upX,
+  };
 }
 
 function expectOrthonormalFrame(orientation: CoursePresentationOrientation): void {
@@ -424,7 +428,7 @@ describe("CoursePresentationRoute", () => {
     expect(geometry.boundingBox?.min.z).toBe(-20);
     expect(geometry.boundingBox?.max.x).toBe(3);
     expect(geometry.boundingBox?.max.y).toBeCloseTo(0.15, 6);
-    expect(geometry.boundingBox?.max.z).toBe(0);
+    expect(geometry.boundingBox?.max.z).toBeCloseTo(0, 10);
     expect(Math.min(...vCoordinates)).toBe(0);
     expect(Math.max(...vCoordinates)).toBe(2);
 

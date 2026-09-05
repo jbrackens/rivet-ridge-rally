@@ -8,6 +8,7 @@ artifacts/performance/screenshots/
 artifacts/performance/latest-production-race.png
 /artifacts/candidate-evidence/
 artifacts/visual-review/
+artifacts/visual-iteration/
 /artifacts/release-manifest.json
 *.tsbuildinfo
 .env

@@ -1,0 +1,44 @@
+{
+  "schemaVersion": 5,
+  "kind": "production-smoke",
+  "createdAt": "2026-07-18T19:47:12.619Z",
+  "run": {
+    "id": "2026-07-18T19-47-12.615Z-5e470182-5127-4600-9258-c129fe563c3c",
+    "startedAt": "2026-07-18T19:47:12.615Z",
+    "candidateManifestSha256": null
+  },
+  "baseURL": "http://127.0.0.1:4173/",
+  "releaseArtifact": null,
+  "browser": {
+    "name": "Google Chrome",
+    "channel": "chrome",
+    "version": null,
+    "headless": true,
+    "viewport": {
+      "width": 1440,
+      "height": 900
+    }
+  },
+  "runtime": null,
+  "steps": [],
+  "serviceWorkerControlled": false,
+  "offlineCacheName": null,
+  "offlineReloadPassed": false,
+  "offlinePracticeRacePassed": false,
+  "network": {
+    "failedRequests": [],
+    "httpErrors": []
+  },
+  "console": {
+    "all": [],
+    "knownDiagnostics": [],
+    "unexpected": []
+  },
+  "screenshots": [],
+  "screenshotAggregateSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "smokeError": {
+    "name": "Error",
+    "message": "Production smoke requires a readable format-2 release manifest."
+  },
+  "status": "FAIL"
+}

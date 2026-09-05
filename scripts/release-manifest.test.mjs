@@ -1,24 +1,49 @@
 import assert from 'node:assert/strict';
 import { execFileSync, spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { access, chmod, copyFile, mkdir, mkdtemp, readFile, rm, symlink, writeFile } from 'node:fs/promises';
+import {
+  access,
+  chmod,
+  copyFile,
+  lstat,
+  mkdir,
+  mkdtemp,
+  readFile,
+  readdir,
+  readlink,
+  realpath,
+  rm,
+  symlink,
+  writeFile,
+} from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
+import { gzipSync } from 'node:zlib';
 
 const FIXTURE_NAME = 'release-manifest-fixture';
 const FIXTURE_VERSION = '1.0.0-rc.2';
 const FIXTURE_NPM_VERSION = '11.17.0';
 const FIXTURE_SOURCE = 'tracked-fixture-source';
-const FAKE_NPM_CLI = String.raw`
+const FAKE_NPM_CLI = "import '../lib/runtime.mjs';\n";
+const HOST_NPM_FIXTURE_BUILD = String.raw`
+import { mkdir, rm, writeFile } from 'node:fs/promises';
+
+await rm('dist', { recursive: true, force: true });
+await mkdir('dist', { recursive: true });
+await writeFile('dist/THIRD_PARTY_NOTICES.txt', 'Fixture notices.\n');
+await writeFile('dist/index.html', 'host-npm-fixture=ok\n');
+`.trimStart();
+const FAKE_NPM_RUNTIME = String.raw`
 import { execFileSync } from 'node:child_process';
 import { access, mkdir, readFile, rm, symlink, writeFile } from 'node:fs/promises';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 const userConfig = process.env.npm_config_userconfig;
 const globalConfig = process.env.npm_config_globalconfig;
 if (process.env.npm_config_ignore_scripts !== 'false') process.exit(46);
-if (!userConfig || !globalConfig || userConfig !== globalConfig) process.exit(47);
+if (!userConfig || !globalConfig || userConfig === globalConfig) process.exit(47);
 try {
   if ((await readFile(userConfig, 'utf8')) !== '') process.exit(48);
   if ((await readFile(globalConfig, 'utf8')) !== '') process.exit(49);
@@ -34,7 +59,7 @@ if (command === '--version') {
 
 if (command === 'ci') {
   if (JSON.stringify(args) !== JSON.stringify(['--no-audit', '--no-fund'])) process.exit(41);
-  if (process.env.VITE_QA_MODE !== '0') process.exit(42);
+  if (!['0', '1'].includes(process.env.VITE_QA_MODE)) process.exit(42);
   await mkdir('node_modules', { recursive: true });
   await writeFile(path.join('node_modules', '.fixture-installed'), 'ci-ok\n');
   const mode = (await readFile('BUILD_MODE.txt', 'utf8')).trim();
@@ -48,7 +73,7 @@ if (command === 'run' && JSON.stringify(args) === JSON.stringify(['build'])) {
   } catch {
     process.exit(43);
   }
-  if (process.env.VITE_QA_MODE !== '0' || process.env.NODE_ENV !== 'production') process.exit(44);
+  if (!['0', '1'].includes(process.env.VITE_QA_MODE) || process.env.NODE_ENV !== 'production') process.exit(44);
 
   const mode = (await readFile('BUILD_MODE.txt', 'utf8')).trim();
   const source = (await readFile('SOURCE.txt', 'utf8')).trim();
@@ -59,7 +84,10 @@ if (command === 'run' && JSON.stringify(args) === JSON.stringify(['build'])) {
   }
   let body = 'source=' + source + '\nci=ok\nqa=' + process.env.VITE_QA_MODE
     + '\nnodeEnv=' + process.env.NODE_ENV + '\n';
+  if (process.env.VITE_QA_MODE === '1') body += '__RRR_QA__\n';
   if (mode === 'qa-marker') body += '__RRR_QA__\n';
+  if (mode === 'performance-capture-marker') body += '__RRR_PERF_CAPTURE__\n';
+  if (mode === 'product-performance-marker') body += '__RRR_PERFORMANCE__\n';
   if (mode === 'local-path') body += 'file:///Users/fixture/project\n';
   if (mode === 'source-path') body += await readFile('SOURCE_ROOT.txt', 'utf8');
   if (mode === 'worktree-path') body += process.cwd() + '\n';
@@ -75,7 +103,8 @@ if (command === 'run' && JSON.stringify(args) === JSON.stringify(['build'])) {
   }
   if (mode === 'file-url') body += 'file:///opt/fixture/project\n';
   if (mode === 'private-key') body += '-----BEGIN PRIVATE KEY-----\nfixture\n';
-  if (mode === 'live-token') body += 'ghp_fixture_high_confidence_token_prefix\n';
+  if (mode === 'live-token') body += 'ghp_' + 'A'.repeat(36) + '\n';
+  if (mode === 'short-token-prefix-noise') body += 'binary-ish-noise=ghp_abcd\n';
   await writeFile(path.join('dist', 'index.html'), body);
   if (mode === 'source-map') await writeFile(path.join('dist', 'bundle.js.map'), '{}\n');
   if (mode === 'symlink') await symlink('../SOURCE.txt', path.join('dist', 'source-link'));
@@ -90,6 +119,11 @@ if (command === 'run' && JSON.stringify(args) === JSON.stringify(['build'])) {
   if (mode === 'mutate-npm-cli') {
     const npmCli = await readFile(process.argv[1], 'utf8');
     await writeFile(process.argv[1], npmCli + '\n// mutated during build\n');
+  }
+  if (mode === 'mutate-npm-implementation') {
+    const implementationPath = fileURLToPath(import.meta.url);
+    const implementation = await readFile(implementationPath, 'utf8');
+    await writeFile(implementationPath, implementation + '\n// mutated during build\n');
   }
   process.exit(0);
 }
@@ -109,6 +143,69 @@ function sha256(contents) {
   return createHash('sha256').update(contents).digest('hex');
 }
 
+function treeMode(entryStat) {
+  return Number(entryStat.mode & 0o7777n).toString(8).padStart(4, '0');
+}
+
+function updateTreeRecord(hash, fields) {
+  for (const field of fields) {
+    hash.update(String(field));
+    hash.update('\0');
+  }
+}
+
+async function fixtureNpmPackageProvenance(packageRoot) {
+  const treeHash = createHash('sha256');
+  let directoryCount = 0;
+  let regularFileCount = 0;
+  let symlinkCount = 0;
+  let totalRegularFileBytes = 0;
+
+  async function walk(absolute, relative) {
+    const entryStat = await lstat(absolute, { bigint: true });
+    const mode = treeMode(entryStat);
+    if (entryStat.isDirectory()) {
+      directoryCount += 1;
+      updateTreeRecord(treeHash, ['D', relative, mode]);
+      const entries = (await readdir(absolute, { withFileTypes: true })).toSorted(
+        (left, right) => Buffer.compare(Buffer.from(left.name), Buffer.from(right.name)),
+      );
+      for (const entry of entries) {
+        await walk(
+          path.join(absolute, entry.name),
+          relative === '.' ? entry.name : `${relative}/${entry.name}`,
+        );
+      }
+    } else if (entryStat.isFile()) {
+      const contents = await readFile(absolute);
+      regularFileCount += 1;
+      totalRegularFileBytes += contents.byteLength;
+      updateTreeRecord(treeHash, ['F', relative, mode, contents.byteLength, sha256(contents)]);
+    } else if (entryStat.isSymbolicLink()) {
+      const target = await readlink(absolute, { encoding: 'buffer' });
+      symlinkCount += 1;
+      updateTreeRecord(treeHash, ['L', relative, mode, target.byteLength, sha256(target)]);
+    } else {
+      throw new Error(`Unexpected fake npm package entry: ${relative}`);
+    }
+  }
+
+  await walk(packageRoot, '.');
+  const packageJsonContents = await readFile(path.join(packageRoot, 'package.json'));
+  return {
+    treeFormat: 1,
+    name: 'npm',
+    version: FIXTURE_NPM_VERSION,
+    cliRelativePath: 'bin/npm-cli.js',
+    packageJsonSha256: sha256(packageJsonContents),
+    directoryCount,
+    regularFileCount,
+    symlinkCount,
+    totalRegularFileBytes,
+    treeSha256: treeHash.digest('hex'),
+  };
+}
+
 async function writeJson(file, value) {
   await writeFile(file, `${JSON.stringify(value, null, 2)}\n`);
 }
@@ -122,13 +219,27 @@ async function createFixture({
   preinstallIgnored = false,
   sidecarDirectory = false,
 } = {}) {
-  const directory = await mkdtemp(path.join(tmpdir(), 'rrr-release-manifest-'));
+  const fixtureRoot = await mkdtemp(path.join(tmpdir(), 'rrr-release-manifest-'));
+  const directory = path.join(fixtureRoot, 'repository');
+  const npmPackageRoot = path.join(fixtureRoot, 'npm-package');
+  await mkdir(directory, { recursive: true });
   await mkdir(path.join(directory, 'scripts'), { recursive: true });
   await copyFile(
     new URL('./release-manifest.mjs', import.meta.url),
     path.join(directory, 'scripts', 'release-manifest.mjs'),
   );
-  await writeFile(path.join(directory, 'fake-npm-cli.mjs'), FAKE_NPM_CLI);
+  await mkdir(path.join(npmPackageRoot, 'bin'), { recursive: true });
+  await mkdir(path.join(npmPackageRoot, 'lib'), { recursive: true });
+  await mkdir(path.join(npmPackageRoot, 'node_modules', '.bin'), { recursive: true });
+  await writeJson(path.join(npmPackageRoot, 'package.json'), {
+    name: 'npm',
+    version: FIXTURE_NPM_VERSION,
+    type: 'module',
+    bin: { npm: 'bin/npm-cli.js' },
+  });
+  await writeFile(path.join(npmPackageRoot, 'bin', 'npm-cli.js'), FAKE_NPM_CLI);
+  await writeFile(path.join(npmPackageRoot, 'lib', 'runtime.mjs'), FAKE_NPM_RUNTIME);
+  await symlink('../../lib/runtime.mjs', path.join(npmPackageRoot, 'node_modules', '.bin', 'runtime'));
   await mkdir(path.join(directory, '.githooks'), { recursive: true });
   await writeFile(path.join(directory, '.githooks', 'post-checkout'), PREINSTALL_HOOK);
   await chmod(path.join(directory, '.githooks', 'post-checkout'), 0o755);
@@ -138,6 +249,7 @@ async function createFixture({
     private: true,
     type: 'module',
     packageManager: `npm@${packageManagerVersion}`,
+    scripts: { build: 'node scripts/host-npm-fixture-build.mjs' },
   });
   await writeJson(path.join(directory, 'package-lock.json'), {
     name: FIXTURE_NAME,
@@ -154,11 +266,12 @@ async function createFixture({
   await writeFile(path.join(directory, '.node-version'), `${nodeVersion}\n`);
   await writeFile(
     path.join(directory, '.gitignore'),
-    '/dist/\n/node_modules/\n.env.*\n/artifacts/release-manifest.json\n',
+    '/dist/\n/node_modules/\n.env.*\n/artifacts/release-manifest.json\n/artifacts/candidate-evidence/\n',
   );
   await writeFile(path.join(directory, 'README.md'), 'Release manifest fixture.\n');
+  await writeFile(path.join(directory, 'scripts', 'host-npm-fixture-build.mjs'), HOST_NPM_FIXTURE_BUILD);
   await writeFile(path.join(directory, 'SOURCE.txt'), `${FIXTURE_SOURCE}\n`);
-  await writeFile(path.join(directory, 'SOURCE_ROOT.txt'), `${directory}\n`);
+  await writeFile(path.join(directory, 'SOURCE_ROOT.txt'), `${await realpath(directory)}\n`);
   await writeFile(path.join(directory, 'BUILD_MODE.txt'), `${buildMode}\n`);
   await writeFile(
     path.join(directory, 'hostile-global.npmrc'),
@@ -201,7 +314,11 @@ async function createFixture({
 
 function runManifest(
   directory,
-  { npmExecPath = path.join(directory, 'fake-npm-cli.mjs'), pathPrefix = null } = {},
+  {
+    npmExecPath = path.join(path.dirname(directory), 'npm-package', 'bin', 'npm-cli.js'),
+    pathPrefix = null,
+    profile = 'release',
+  } = {},
 ) {
   const hostileConfig = path.join(directory, 'hostile-global.npmrc');
   const environment = {
@@ -214,27 +331,35 @@ function runManifest(
   if (npmExecPath === null) delete environment.npm_execpath;
   else environment.npm_execpath = npmExecPath;
   if (pathPrefix) environment.PATH = `${pathPrefix}${path.delimiter}${environment.PATH ?? ''}`;
-  return spawnSync(process.execPath, ['scripts/release-manifest.mjs'], {
+  const profileArgs = profile === 'release' ? [] : ['--profile', profile];
+  return spawnSync(process.execPath, ['scripts/release-manifest.mjs', ...profileArgs], {
     cwd: directory,
     encoding: 'utf8',
     env: environment,
   });
 }
 
-async function assertFailedClosed(directory, result, message) {
+async function assertFailedClosed(directory, result, message, { preserveRootOutputs = false } = {}) {
   assert.notEqual(result.status, 0);
   assert.match(`${result.stdout}\n${result.stderr}`, message);
-  await assert.rejects(access(path.join(directory, 'artifacts', 'release-manifest.json')));
-  await assert.rejects(access(path.join(directory, 'dist')));
+  if (preserveRootOutputs) {
+    assert.equal(
+      await readFile(path.join(directory, 'dist', 'FOREIGN.txt'), 'utf8'),
+      'stale foreign root artifact\n',
+    );
+  } else {
+    await assert.rejects(access(path.join(directory, 'artifacts', 'release-manifest.json')));
+    await assert.rejects(access(path.join(directory, 'dist')));
+  }
   const worktrees = git(directory, 'worktree', 'list', '--porcelain')
     .split('\n')
     .filter((line) => line.startsWith('worktree '));
   assert.equal(worktrees.length, 1);
 }
 
-test('builds format-2 bytes from tracked source with the exact npm CLI in a detached checkout', async (t) => {
+test('builds format-2 bytes from tracked source with the exact npm package in a detached checkout', async (t) => {
   const directory = await createFixture({ buildMode: 'generic-file-api' });
-  t.after(() => rm(directory, { recursive: true, force: true }));
+  t.after(() => rm(path.dirname(directory), { recursive: true, force: true }));
   const hostileBin = await mkdtemp(path.join(tmpdir(), 'rrr-hostile-node-'));
   t.after(() => rm(hostileBin, { recursive: true, force: true }));
   await writeFile(
@@ -250,7 +375,9 @@ test('builds format-2 bytes from tracked source with the exact npm CLI in a deta
     await readFile(path.join(directory, 'artifacts', 'release-manifest.json'), 'utf8'),
   );
   const packageLockContents = await readFile(path.join(directory, 'package-lock.json'));
-  const npmCliContents = await readFile(path.join(directory, 'fake-npm-cli.mjs'));
+  const npmPackageRoot = path.join(path.dirname(directory), 'npm-package');
+  const npmCliContents = await readFile(path.join(npmPackageRoot, 'bin', 'npm-cli.js'));
+  const npmPackage = await fixtureNpmPackageProvenance(npmPackageRoot);
   const nodeExecutableContents = await readFile(process.execPath);
   assert.equal(manifest.format, 2);
   assert.deepEqual(manifest.source, {
@@ -264,6 +391,7 @@ test('builds format-2 bytes from tracked source with the exact npm CLI in a deta
     nodeExecutableSha256: sha256(nodeExecutableContents),
     npm: FIXTURE_NPM_VERSION,
     npmCliSha256: sha256(npmCliContents),
+    npmPackage,
     platform: process.platform,
     arch: process.arch,
     packageLockSha256: sha256(packageLockContents),
@@ -280,6 +408,17 @@ test('builds format-2 bytes from tracked source with the exact npm CLI in a deta
     'THIRD_PARTY_NOTICES.txt',
     'index.html',
   ]);
+  assert.deepEqual(manifest.compression, { algorithm: 'gzip', level: 9 });
+  assert.equal(
+    manifest.totalGzipBytes,
+    manifest.files.reduce((sum, record) => sum + record.gzipBytes, 0),
+  );
+  for (const record of manifest.files) {
+    const contents = await readFile(path.join(directory, 'dist', record.path));
+    const gzipContents = gzipSync(contents, { level: 9 });
+    assert.equal(record.gzipBytes, gzipContents.length);
+    assert.equal(record.gzipSha256, sha256(gzipContents));
+  }
 
   const builtIndex = await readFile(path.join(directory, 'dist', 'index.html'), 'utf8');
   assert.match(builtIndex, new RegExp(`source=${FIXTURE_SOURCE}`));
@@ -288,7 +427,7 @@ test('builds format-2 bytes from tracked source with the exact npm CLI in a deta
   assert.match(builtIndex, /nodeEnv=production/);
   assert.match(builtIndex, /filename\.startsWith\("file:\/\/"\)/);
   assert.match(builtIndex, /route=\/home\/account/);
-  assert.match(builtIndex, /pattern=\\Users\\/);
+  assert.match(builtIndex, /pattern=\\\\Users\\\\/);
   await assert.rejects(access(path.join(directory, 'dist', 'FOREIGN.txt')));
   assert.equal(git(directory, 'status', '--porcelain=v1', '--untracked-files=all'), '');
   const worktrees = git(directory, 'worktree', 'list', '--porcelain')
@@ -297,19 +436,98 @@ test('builds format-2 bytes from tracked source with the exact npm CLI in a deta
   assert.equal(worktrees.length, 1);
 });
 
+test('qualifies the installed npm package tree against a detached fixture', async (t) => {
+  const npmExecPath = process.env.npm_execpath;
+  assert.equal(
+    typeof npmExecPath === 'string' && path.isAbsolute(npmExecPath),
+    true,
+    'test:release-manifest requires an absolute npm_execpath from npm run',
+  );
+  const directory = await createFixture();
+  t.after(() => rm(path.dirname(directory), { recursive: true, force: true }));
+
+  const result = runManifest(directory, { npmExecPath });
+  assert.equal(result.status, 0, `${result.stdout}\n${result.stderr}`);
+
+  const manifest = JSON.parse(await readFile(
+    path.join(directory, 'artifacts', 'release-manifest.json'),
+    'utf8',
+  ));
+  assert.equal(manifest.toolchain.npm, FIXTURE_NPM_VERSION);
+  assert.equal(manifest.toolchain.npmPackage.name, 'npm');
+  assert.equal(manifest.toolchain.npmPackage.version, FIXTURE_NPM_VERSION);
+  assert.ok(manifest.toolchain.npmPackage.regularFileCount > 1);
+  assert.ok(manifest.toolchain.npmPackage.totalRegularFileBytes > 0);
+  assert.match(
+    await readFile(path.join(directory, 'dist', 'index.html'), 'utf8'),
+    /host-npm-fixture=ok/,
+  );
+});
+
+test('builds a pre-tag visual candidate bound to the same complete npm package tree', async (t) => {
+  const directory = await createFixture({ tagMode: 'none' });
+  t.after(() => rm(path.dirname(directory), { recursive: true, force: true }));
+
+  const result = runManifest(directory, { profile: 'visual-qa' });
+  assert.equal(result.status, 0, `${result.stdout}\n${result.stderr}`);
+
+  const manifest = JSON.parse(await readFile(
+    path.join(directory, 'artifacts', 'candidate-evidence', 'visual', 'current', 'manifest.json'),
+    'utf8',
+  ));
+  const npmPackageRoot = path.join(path.dirname(directory), 'npm-package');
+  assert.equal(manifest.kind, 'visual-qa-candidate');
+  assert.equal(manifest.format, 1);
+  assert.equal(manifest.source.expectedVersionTagAtCommit, false);
+  assert.equal(manifest.source.expectedVersionTagObject, null);
+  assert.equal(manifest.source.expectedVersionTagObjectType, null);
+  assert.deepEqual(manifest.toolchain.npmPackage, await fixtureNpmPackageProvenance(npmPackageRoot));
+  assert.equal(await readFile(path.join(directory, 'dist', 'FOREIGN.txt'), 'utf8'), 'stale foreign root artifact\n');
+});
+
+test('allows short token-prefix coincidences that are not token-shaped', async (t) => {
+  const directory = await createFixture({ buildMode: 'short-token-prefix-noise' });
+  t.after(() => rm(path.dirname(directory), { recursive: true, force: true }));
+
+  const result = runManifest(directory);
+  assert.equal(result.status, 0, `${result.stdout}\n${result.stderr}`);
+});
+
+test('rejects visual candidates captured after the expected annotated or lightweight tag', async (t) => {
+  for (const tagMode of ['annotated', 'lightweight']) {
+    await t.test(tagMode, async (subtest) => {
+      const directory = await createFixture({ tagMode });
+      subtest.after(() => rm(path.dirname(directory), { recursive: true, force: true }));
+      const result = runManifest(directory, { profile: 'visual-qa' });
+      assert.notEqual(result.status, 0);
+      assert.match(
+        `${result.stdout}\n${result.stderr}`,
+        /visual QA candidate must be captured before creating v1\.0\.0-rc\.2/,
+      );
+      await assert.rejects(access(
+        path.join(directory, 'artifacts', 'candidate-evidence', 'visual', 'current'),
+      ));
+      assert.equal(await readFile(path.join(directory, 'dist', 'FOREIGN.txt'), 'utf8'), 'stale foreign root artifact\n');
+    });
+  }
+});
+
 test('rejects a symlinked release sidecar parent before touching outside files', async (t) => {
   if (process.platform === 'win32') {
     t.skip('Windows symlink creation requires host-specific privileges.');
     return;
   }
   const directory = await createFixture();
-  t.after(() => rm(directory, { recursive: true, force: true }));
+  t.after(() => rm(path.dirname(directory), { recursive: true, force: true }));
   const outsideDirectory = await mkdtemp(path.join(tmpdir(), 'rrr-release-outside-'));
   t.after(() => rm(outsideDirectory, { recursive: true, force: true }));
   const outsideSidecar = path.join(outsideDirectory, 'release-manifest.json');
   await writeFile(outsideSidecar, 'must remain untouched\n');
   await rm(path.join(directory, 'artifacts'), { recursive: true, force: true });
   await symlink(outsideDirectory, path.join(directory, 'artifacts'));
+  git(directory, 'add', 'artifacts');
+  git(directory, 'commit', '-m', 'Track symlinked artifact parent fixture');
+  git(directory, 'tag', '-f', '-a', `v${FIXTURE_VERSION}`, '-m', `v${FIXTURE_VERSION}`);
 
   const result = runManifest(directory);
   assert.notEqual(result.status, 0);
@@ -361,7 +579,7 @@ test('fails closed for invalid provenance inputs', async (t) => {
       message: /npm_execpath must be an absolute path/,
     },
     {
-      name: 'sidecar directory is removed before a later failure',
+      name: 'sidecar directory is preserved before root output replacement starts',
       fixture: { sidecarDirectory: true },
       run: { npmExecPath: null },
       message: /npm_execpath must be an absolute path/,
@@ -386,10 +604,10 @@ test('fails closed for invalid provenance inputs', async (t) => {
   for (const scenario of scenarios) {
     await t.test(scenario.name, async (subtest) => {
       const directory = await createFixture(scenario.fixture);
-      subtest.after(() => rm(directory, { recursive: true, force: true }));
+      subtest.after(() => rm(path.dirname(directory), { recursive: true, force: true }));
       if (scenario.mutate) await scenario.mutate(directory);
       const result = runManifest(directory, scenario.run);
-      await assertFailedClosed(directory, result, scenario.message);
+      await assertFailedClosed(directory, result, scenario.message, { preserveRootOutputs: true });
     });
   }
 });
@@ -416,14 +634,14 @@ test('fails closed on unexpected ignored detached-checkout inputs at every build
   for (const scenario of scenarios) {
     await t.test(scenario.name, async (subtest) => {
       const directory = await createFixture(scenario.fixture);
-      subtest.after(() => rm(directory, { recursive: true, force: true }));
+      subtest.after(() => rm(path.dirname(directory), { recursive: true, force: true }));
       const result = runManifest(directory);
-      await assertFailedClosed(directory, result, scenario.message);
+      await assertFailedClosed(directory, result, scenario.message, { preserveRootOutputs: true });
     });
   }
 });
 
-test('fails closed when exact tag or npm CLI provenance changes during build', async (t) => {
+test('fails closed when exact tag or npm package provenance changes during build', async (t) => {
   const scenarios = [
     {
       name: 'annotated tag object replaced at the same commit',
@@ -436,14 +654,20 @@ test('fails closed when exact tag or npm CLI provenance changes during build', a
       message: /exact npm CLI changed during the release build/,
       excludedMessage: /Source checkout working tree changed/,
     },
+    {
+      name: 'non-entry npm implementation mutated during build',
+      buildMode: 'mutate-npm-implementation',
+      message: /exact npm package tree changed during the release build/,
+      excludedMessage: /Source checkout working tree changed/,
+    },
   ];
 
   for (const scenario of scenarios) {
     await t.test(scenario.name, async (subtest) => {
       const directory = await createFixture({ buildMode: scenario.buildMode });
-      subtest.after(() => rm(directory, { recursive: true, force: true }));
+      subtest.after(() => rm(path.dirname(directory), { recursive: true, force: true }));
       const result = runManifest(directory);
-      await assertFailedClosed(directory, result, scenario.message);
+      await assertFailedClosed(directory, result, scenario.message, { preserveRootOutputs: true });
       if (scenario.excludedMessage) {
         assert.doesNotMatch(`${result.stdout}\n${result.stderr}`, scenario.excludedMessage);
       }
@@ -456,6 +680,8 @@ test('fails closed for invalid isolated build outputs', async (t) => {
     { buildMode: 'source-map', message: /source maps present: bundle\.js\.map/ },
     { buildMode: 'missing-notice', message: /THIRD_PARTY_NOTICES\.txt is missing/ },
     { buildMode: 'qa-marker', message: /QA runtime marker __RRR_QA__/ },
+    { buildMode: 'performance-capture-marker', message: /injected performance capture marker __RRR_PERF_CAPTURE__/ },
+    { buildMode: 'product-performance-marker', message: /product performance API marker __RRR_PERFORMANCE__/ },
     { buildMode: 'local-path', message: /absolute local file URL/ },
     { buildMode: 'source-path', message: /source checkout path/ },
     { buildMode: 'worktree-path', message: /detached release worktree path/ },
@@ -464,16 +690,22 @@ test('fails closed for invalid isolated build outputs', async (t) => {
     { buildMode: 'windows-path', message: /absolute local file URL/ },
     { buildMode: 'file-url', message: /absolute local file URL/ },
     { buildMode: 'private-key', message: /PEM private-key header/ },
-    { buildMode: 'live-token', message: /GitHub token prefix ghp_/ },
-    { buildMode: 'symlink', message: /non-regular dist entry: source-link/ },
+    { buildMode: 'live-token', message: /GitHub token ghp_/ },
+    {
+      buildMode: 'symlink',
+      message: /non-regular dist entry: source-link/,
+      preserveRootOutputs: true,
+    },
   ];
 
   for (const scenario of scenarios) {
     await t.test(scenario.buildMode, async (subtest) => {
       const directory = await createFixture({ buildMode: scenario.buildMode });
-      subtest.after(() => rm(directory, { recursive: true, force: true }));
+      subtest.after(() => rm(path.dirname(directory), { recursive: true, force: true }));
       const result = runManifest(directory);
-      await assertFailedClosed(directory, result, scenario.message);
+      await assertFailedClosed(directory, result, scenario.message, {
+        preserveRootOutputs: scenario.preserveRootOutputs === true,
+      });
     });
   }
 });

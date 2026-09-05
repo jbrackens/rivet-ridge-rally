@@ -1,4 +1,16 @@
+import {
+  FROZEN_READINESS,
+  frozenSceneContract,
+} from "../scripts/lib/frozen-scene-inventory.mjs";
 import { expect, test } from "@playwright/test";
+
+test.beforeEach(({ browserName }, testInfo) => {
+  testInfo.setTimeout(90_000);
+  expect(
+    testInfo.config.updateSnapshots,
+    `Visual qualification in ${browserName} must never create or replace checked-in baselines.`,
+  ).toBe("none");
+});
 
 function collectErrors(page: import("@playwright/test").Page): string[] {
   const errors: string[] = [];
@@ -34,7 +46,10 @@ async function openFrozenRace(
     uiScale?: string;
   } = {},
 ): Promise<import("@playwright/test").Locator> {
-  await page.goto(options.initialPath ?? "/?qa-fast-race=1&qa-visual-freeze=1");
+  // Visual qualification must use the production-length route. The fast-race
+  // hook compresses gameplay distances while authored Canyon decor deliberately
+  // remains at production coordinates, so that hybrid is not a valid art frame.
+  await page.goto(options.initialPath ?? "/?qa-visual-freeze=1");
   await waitForStableFonts(page);
   await page.getByRole("button", { name: "Skip training" }).click();
   await page.getByRole("button", { name: "Settings", exact: true }).click();
@@ -47,41 +62,22 @@ async function openFrozenRace(
   await page.getByRole("button", { name: /Practice/ }).click();
   const raceCanvas = page.getByLabel("Live 3D race on Canyon Kickoff");
   await expect(raceCanvas).toBeVisible();
-  await expect(raceCanvas).toHaveAttribute("data-visual-state", "frozen");
-  await expect(raceCanvas).toHaveAttribute("data-bike-asset", "ready", { timeout: 15_000 });
-  await expect(raceCanvas).toHaveAttribute("data-cooling-gate-venue-pocket-count", "4");
-  await expect(raceCanvas).toHaveAttribute("data-cooling-gate-venue-style", "bilateral");
-  await expect(raceCanvas).toHaveAttribute("data-cooling-gate-watchtower-count", "4");
-  await expect(raceCanvas).toHaveAttribute(
-    "data-cooling-gate-watchtower-style",
-    "staffed-elevated",
-  );
-  await expect(raceCanvas).toHaveAttribute(
-    "data-cooling-gate-watchtower-spectator-count",
-    "16",
-  );
-  await expect(raceCanvas).toHaveAttribute("data-festival-pocket-style", "tiered-canyon");
-  await expect(raceCanvas).toHaveAttribute(
-    "data-festival-pocket-count",
-    options.expectedFestivalPocketCount ?? "8",
-  );
-  await expect(raceCanvas).toHaveAttribute(
-    "data-festival-pocket-tier-count",
-    options.expectedFestivalTierCount ?? "32",
-  );
-  await expect(raceCanvas).toHaveAttribute("data-festival-pocket-tier-rows", "4");
-  await expect(raceCanvas).toHaveAttribute("data-course-edge-safety-style", "continuous-canyon");
-  await expect(raceCanvas).toHaveAttribute("data-course-edge-safety-batch-count", "1");
-  await expect(raceCanvas).toHaveAttribute(
-    "data-course-edge-safety-block-count",
-    options.expectedSafetyBlockCount ?? "144",
-  );
-  await expect(raceCanvas).toHaveAttribute("data-start-grid-style", "numbered-four-lane");
-  await expect(raceCanvas).toHaveAttribute("data-start-grid-stencil-count", "4");
-  await expect(raceCanvas).toHaveAttribute("data-start-grid-batch-count", "2");
-  await expect(raceCanvas).toHaveAttribute("data-canyon-cactus-style", "branched-saguaro");
-  await expect(raceCanvas).toHaveAttribute("data-canyon-cactus-batch-count", "1");
-  await expect(raceCanvas).toHaveAttribute("data-canyon-cactus-instance-count", "24");
+  // The scene contract lives in scripts/lib/frozen-scene-inventory.mjs so this
+  // gate and the capture script that produces the frames an owner signs cannot
+  // drift apart. It used to be 41 assertions here against four waits there.
+  for (const [attribute, value] of FROZEN_READINESS) {
+    await expect(raceCanvas).toHaveAttribute(attribute, value, { timeout: 15_000 });
+  }
+  for (const [attribute, value] of frozenSceneContract({
+    ...(options.expectedFestivalPocketCount === undefined
+      ? {} : { festivalPocketCount: options.expectedFestivalPocketCount }),
+    ...(options.expectedFestivalTierCount === undefined
+      ? {} : { festivalPocketTierCount: options.expectedFestivalTierCount }),
+    ...(options.expectedSafetyBlockCount === undefined
+      ? {} : { courseEdgeSafetyBlockCount: options.expectedSafetyBlockCount }),
+  })) {
+    await expect(raceCanvas).toHaveAttribute(attribute, value);
+  }
   await expect(page.locator(".game-shell")).toHaveAttribute(
     "data-race-gate-phase",
     "racing",
@@ -91,18 +87,19 @@ async function openFrozenRace(
   return raceCanvas;
 }
 
-test("desktop race retains its accepted production composition", async ({ page }, testInfo) => {
+test("desktop race matches its checked-in visual baseline", async ({ page }, testInfo) => {
   test.skip(testInfo.project.name !== "chromium", "Single-renderer visual baseline");
   const errors = collectErrors(page);
   await openFrozenRace(page);
   await expect(page).toHaveScreenshot("race-screen.png", {
     animations: "disabled",
     maxDiffPixelRatio: 0.02,
+    timeout: 20_000,
   });
   expect(errors).toEqual([]);
 });
 
-test("production Canyon bend retains a readable shared course presentation", async ({ page }, testInfo) => {
+test("production Canyon bend matches its checked-in visual baseline", async ({ page }, testInfo) => {
   test.skip(testInfo.project.name !== "chromium", "Single-renderer curved-course qualification");
   const errors = collectErrors(page);
   const raceCanvas = await openFrozenRace(page, {
@@ -116,11 +113,12 @@ test("production Canyon bend retains a readable shared course presentation", asy
   await expect(page).toHaveScreenshot("race-curved-course-canyon.png", {
     animations: "disabled",
     maxDiffPixelRatio: 0.02,
+    timeout: 20_000,
   });
   expect(errors).toEqual([]);
 });
 
-test("editor retains its accepted production composition", async ({ page }, testInfo) => {
+test("editor matches its checked-in visual baseline", async ({ page }, testInfo) => {
   test.skip(testInfo.project.name !== "chromium", "Single-renderer visual baseline");
   const errors = collectErrors(page);
   await page.goto("/");
@@ -131,11 +129,12 @@ test("editor retains its accepted production composition", async ({ page }, test
   await expect(page).toHaveScreenshot("editor-screen.png", {
     animations: "disabled",
     maxDiffPixelRatio: 0.02,
+    timeout: 20_000,
   });
   expect(errors).toEqual([]);
 });
 
-test("portrait race retains its accepted touch composition", async ({ page }, testInfo) => {
+test("portrait race matches its checked-in visual baseline", async ({ page }, testInfo) => {
   test.skip(testInfo.project.name !== "mobile-chrome", "Single mobile visual baseline");
   const errors = collectErrors(page);
   await openFrozenRace(page);
@@ -143,17 +142,19 @@ test("portrait race retains its accepted touch composition", async ({ page }, te
   await expect(page).toHaveScreenshot("race-mobile.png", {
     animations: "disabled",
     maxDiffPixelRatio: 0.02,
+    timeout: 20_000,
   });
   expect(errors).toEqual([]);
 });
 
-test("high-contrast scaled HUD retains readable hierarchy", async ({ page }, testInfo) => {
+test("high-contrast scaled HUD matches its checked-in visual baseline", async ({ page }, testInfo) => {
   test.skip(testInfo.project.name !== "chromium", "Single-renderer accessibility baseline");
   const errors = collectErrors(page);
   await openFrozenRace(page, { highContrast: true, uiScale: "1.2" });
   await expect(page).toHaveScreenshot("race-high-contrast.png", {
     animations: "disabled",
     maxDiffPixelRatio: 0.02,
+    timeout: 20_000,
   });
   expect(errors).toEqual([]);
 });

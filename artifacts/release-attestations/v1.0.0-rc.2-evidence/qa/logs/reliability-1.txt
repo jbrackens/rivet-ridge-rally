@@ -1,0 +1,115 @@
+$ npx playwright test e2e/reliability.spec.ts
+startedAt=2026-07-19T13:12:57.391Z
+completedAt=2026-07-19T13:19:43.615Z
+exitCode=0
+
+
+Running 78 tests using 1 worker
+
+  ✓   1 [chromium] › e2e/reliability.spec.ts:83:1 › unsupported WebGL presents recovery and menu paths instead of crashing (1.7s)
+  ✓   2 [chromium] › e2e/reliability.spec.ts:107:3 › production asset network fallbacks › the authored Canyon kit replaces every Rider School gameplay shell while retaining cooling cues (55.1s)
+  ✓   3 [chromium] › e2e/reliability.spec.ts:149:3 › production asset network fallbacks › a failed canyon panorama request keeps the tutorial playable (25.2s)
+  ✓   4 [chromium] › e2e/reliability.spec.ts:173:3 › production asset network fallbacks › a panorama that misses the race deadline upgrades the generated fallback when it arrives (24.2s)
+  ✓   5 [chromium] › e2e/reliability.spec.ts:192:3 › production asset network fallbacks › a failed same-origin compressed model request keeps the playable fallback (31.6s)
+  ✓   6 [chromium] › e2e/reliability.spec.ts:217:3 › production asset network fallbacks › a decoded model with an invalid hero contract keeps the playable fallback (32.2s)
+  ✓   7 [chromium] › e2e/reliability.spec.ts:244:3 › production asset network fallbacks › a failed Canyon kit request keeps procedural scenery and the bike loader independent (33.7s)
+  ✓   8 [chromium] › e2e/reliability.spec.ts:268:3 › production asset network fallbacks › a stalled compressed model request reaches the fallback and starts the race (59.2s)
+  ✓   9 [chromium] › e2e/reliability.spec.ts:368:1 › corrupt local progress is quarantined and replaced with a safe profile (26.6s)
+  ✓  10 [chromium] › e2e/reliability.spec.ts:412:1 › unavailable IndexedDB discloses session mode while a race remains playable (26.5s)
+  ✓  11 [chromium] › e2e/reliability.spec.ts:448:1 › session-mode Track Builder restores its unsaved draft and history after Test Ride (35.9s)
+  ✓  12 [chromium] › e2e/reliability.spec.ts:497:1 › quota write failure stays visible and retry flushes session settings (17.5s)
+  ✓  13 [chromium] › e2e/reliability.spec.ts:545:1 › newer-version open failure preserves seeded data and shows upgrade recovery guidance (14.6s)
+  -  14 [firefox] › e2e/reliability.spec.ts:83:1 › unsupported WebGL presents recovery and menu paths instead of crashing
+  -  15 [firefox] › e2e/reliability.spec.ts:107:3 › production asset network fallbacks › the authored Canyon kit replaces every Rider School gameplay shell while retaining cooling cues
+  -  16 [firefox] › e2e/reliability.spec.ts:149:3 › production asset network fallbacks › a failed canyon panorama request keeps the tutorial playable
+  -  17 [firefox] › e2e/reliability.spec.ts:173:3 › production asset network fallbacks › a panorama that misses the race deadline upgrades the generated fallback when it arrives
+  -  18 [firefox] › e2e/reliability.spec.ts:192:3 › production asset network fallbacks › a failed same-origin compressed model request keeps the playable fallback
+  -  19 [firefox] › e2e/reliability.spec.ts:217:3 › production asset network fallbacks › a decoded model with an invalid hero contract keeps the playable fallback
+  -  20 [firefox] › e2e/reliability.spec.ts:244:3 › production asset network fallbacks › a failed Canyon kit request keeps procedural scenery and the bike loader independent
+  -  21 [firefox] › e2e/reliability.spec.ts:268:3 › production asset network fallbacks › a stalled compressed model request reaches the fallback and starts the race
+  -  22 [firefox] › e2e/reliability.spec.ts:368:1 › corrupt local progress is quarantined and replaced with a safe profile
+  -  23 [firefox] › e2e/reliability.spec.ts:412:1 › unavailable IndexedDB discloses session mode while a race remains playable
+  -  24 [firefox] › e2e/reliability.spec.ts:448:1 › session-mode Track Builder restores its unsaved draft and history after Test Ride
+  -  25 [firefox] › e2e/reliability.spec.ts:497:1 › quota write failure stays visible and retry flushes session settings
+  -  26 [firefox] › e2e/reliability.spec.ts:545:1 › newer-version open failure preserves seeded data and shows upgrade recovery guidance
+  -  27 [webkit] › e2e/reliability.spec.ts:83:1 › unsupported WebGL presents recovery and menu paths instead of crashing
+  -  28 [webkit] › e2e/reliability.spec.ts:107:3 › production asset network fallbacks › the authored Canyon kit replaces every Rider School gameplay shell while retaining cooling cues
+  -  29 [webkit] › e2e/reliability.spec.ts:149:3 › production asset network fallbacks › a failed canyon panorama request keeps the tutorial playable
+  -  30 [webkit] › e2e/reliability.spec.ts:173:3 › production asset network fallbacks › a panorama that misses the race deadline upgrades the generated fallback when it arrives
+  -  31 [webkit] › e2e/reliability.spec.ts:192:3 › production asset network fallbacks › a failed same-origin compressed model request keeps the playable fallback
+  -  32 [webkit] › e2e/reliability.spec.ts:217:3 › production asset network fallbacks › a decoded model with an invalid hero contract keeps the playable fallback
+  -  33 [webkit] › e2e/reliability.spec.ts:244:3 › production asset network fallbacks › a failed Canyon kit request keeps procedural scenery and the bike loader independent
+  -  34 [webkit] › e2e/reliability.spec.ts:268:3 › production asset network fallbacks › a stalled compressed model request reaches the fallback and starts the race
+  -  35 [webkit] › e2e/reliability.spec.ts:368:1 › corrupt local progress is quarantined and replaced with a safe profile
+  -  36 [webkit] › e2e/reliability.spec.ts:412:1 › unavailable IndexedDB discloses session mode while a race remains playable
+  -  37 [webkit] › e2e/reliability.spec.ts:448:1 › session-mode Track Builder restores its unsaved draft and history after Test Ride
+  -  38 [webkit] › e2e/reliability.spec.ts:497:1 › quota write failure stays visible and retry flushes session settings
+  -  39 [webkit] › e2e/reliability.spec.ts:545:1 › newer-version open failure preserves seeded data and shows upgrade recovery guidance
+  -  40 [mobile-chrome] › e2e/reliability.spec.ts:83:1 › unsupported WebGL presents recovery and menu paths instead of crashing
+  -  41 [mobile-chrome] › e2e/reliability.spec.ts:107:3 › production asset network fallbacks › the authored Canyon kit replaces every Rider School gameplay shell while retaining cooling cues
+  -  42 [mobile-chrome] › e2e/reliability.spec.ts:149:3 › production asset network fallbacks › a failed canyon panorama request keeps the tutorial playable
+  -  43 [mobile-chrome] › e2e/reliability.spec.ts:173:3 › production asset network fallbacks › a panorama that misses the race deadline upgrades the generated fallback when it arrives
+  -  44 [mobile-chrome] › e2e/reliability.spec.ts:192:3 › production asset network fallbacks › a failed same-origin compressed model request keeps the playable fallback
+  -  45 [mobile-chrome] › e2e/reliability.spec.ts:217:3 › production asset network fallbacks › a decoded model with an invalid hero contract keeps the playable fallback
+  -  46 [mobile-chrome] › e2e/reliability.spec.ts:244:3 › production asset network fallbacks › a failed Canyon kit request keeps procedural scenery and the bike loader independent
+  -  47 [mobile-chrome] › e2e/reliability.spec.ts:268:3 › production asset network fallbacks › a stalled compressed model request reaches the fallback and starts the race
+  -  48 [mobile-chrome] › e2e/reliability.spec.ts:368:1 › corrupt local progress is quarantined and replaced with a safe profile
+  -  49 [mobile-chrome] › e2e/reliability.spec.ts:412:1 › unavailable IndexedDB discloses session mode while a race remains playable
+  -  50 [mobile-chrome] › e2e/reliability.spec.ts:448:1 › session-mode Track Builder restores its unsaved draft and history after Test Ride
+  -  51 [mobile-chrome] › e2e/reliability.spec.ts:497:1 › quota write failure stays visible and retry flushes session settings
+  -  52 [mobile-chrome] › e2e/reliability.spec.ts:545:1 › newer-version open failure preserves seeded data and shows upgrade recovery guidance
+  -  53 [mobile-safari] › e2e/reliability.spec.ts:83:1 › unsupported WebGL presents recovery and menu paths instead of crashing
+  -  54 [mobile-safari] › e2e/reliability.spec.ts:107:3 › production asset network fallbacks › the authored Canyon kit replaces every Rider School gameplay shell while retaining cooling cues
+  -  55 [mobile-safari] › e2e/reliability.spec.ts:149:3 › production asset network fallbacks › a failed canyon panorama request keeps the tutorial playable
+  -  56 [mobile-safari] › e2e/reliability.spec.ts:173:3 › production asset network fallbacks › a panorama that misses the race deadline upgrades the generated fallback when it arrives
+  -  57 [mobile-safari] › e2e/reliability.spec.ts:192:3 › production asset network fallbacks › a failed same-origin compressed model request keeps the playable fallback
+  -  58 [mobile-safari] › e2e/reliability.spec.ts:217:3 › production asset network fallbacks › a decoded model with an invalid hero contract keeps the playable fallback
+  -  59 [mobile-safari] › e2e/reliability.spec.ts:244:3 › production asset network fallbacks › a failed Canyon kit request keeps procedural scenery and the bike loader independent
+  -  60 [mobile-safari] › e2e/reliability.spec.ts:268:3 › production asset network fallbacks › a stalled compressed model request reaches the fallback and starts the race
+  -  61 [mobile-safari] › e2e/reliability.spec.ts:368:1 › corrupt local progress is quarantined and replaced with a safe profile
+  -  62 [mobile-safari] › e2e/reliability.spec.ts:412:1 › unavailable IndexedDB discloses session mode while a race remains playable
+  -  63 [mobile-safari] › e2e/reliability.spec.ts:448:1 › session-mode Track Builder restores its unsaved draft and history after Test Ride
+  -  64 [mobile-safari] › e2e/reliability.spec.ts:497:1 › quota write failure stays visible and retry flushes session settings
+  -  65 [mobile-safari] › e2e/reliability.spec.ts:545:1 › newer-version open failure preserves seeded data and shows upgrade recovery guidance
+  -  66 [tablet-chrome] › e2e/reliability.spec.ts:83:1 › unsupported WebGL presents recovery and menu paths instead of crashing
+  -  67 [tablet-chrome] › e2e/reliability.spec.ts:107:3 › production asset network fallbacks › the authored Canyon kit replaces every Rider School gameplay shell while retaining cooling cues
+  -  68 [tablet-chrome] › e2e/reliability.spec.ts:149:3 › production asset network fallbacks › a failed canyon panorama request keeps the tutorial playable
+  -  69 [tablet-chrome] › e2e/reliability.spec.ts:173:3 › production asset network fallbacks › a panorama that misses the race deadline upgrades the generated fallback when it arrives
+  -  70 [tablet-chrome] › e2e/reliability.spec.ts:192:3 › production asset network fallbacks › a failed same-origin compressed model request keeps the playable fallback
+  -  71 [tablet-chrome] › e2e/reliability.spec.ts:217:3 › production asset network fallbacks › a decoded model with an invalid hero contract keeps the playable fallback
+  -  72 [tablet-chrome] › e2e/reliability.spec.ts:244:3 › production asset network fallbacks › a failed Canyon kit request keeps procedural scenery and the bike loader independent
+  -  73 [tablet-chrome] › e2e/reliability.spec.ts:268:3 › production asset network fallbacks › a stalled compressed model request reaches the fallback and starts the race
+  -  74 [tablet-chrome] › e2e/reliability.spec.ts:368:1 › corrupt local progress is quarantined and replaced with a safe profile
+  -  75 [tablet-chrome] › e2e/reliability.spec.ts:412:1 › unavailable IndexedDB discloses session mode while a race remains playable
+  -  76 [tablet-chrome] › e2e/reliability.spec.ts:448:1 › session-mode Track Builder restores its unsaved draft and history after Test Ride
+  -  77 [tablet-chrome] › e2e/reliability.spec.ts:497:1 › quota write failure stays visible and retry flushes session settings
+  -  78 [tablet-chrome] › e2e/reliability.spec.ts:545:1 › newer-version open failure preserves seeded data and shows upgrade recovery guidance
+
+  Slow test file: [chromium] › e2e/reliability.spec.ts (6.4m)
+  Consider running tests from slow files in parallel. See: https://playwright.dev/docs/test-parallel
+  65 skipped
+  13 passed (6.8m)
+[WebServer] (node:94779) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[WebServer] (Use `node --trace-warnings ...` to show where the warning was created)
+[WebServer] (node:94781) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[WebServer] (Use `node --trace-warnings ...` to show where the warning was created)
+[WebServer] (node:94782) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[WebServer] (Use `node --trace-warnings ...` to show where the warning was created)
+[WebServer] (node:94783) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[WebServer] (Use `node --trace-warnings ...` to show where the warning was created)
+[WebServer] (node:94826) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[WebServer] (Use `node --trace-warnings ...` to show where the warning was created)
+[WebServer] (node:94908) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[WebServer] (Use `node --trace-warnings ...` to show where the warning was created)
+(node:94946) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:95888) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:95928) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:95976) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:96009) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:96062) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)

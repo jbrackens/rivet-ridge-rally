@@ -9,7 +9,9 @@ import {
 import { KTX2Loader } from "three/examples/jsm/loaders/KTX2Loader.js";
 import { MeshoptDecoder } from "three/examples/jsm/libs/meshopt_decoder.module.js";
 
-export const FESTIVAL_TRAIL_BIKE_URL = "/assets/3d/festival-trail-bike.glb";
+export const HERO_BIKE_RIDER_URL = "/assets/3d/hero-bike-rider.glb";
+export const RIVAL_PACK_URL = "/assets/rivals/rival-pack.glb";
+export const CANYON_KIT_URL = "/assets/canyon/canyon-kit.glb";
 export const BASIS_TRANSCODER_PATH = "/assets/transcoders/basis/";
 
 export interface CompressedAssetLoaderOptions {

@@ -10,7 +10,9 @@
 
 ## High concept
 
-RIVET RIDGE RALLY is a fast, readable 3D arcade motocross game set in a traveling toy-diorama racing festival. Players choose among four marked lanes, manage turbo heat, shape jumps with bike pitch, and read obstacle rhythms at speed. Short races invite immediate retries, while campaign targets, rivals, and a local track editor create long-term mastery.
+RIVET RIDGE RALLY is a fast, readable 3D arcade motocross game set in a traveling, original motocross festival world. Players choose among four marked lanes, manage turbo heat, shape jumps with bike pitch, and read obstacle rhythms at speed. Short races invite immediate retries, while campaign targets, rivals, and a local track editor create long-term mastery.
+
+The revised art target is no longer Roblox-adjacent blocky toy assets. The target is an original, polished, mascot-kart-racer level of charm, material finish, animation readability, colorful track spectacle, and approachable arcade clarity. This is a quality and readability reference, not permission to copy Mario Kart, Nintendo characters, items, UI, track layouts, vehicle silhouettes, iconography, music, sounds, branding, or trade dress.
 
 The game should feel generous enough for a new player to finish a first race and deep enough for an expert to improve lines, turbo timing, landings, and recovery decisions over many attempts.
 
@@ -36,7 +38,7 @@ Crashes and overheating have clear causes, strong audiovisual feedback, and boun
 
 The editor is a complete local creative mode, not an online platform. Tracks can be saved, validated, test-played, and exported as bounded JSON without accounts, public browsing, comments, chat, or public sharing services.
 
-Release safety follows the same honest-local principle. The shell-v30 cache is populated from fresh same-origin responses, stores one freshly fetched index response under both root entry keys, and includes the bundled display fonts; it is discarded if installation leaves a partial current-generation cache. Production smoke binds its runtime commit and browser evidence to every byte recorded by the exact format-2 release manifest, verifies served bytes before and after the journey, separately proves that the served root is the same index on the same credential-free origin, exercises cached Practice while offline, and atomically retains each run under its manifest identity instead of overwriting historical proof. Those latest safeguards are implemented in source but remain `UNVERIFIED` until the paused qualification run resumes.
+Release safety follows the same honest-local principle. The shell-v35 cache is populated from fresh same-origin responses, stores one freshly fetched index response under both root entry keys, and includes the bundled display fonts, `/assets/3d/hero-bike-rider.glb`, `/assets/rivals/rival-pack.glb`, and the Canyon modular GLB; it is discarded if installation leaves a partial current-generation cache. Production smoke binds its runtime commit and browser evidence to every byte recorded by the exact format-2 release manifest, verifies served bytes before and after the journey, separately proves that the served root is the same index on the same credential-free origin, exercises cached Practice while offline, and atomically retains each run under its manifest identity instead of overwriting historical proof. Those latest safeguards are implemented in source but remain `UNVERIFIED` until the paused qualification run resumes.
 
 ## Audience and session shape
 
@@ -48,7 +50,7 @@ Release safety follows the same honest-local principle. The shell-v30 cache is p
 
 ## World and tone
 
-The Rivet Ridge Rally is a colorful festival tour built around compact handcrafted race parks. Oversized track pieces, banners, spectator props, service gantries, cooling equipment, and scenery make each location feel like a physical toy diorama. The tone is playful, energetic, and competitive without hostility.
+The Rivet Ridge Rally is a colorful festival tour built around compact handcrafted race parks. Oversized track pieces, banners, spectator props, service gantries, cooling equipment, and scenery make each location feel like a premium arcade racing playset rather than sparse construction blocks. The tone is playful, energetic, and competitive without hostility.
 
 All names, visuals, layouts, vehicles, riders, icons, music, sound, writing, and promotional material must be original or commercially licensed and recorded in `ASSET_LICENSES.md`.
 
@@ -73,6 +75,9 @@ Three additional polished example tracks must be created with the shipping edito
 - No direct AI interference.
 - Shows current lap, lap and checkpoint splits, final time, personal best, best time, and a visible third-place qualification target. A completed Solo run keeps its current timings visible beside signed comparisons with the standing personal-best lap/split timings; only a faster final time replaces that saved timing set.
 - Beating the third-place target unlocks that track's Rival Main Race.
+- Production targets are calibrated against a clean standard-Ride two-lap reference with human margin rather than an impossible maximum-speed fantasy. Current Solo targets are 190, 208, 224, 239, and 259 seconds in campaign order; tighter values require recorded full-course deterministic qualification.
+
+- Your own fastest stored run for that exact course rides alongside you as a translucent ghost, with a signed gap measured where you are on the track rather than on a shared clock. It is a record, not a rival: it cannot touch you, cannot be finished ahead of or behind in any standing, and changes nothing about qualification. The point is that the target stops being a fixed number and becomes the last version of yourself — which keeps tightening for as long as the player keeps improving, on the courses that already exist.
 
 ### Rival Main Race
 
@@ -85,10 +90,11 @@ Three additional polished example tracks must be created with the shipping edito
 - Available for every unlocked track.
 - Supports learning lines and mechanics without campaign pressure.
 - Provides quick restart and return paths.
+- Carries the personal ghost, because learning a line is exactly where riding against your own best run helps most.
 
 ### Summit mastery
 
-Summit Showdown remains replayable after campaign completion with escalating, clearly disclosed goals or modifiers. Mastery must not rely on hidden rule changes.
+Summit Showdown remains replayable after campaign completion with escalating, clearly disclosed goals or modifiers. Mastery must not rely on hidden rule changes. One shared configuration supplies both the HUD and progression gate: the seven current targets are 257, 255, 253, 251, 249, 248, and 247 seconds while starting heat rises from 35% to 65%.
 
 ## Core riding language
 
@@ -101,6 +107,7 @@ Four clearly marked lanes create discrete, intentional choices. Lane changes are
 - Standard Ride approaches a fixed 62% safe heat ceiling without exceeding it on its own.
 - Turbo provides an obvious speed advantage and continuously adds heat.
 - Turbo can push beyond that safe ceiling into warning and overheat territory.
+- Turbo remains controllable for at least 11 seconds from cold and at least 4 seconds from the normal 62% operating ceiling before lockout.
 - A prominent meter and escalating visual/audio warnings precede overheating; gamepad warning feedback is optional where supported.
 - Overheating forces a short, readable loss-of-control or recovery state until cooling completes.
 - Cooling zones are visible before entry and reduce heat immediately.
@@ -111,6 +118,7 @@ Four clearly marked lanes create discrete, intentional choices. Lane changes are
 - Pulling back raises the front wheel; pushing forward lowers it.
 - Airborne pitch changes trajectory, landing angle, retained speed, and crash risk.
 - Short wheelies clear small bumps; holding them too long becomes unsafe.
+- A controlled grounded wheelie clears a striped barrier but retains only 60% of entry speed; a front-wheel-down barrier hit still causes a crash, for player and rivals alike.
 - Clean two-wheel landings preserve momentum.
 - Bad landings cause a readable crash or meaningful speed penalty.
 
@@ -141,10 +149,10 @@ The interactive tutorial begins paused behind an input-adaptive rider-school map
 6. Hold a controlled wheelie over a bump.
 7. Command nose-up and nose-down airborne pitch, then release toward neutral.
 8. Land nearly level on both wheels.
-9. Read the named striped lane-choice barrier and move to an open lane; an unrelated avoided hazard does not count.
+9. Read the named striped lane-choice barrier and either move to an open lane for full speed or use a controlled wheelie to clear it with heavy speed loss; an unrelated avoided hazard does not count.
 10. Experience mud slowdown.
 11. Experience grass/off-track slowdown and return to the marked dirt.
-12. Hit the final training barrier and hold Recover through a real crash-and-recovery cycle.
+12. Lower the front wheel, hit the final training barrier, and hold Recover through a real crash-and-recovery cycle.
 
 Each riding lesson requires fresh evidence after that lesson becomes active; an earlier lane move, jump input, surface touch, or crash may remain in the recap but cannot clear a later lesson. Multi-part lessons enforce their stated order. A completed lesson freezes the simulation for the 550 ms presentation handoff without discarding held Ride or Turbo input, so the next release-based lesson still requires the player to release the control deliberately.
 
@@ -167,13 +175,16 @@ Two contact-rule drills follow the riding lessons. Prompts and the final six-con
 
 ## Track editor fantasy
 
-Players operate a readable 3D build camera and place lane-aware modules on a four-lane route surface. Checkpoints can shape a smooth local turn and rise; the Builder surface, lane guides, modules, camera, saved thumbnail, and Test Ride must consume the same deterministic centerline. The editor offers at least 19 original modules spanning ramps, bumps, jump chains, mud, cooling, barriers, curves/banks, and a high-risk super jump. Placement preview, duplicate, delete, rename, thumbnail, one-to-nine laps, 50-action undo/redo, confirmation-based clear, validation, save, test play, and a local library are mandatory. If device saving becomes unavailable, a valid draft still launches as an in-memory Test Ride while the editor keeps its session-mode and Export guidance honest.
+Players operate a readable 3D build camera and place lane-aware modules on a four-lane route surface. Checkpoints can shape a smooth local turn and rise; the Builder surface, lane guides, modules, camera, saved thumbnail, and Test Ride must consume the same deterministic centerline. The editor offers at least 19 original modules spanning ramps, bumps, jump chains, mud, cooling, barriers, curves/banks, and a high-risk super jump. Placement preview, duplicate, delete, rename, thumbnail, one-to-nine laps, 50-action undo/redo, confirmation-based clear, validation, save, test play, and a local library are mandatory. Invalid red-preview or keyboard candidates never enter the draft. A keyboard-only rider can choose a module, route-view position, and lane and place it without the canvas. Phone layouts retain Export/Import, inspection/repair controls, validation detail, and live notices rather than hiding core authoring or recovery paths. If device saving becomes unavailable, a valid draft still launches as an in-memory Test Ride while the editor keeps its session-mode and Export guidance honest.
 
 Import/export is intentionally defensive: corrupt, malicious, oversized, incompatible, overlapping, or otherwise invalid JSON is rejected with actionable errors. Imported content never executes code or loads arbitrary network resources.
 
 ## Visual direction
 
-- Chunky, readable low-poly forms and deliberate per-track palettes.
+- Polished, readable, original 3D mascot-racer forms with rounded silhouettes, pleasing proportions, authored surface detail, and deliberate per-track palettes.
+- Avoid Roblox-adjacent block avatars, cube-first bodies, default-engine primitive props, and flat untextured blockiness as a final style.
+- Use the best qualities of family-friendly kart-racer presentation as a quality bar: bold silhouettes, saturated but disciplined color, glossy readable materials, expressive trackside set dressing, lively motion feedback, and clear first-read hazards.
+- Do not copy Mario Kart or Nintendo-controlled expression: no characters, items, logos, UI layout, font treatment, course layouts, vehicle silhouettes, sounds, music, iconography, or recognizable trade dress from those games.
 - Strong hierarchy between dirt, grass, lane paint, mud, cooling gates, hazards, riders, and scenery.
 - Original bikes and riders with silhouettes readable at gameplay distance.
 - Essential HUD only: position, lap, timer, target, heat, and actionable feedback.
@@ -183,14 +194,14 @@ Import/export is intentionally defensive: corrupt, malicious, oversized, incompa
 - Canyon's two unique cooling-gate showcase locations use live bilateral, staffed elevated watchtowers beyond the course fence, with mirrored teal/coral roofs and two, three, or four deck spectators on Low, Medium, or High. The raised silhouettes should make the cyan gate corridor read as a staffed festival venue on both desktop and portrait layouts while preserving the full gate silhouette, lane reads, snowflake cues, and landing sightline; they remain decorative rather than a second hazard or cooling affordance.
 - The dirt color layer, non-color surface relief, and lane-divider geometry remain separate: painted guides stay flat and readable while shallow ruts, clods, and sculpted grass berms catch light without changing bike physics.
 - High-contrast cues belong to the visible route: campaign stripes clear sculpted berms, while custom-course stripes follow authored curves, banks, heights, and rotations and preserve fallback cues wherever an authored strip is buried.
-- Terraced course edges, sculpted lane ridges, and denser theme-specific scenery make the route read as a built festival diorama instead of a road floating through sparse props. Canyon Kickoff and Rider School use a continuous cream/coral/teal modular safety wall with the timber fence behind it; other handcrafted venues retain shorter festival-zone runs, while editor-authored courses omit this straight campaign treatment.
-- `docs/design/concepts/track-builder.png` is the Track Builder composition reference: the live Builder and Test Ride must read as one compact, connected, winding four-lane diorama, with gates, lane guides, modules, camera focus, and elevation attached to the same route rather than independent props on an endless straight.
+- Terraced course edges, sculpted lane ridges, and denser theme-specific scenery make the route read as a premium arcade racing festival course instead of a road floating through sparse props. Canyon Kickoff and Rider School use a continuous cream/coral/teal modular safety wall with the timber fence behind it; other handcrafted venues retain shorter festival-zone runs, while editor-authored courses omit this straight campaign treatment.
+- `docs/design/concepts/track-builder.png` remains a Track Builder composition reference, but the renewed acceptance target should push beyond blocky toy-diorama finish toward a polished, rounded, richly dressed, original 3D racing playset. The live Builder and Test Ride must read as one compact, connected, winding four-lane course with gates, lane guides, modules, camera focus, and elevation attached to the same route rather than independent props on an endless straight.
 - Handcrafted tracks and Rider School open on a code-native four-lane start stencil numbered `1`–`4`; authored Test Rides exclude it so the builder's saved Start Grid remains visually authoritative.
 - Mobile lane/pitch and Ride/Turbo controls use stronger scale, contrast, depth, and separation plus the original rally pictogram set while retaining safe reach, readable Ride/Turbo labels, explicit accessible names, and mirrored layout support.
 - At the 320 CSS-pixel fallback with UI scale at 140%, the steering, throttle, and heat groups must remain in-bounds and non-overlapping in both handed layouts, with 44×44 CSS-pixel minimum touch targets.
 - Avoid generic dashboard cards, default engine UI, excessive gradients, stock-icon misuse, random rounded panels, and visibly temporary meshes.
 
-The desktop and mobile gameplay concepts remain references for composition, hierarchy, richness, rider readability, track depth, and control presence, not pixel-accurate screenshots. The owner rejected the previous blanket acceptance of materially coarser and less-dense output. The post-RC1 rendering changes therefore reopen concept fidelity: they are proposed improvements, not accepted evidence, until renewed side-by-side owner review is recorded.
+The desktop and mobile gameplay concepts remain references for composition, hierarchy, richness, rider readability, track depth, and control presence, not pixel-accurate screenshots. The owner rejected the previous blanket acceptance of materially coarser and less-dense output and has now pivoted the desired finish away from Roblox-style block assets toward a polished, original mascot-kart-racer level of finish. The post-RC1 rendering changes therefore remain proposed improvements, not accepted evidence, until renewed side-by-side owner review is recorded against this updated creative target.
 
 ## Audio direction
 
@@ -213,4 +224,4 @@ Original or properly licensed audio must cover engine load/turbo, landing qualit
 
 ## Creative acceptance bar
 
-The game is not creatively complete when systems merely exist. Each track must be finishable, readable, visually coherent, meaningfully distinct, and accepted against the relevant concept direction; controls must invite mastery; feedback must make mistakes understandable; and every shipped asset must have recorded provenance. Automated screenshot stability cannot substitute for concept-fidelity or first-time-player comprehension review. These criteria require browser playtesting and renewed owner acceptance and cannot be marked complete from this document alone.
+The game is not creatively complete when systems merely exist. Each track must be finishable, readable, visually coherent, meaningfully distinct, and accepted against the updated polished mascot-racer concept direction; controls must invite mastery; feedback must make mistakes understandable; and every shipped asset must have recorded provenance. Automated screenshot stability cannot substitute for concept-fidelity or first-time-player comprehension review. These criteria require browser playtesting and renewed owner acceptance and cannot be marked complete from this document alone.

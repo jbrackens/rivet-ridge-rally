@@ -112,10 +112,18 @@ describe("lane movement", () => {
 });
 
 describe("heat and surfaces", () => {
-  it("heats under turbo, locks controls at maximum heat, and recovers after cooling", () => {
+  it("allows a usable turbo window, then locks controls and recovers after cooling", () => {
     const simulation = new RaceSimulation();
 
+    simulation.advance(11, input({ turbo: true }));
+    expect(simulation.snapshot.bike.overheated).toBe(false);
+    expect(simulation.snapshot.bike.heat).toBeCloseTo(83, 8);
+
     simulation.advance(3, input({ turbo: true }));
+    expect(simulation.snapshot.bike.overheated).toBe(false);
+    expect(simulation.snapshot.bike.heat).toBeCloseTo(95, 8);
+
+    simulation.advance(2, input({ turbo: true }));
     expect(simulation.snapshot.bike.overheated).toBe(true);
     expect(simulation.snapshot.bike.heat).toBeGreaterThan(80);
 
@@ -136,10 +144,11 @@ describe("heat and surfaces", () => {
     expect(simulation.snapshot.bike.heat).toBe(62);
     expect(simulation.snapshot.bike.overheated).toBe(false);
 
-    simulation.advance(0.5, input({ throttle: true, turbo: true }));
-    expect(simulation.snapshot.bike.heat).toBeGreaterThan(62);
+    simulation.advance(4, input({ throttle: true, turbo: true }));
+    expect(simulation.snapshot.bike.heat).toBeCloseTo(86, 8);
+    expect(simulation.snapshot.bike.overheated).toBe(false);
 
-    simulation.advance(2, input({ throttle: true }));
+    simulation.advance(4, input({ throttle: true }));
     expect(simulation.snapshot.bike.heat).toBe(62);
 
     simulation.advance(1, neutralInput);
@@ -147,8 +156,7 @@ describe("heat and surfaces", () => {
   });
 
   it("applies an immediate cooling-zone drop and continued cooling", () => {
-    const simulation = new RaceSimulation();
-    simulation.advance(1, input({ turbo: true }));
+    const simulation = new RaceSimulation({ initialHeat: 50 });
     const heated = simulation.snapshot.bike.heat;
 
     simulation.advance(FIXED_DT, input({ throttle: true }), environment("cooling"));
@@ -329,6 +337,19 @@ describe("crash recovery", () => {
     holding.forceCrash();
     holding.advance(0.8, input({ recover: true }));
     expect(holding.snapshot.bike.phase).toBe("recovering");
+  });
+
+  it("applies retro recovery changes to the live simulation", () => {
+    const simulation = new RaceSimulation();
+    simulation.forceCrash();
+    simulation.setRetroRecovery(true);
+
+    simulation.advance(FIXED_DT, input({ recover: true }));
+    expect(simulation.snapshot.bike.recoveryProgress).toBeGreaterThan(0.16);
+
+    simulation.setRetroRecovery(false);
+    simulation.advance(FIXED_DT, neutralInput);
+    expect(simulation.snapshot.bike.recoveryProgress).toBe(0);
   });
 });
 

@@ -19,6 +19,9 @@ describe("GameEngine initial HUD", () => {
     const emitHud = vi.fn((state: SimulationState) => {
       events.push(`hud:${state.race.totalLaps}`);
     });
+    const captureReplay = vi.fn((state: SimulationState) => {
+      events.push(`replay:${state.race.totalLaps}`);
+    });
 
     class ResizeObserverStub {
       observe = vi.fn();
@@ -47,6 +50,7 @@ describe("GameEngine initial HUD", () => {
       unlockAudio,
       timer: { connect: vi.fn(), reset: vi.fn() },
       simulation,
+      replayRecorder: { capture: captureReplay },
       emitHud,
       animationFrame: 0,
       frame: vi.fn(),
@@ -57,7 +61,9 @@ describe("GameEngine initial HUD", () => {
 
       expect(emitHud).toHaveBeenCalledOnce();
       expect(emitHud).toHaveBeenCalledWith(snapshot);
-      expect(events).toEqual(["hud:7", "frame"]);
+      expect(captureReplay).toHaveBeenCalledOnce();
+      expect(captureReplay).toHaveBeenCalledWith(snapshot);
+      expect(events).toEqual(["replay:7", "hud:7", "frame"]);
     } finally {
       window.removeEventListener("pointerdown", unlockAudio);
       window.removeEventListener("keydown", unlockAudio);

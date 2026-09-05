@@ -1,0 +1,83 @@
+$ npx playwright test e2e/migrations.spec.ts
+startedAt=2026-07-19T13:02:21.321Z
+completedAt=2026-07-19T13:03:03.776Z
+exitCode=0
+
+
+Running 48 tests using 1 worker
+
+  ✓   1 [chromium] › e2e/migrations.spec.ts:324:1 › a fresh v6 profile stores and labels arrow lane defaults (15.2s)
+  ✓   2 [chromium] › e2e/migrations.spec.ts:342:1 › a native v1 profile runs through the v6 migration and preserves custom controls (377ms)
+  ✓   3 [chromium] › e2e/migrations.spec.ts:381:1 › a native v2 profile upgrades to v6 without losing its track, replay, or custom controls (2.1s)
+  ✓   4 [chromium] › e2e/migrations.spec.ts:423:1 › a native v4 profile upgrades a valid version-1 custom track in place (2.2s)
+  ✓   5 [chromium] › e2e/migrations.spec.ts:458:1 › a native v4 center-contained track remains editable until its v2 footprint is repaired (2.1s)
+  ✓   6 [chromium] › e2e/migrations.spec.ts:500:1 › a native v4 profile leaves a future custom-track schema untouched and fails closed (2.2s)
+  ✓   7 [chromium] › e2e/migrations.spec.ts:534:1 › a native v3 profile migrates only the exact legacy A and D lane pair (445ms)
+  ✓   8 [chromium] › e2e/migrations.spec.ts:578:1 › a native v3 profile swaps occupied arrows without resetting unrelated settings (444ms)
+  -   9 [firefox] › e2e/migrations.spec.ts:324:1 › a fresh v6 profile stores and labels arrow lane defaults
+  -  10 [firefox] › e2e/migrations.spec.ts:342:1 › a native v1 profile runs through the v6 migration and preserves custom controls
+  -  11 [firefox] › e2e/migrations.spec.ts:381:1 › a native v2 profile upgrades to v6 without losing its track, replay, or custom controls
+  -  12 [firefox] › e2e/migrations.spec.ts:423:1 › a native v4 profile upgrades a valid version-1 custom track in place
+  -  13 [firefox] › e2e/migrations.spec.ts:458:1 › a native v4 center-contained track remains editable until its v2 footprint is repaired
+  -  14 [firefox] › e2e/migrations.spec.ts:500:1 › a native v4 profile leaves a future custom-track schema untouched and fails closed
+  -  15 [firefox] › e2e/migrations.spec.ts:534:1 › a native v3 profile migrates only the exact legacy A and D lane pair
+  -  16 [firefox] › e2e/migrations.spec.ts:578:1 › a native v3 profile swaps occupied arrows without resetting unrelated settings
+  -  17 [webkit] › e2e/migrations.spec.ts:324:1 › a fresh v6 profile stores and labels arrow lane defaults
+  -  18 [webkit] › e2e/migrations.spec.ts:342:1 › a native v1 profile runs through the v6 migration and preserves custom controls
+  -  19 [webkit] › e2e/migrations.spec.ts:381:1 › a native v2 profile upgrades to v6 without losing its track, replay, or custom controls
+  -  20 [webkit] › e2e/migrations.spec.ts:423:1 › a native v4 profile upgrades a valid version-1 custom track in place
+  -  21 [webkit] › e2e/migrations.spec.ts:458:1 › a native v4 center-contained track remains editable until its v2 footprint is repaired
+  -  22 [webkit] › e2e/migrations.spec.ts:500:1 › a native v4 profile leaves a future custom-track schema untouched and fails closed
+  -  23 [webkit] › e2e/migrations.spec.ts:534:1 › a native v3 profile migrates only the exact legacy A and D lane pair
+  -  24 [webkit] › e2e/migrations.spec.ts:578:1 › a native v3 profile swaps occupied arrows without resetting unrelated settings
+  -  25 [mobile-chrome] › e2e/migrations.spec.ts:324:1 › a fresh v6 profile stores and labels arrow lane defaults
+  -  26 [mobile-chrome] › e2e/migrations.spec.ts:342:1 › a native v1 profile runs through the v6 migration and preserves custom controls
+  -  27 [mobile-chrome] › e2e/migrations.spec.ts:381:1 › a native v2 profile upgrades to v6 without losing its track, replay, or custom controls
+  -  28 [mobile-chrome] › e2e/migrations.spec.ts:423:1 › a native v4 profile upgrades a valid version-1 custom track in place
+  -  29 [mobile-chrome] › e2e/migrations.spec.ts:458:1 › a native v4 center-contained track remains editable until its v2 footprint is repaired
+  -  30 [mobile-chrome] › e2e/migrations.spec.ts:500:1 › a native v4 profile leaves a future custom-track schema untouched and fails closed
+  -  31 [mobile-chrome] › e2e/migrations.spec.ts:534:1 › a native v3 profile migrates only the exact legacy A and D lane pair
+  -  32 [mobile-chrome] › e2e/migrations.spec.ts:578:1 › a native v3 profile swaps occupied arrows without resetting unrelated settings
+  -  33 [mobile-safari] › e2e/migrations.spec.ts:324:1 › a fresh v6 profile stores and labels arrow lane defaults
+  -  34 [mobile-safari] › e2e/migrations.spec.ts:342:1 › a native v1 profile runs through the v6 migration and preserves custom controls
+  -  35 [mobile-safari] › e2e/migrations.spec.ts:381:1 › a native v2 profile upgrades to v6 without losing its track, replay, or custom controls
+  -  36 [mobile-safari] › e2e/migrations.spec.ts:423:1 › a native v4 profile upgrades a valid version-1 custom track in place
+  -  37 [mobile-safari] › e2e/migrations.spec.ts:458:1 › a native v4 center-contained track remains editable until its v2 footprint is repaired
+  -  38 [mobile-safari] › e2e/migrations.spec.ts:500:1 › a native v4 profile leaves a future custom-track schema untouched and fails closed
+  -  39 [mobile-safari] › e2e/migrations.spec.ts:534:1 › a native v3 profile migrates only the exact legacy A and D lane pair
+  -  40 [mobile-safari] › e2e/migrations.spec.ts:578:1 › a native v3 profile swaps occupied arrows without resetting unrelated settings
+  -  41 [tablet-chrome] › e2e/migrations.spec.ts:324:1 › a fresh v6 profile stores and labels arrow lane defaults
+  -  42 [tablet-chrome] › e2e/migrations.spec.ts:342:1 › a native v1 profile runs through the v6 migration and preserves custom controls
+  -  43 [tablet-chrome] › e2e/migrations.spec.ts:381:1 › a native v2 profile upgrades to v6 without losing its track, replay, or custom controls
+  -  44 [tablet-chrome] › e2e/migrations.spec.ts:423:1 › a native v4 profile upgrades a valid version-1 custom track in place
+  -  45 [tablet-chrome] › e2e/migrations.spec.ts:458:1 › a native v4 center-contained track remains editable until its v2 footprint is repaired
+  -  46 [tablet-chrome] › e2e/migrations.spec.ts:500:1 › a native v4 profile leaves a future custom-track schema untouched and fails closed
+  -  47 [tablet-chrome] › e2e/migrations.spec.ts:534:1 › a native v3 profile migrates only the exact legacy A and D lane pair
+  -  48 [tablet-chrome] › e2e/migrations.spec.ts:578:1 › a native v3 profile swaps occupied arrows without resetting unrelated settings
+
+  40 skipped
+  8 passed (41.9s)
+[WebServer] (node:91906) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[WebServer] (Use `node --trace-warnings ...` to show where the warning was created)
+[WebServer] (node:91908) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[WebServer] (Use `node --trace-warnings ...` to show where the warning was created)
+[WebServer] (node:91909) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[WebServer] (Use `node --trace-warnings ...` to show where the warning was created)
+[WebServer] (node:91910) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[WebServer] (Use `node --trace-warnings ...` to show where the warning was created)
+[WebServer] (node:91953) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[WebServer] (Use `node --trace-warnings ...` to show where the warning was created)
+[WebServer] (node:92036) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[WebServer] (Use `node --trace-warnings ...` to show where the warning was created)
+(node:92080) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:92150) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:92189) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:92228) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:92250) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:92281) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)

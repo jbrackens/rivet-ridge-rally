@@ -29,7 +29,8 @@ import {
 const DEFAULT_PRODUCTION_URL = "http://127.0.0.1:4173";
 const DEFAULT_RELEASE_MANIFEST = "artifacts/release-manifest.json";
 const SERVICE_WORKER_READY_TIMEOUT_MS = 20_000;
-const EXPECTED_OFFLINE_CACHE_NAME = "rivet-ridge-rally-shell-v30";
+const EXPECTED_OFFLINE_CACHE_NAME = "rivet-ridge-rally-shell-v35";
+const SMOKE_VIEWPORT = Object.freeze({ width: 1_440, height: 900 });
 const argumentsList = process.argv.slice(2);
 const baseURL = normalizeProductionBaseURL(
   readOption(argumentsList, "base-url", DEFAULT_PRODUCTION_URL),
@@ -128,15 +129,17 @@ try {
     aggregateSha256: loadedManifest.manifest.aggregateSha256,
     fileCount: loadedManifest.manifest.fileCount,
     totalBytes: loadedManifest.manifest.totalBytes,
+    totalGzipBytes: loadedManifest.manifest.totalGzipBytes,
+    compression: loadedManifest.manifest.compression,
     servedBefore: null,
     servedAfter: null,
   };
   releaseArtifact.servedBefore = await verifyServedRelease(loadedManifest.manifest, baseURL);
   steps.push("format-2-artifact-binding");
 
-  browser = await chromium.launch({ channel: "chrome", headless: true });
+  browser = await chromium.launch({ channel: "chrome", headless: true, args: ["--mute-audio"] });
   browserVersion = browser.version();
-  context = await browser.newContext({ viewport: { width: 1440, height: 900 } });
+  context = await browser.newContext({ viewport: SMOKE_VIEWPORT });
   const page = await context.newPage();
 
   page.on("console", (message) => {
@@ -166,12 +169,16 @@ try {
   if (await skipTraining.isVisible().catch(() => false)) await skipTraining.click();
   const ride = await requireOne(page.getByRole("button", { name: "Ride", exact: true }), "Title Ride button");
   await ride.waitFor({ state: "visible", timeout: 15_000 });
-  runtime = await page.evaluate((expectedVersion) => ({
-    title: document.title,
-    qaApiPresent: Object.prototype.hasOwnProperty.call(window, "__RRR_QA__"),
-    versionPresent: (document.body.textContent ?? "").includes(`v${expectedVersion}`),
-    build: window.__RRR_BUILD__ ?? null,
-  }), releaseArtifact.version);
+  runtime = await page.evaluate((expectedVersion) => {
+    const versionPresent = (document.body.textContent ?? "").includes(`v${expectedVersion}`);
+    return {
+      title: document.title,
+      qaApiPresent: Object.prototype.hasOwnProperty.call(window, "__RRR_QA__"),
+      version: versionPresent ? expectedVersion : null,
+      versionPresent,
+      build: window.__RRR_BUILD__ ?? null,
+    };
+  }, releaseArtifact.version);
   if (
     runtime.title !== "Rivet Ridge Rally"
     || runtime.qaApiPresent
@@ -277,7 +284,7 @@ const passed = smokeError === null
   && offlineReloadPassed
   && offlinePracticeRacePassed;
 const evidence = {
-  schemaVersion: 4,
+  schemaVersion: 5,
   kind: "production-smoke",
   createdAt: new Date().toISOString(),
   run: {
@@ -287,7 +294,13 @@ const evidence = {
   },
   baseURL,
   releaseArtifact,
-  browser: { name: "Google Chrome", version: browserVersion, headless: true },
+  browser: {
+    name: "Google Chrome",
+    channel: "chrome",
+    version: browserVersion,
+    headless: true,
+    viewport: SMOKE_VIEWPORT,
+  },
   runtime,
   steps,
   serviceWorkerControlled,

@@ -1,4 +1,4 @@
-export { RaceSimulation } from "./simulation";
+export { BIKE_PERFORMANCE_LIMITS, RaceSimulation } from "./simulation";
 export {
   DIRT_ENVIRONMENT,
   FIXED_DT,

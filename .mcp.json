@@ -1,0 +1,16 @@
+{
+  "mcpServers": {
+    "playwright": {
+      "command": "npx",
+      "args": ["--no-install", "playwright-mcp"]
+    },
+    "chrome-devtools": {
+      "command": "npx",
+      "args": ["--no-install", "chrome-devtools-mcp"]
+    },
+    "lighthouse": {
+      "command": "npx",
+      "args": ["--no-install", "lighthouse-mcp-server"]
+    }
+  }
+}
