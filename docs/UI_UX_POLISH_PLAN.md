@@ -1,5 +1,8 @@
 # UI/UX Polish — Strategy & Execution Plan
 
+> **STATUS 2026-09-06 — COMPLETE.** Every row in Waves 1–4 is marked Done, so this is a record of finished work, not the forward plan it still reads as.
+> The Lighthouse scores in row 4.4 are a 2026-07-20 measurement, not a current benchmark — re-measure before quoting them, and note the render overhaul of 2026-08-30 → 2026-09-05 landed after every row here.
+
 **Date:** 2026-07-18 · **Owner gate:** all visual changes re-verified through the repo's own
 visual harness; baselines only change via deliberate `npm run visual:promote:canyon` /
 promote flow, never silently.

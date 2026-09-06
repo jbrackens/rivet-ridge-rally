@@ -1,5 +1,8 @@
 # Handoff to Claude Fable — Rivet Ridge Rally RC2 Closure
 
+> **STATUS 2026-09-06 — SUPERSEDED.** This calls itself the durable operating brief, active across milestones, but it was prepared 2026-07-25 and never revised; its art target — an original "mascot-kart-racer level of charm" — was replaced by the owner brief of 2026-08-30.
+> Use `docs/design/GRAPHICS_EVOLUTION_PLAN.md` as the current art direction and the record of the open blocker (§10). The non-art operating rules below still describe how this project works.
+
 Prepared: 2026-07-25
 Project folder: `/Users/john/Sandbox/Rivet Ridge Rally`
 Repository: `https://github.com/jbrackens/rivet-ridge-rally.git`

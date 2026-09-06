@@ -1,5 +1,9 @@
 # RIVET RIDGE RALLY — Launch Readiness
 
+> **STATUS 2026-09-06 — STALE IN PART.** This document was last updated 2026-07-27; 31 commits have landed since, including the render overhaul of 2026-08-30 → 2026-09-05.
+> Three statements below are no longer true: it names `v1.0.0-rc.2` as the candidate, but `package.json` now reads `1.0.0-rc.3`; it asserts "Zero product defects now outstanding across all six Playwright projects", but `QA_REPORT.md` — which this file names as its own authority — records an untouched CRITICAL fairness defect; and it quotes pixel-diff figures for four visual baselines that were deleted 2026-07-28 and never re-promoted.
+> The current blocker is not an owner signature. It is the load-sensitive scene-render flicker recorded in `docs/design/GRAPHICS_EVOLUTION_PLAN.md` §10; read that section before acting on any gate below.
+
 # NOT READY
 
 > ## Reconciliation notice — 2026-07-25 at `bb10ce4448bc3b4036ba832382c57b7086747400`

@@ -1,5 +1,8 @@
 # Owner Supply List — What Only You Can Provide
 
+> **STATUS 2026-09-06 — SUPERSEDED.** Do not action §1 as written: the package it sends you to, `docs/OWNER_VISUAL_REVIEW_2026-07-27.md`, is itself marked "SUPERSEDED — DO NOT REVIEW YET. RECAPTURE REQUIRED FIRST", and the single-Canyon `npm run visual:promote:canyon` flow it names has been retired.
+> Visual acceptance is not currently waiting on you. Read `docs/design/GRAPHICS_EVOLUTION_PLAN.md` §10 for the engine defect that blocks a clean recapture; the non-visual items below (licence, contact channels, and the rest) are still accurate and still yours.
+
 **Prepared:** 2026-07-27
 **Purpose:** every remaining release blocker that cannot be closed by engineering work, stated precisely enough to act on. Gates 4, 7, 8, 9, 11 and 14 of `docs/RC2_REMAINING_GATES_CHECKLIST.md`.
 

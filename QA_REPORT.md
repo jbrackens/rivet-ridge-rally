@@ -1,5 +1,8 @@
 # RIVET RIDGE RALLY — QA Report
 
+> **STATUS 2026-09-06 — STALE IN PART.** The header block only: it still gave a report date of 2026-07-17 and a milestone of `1.0.0-rc.2`, though the body carries current sections through 2026-08-29 and the candidate is now `1.0.0-rc.3`. Both header fields are corrected in place.
+> The body below is current and authoritative — including the untouched CRITICAL fairness finding in §10b/§10c, which other documents in this repo still contradict.
+
 > ## Reconciliation notice — 2026-07-25 at `bb10ce4448bc3b4036ba832382c57b7086747400`
 >
 > A reconciliation pass against current source found stale statements in this report. Full evidence: `docs/RC2_RECONCILIATION_2026-07-25.md`. **No historical result below has been deleted, altered, or relabelled**; each remains valid for the exact bytes and scope it names.
@@ -22,9 +25,9 @@
 >
 > **Current-source `DIAGNOSTIC` evidence at `bb10ce4`, clean tree, pinned toolchain:** `assets:verify`, `typecheck`, `lint`, `npm test` (456), `audit:release-scope` (131 files / 14,916,760 bytes / aggregate `ceff8bedb6b88393786ddfafac55b8cb395642b37ba014dc9c103ecada0fe3b7` / zero findings), and `VITE_QA_MODE=0 npm run build` all pass. This does not qualify a frozen candidate and is not owner, manual, accessibility, or legal approval. **Release decision remains NOT READY.**
 
-**Report date:** 2026-07-17; reconciled 2026-07-25
+**Report date:** 2026-07-17; reconciled 2026-07-25; body current through 2026-08-29
 
-**Milestone:** `1.0.0-rc.2` working-candidate hardening
+**Milestone:** `1.0.0-rc.3` working-candidate hardening
 
 **Current source:** annotated `v1.0.0-rc.2` candidate tag at `2b4069538c242da37c8c43d6581e097149fa1994`, with an evidence-only branch continuation after the product tag — **stale; the continuation included product-byte changes. See the reconciliation notice above.**
 

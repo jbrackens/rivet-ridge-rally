@@ -1,5 +1,8 @@
 # Owner Visual Review Package — 2026-08-09 (rc.3)
 
+> **STATUS 2026-09-06 — SUPERSEDED.** The "READY FOR OWNER REVIEW" status below no longer holds: the default look was replaced after these frames were captured at `16951c9` — cine-night grade became the default 2026-09-01, per-venue sky IBL 09-02, height fog 09-03, exposure retune 09-05.
+> Reviewing these frames would approve a look that no longer ships. Recapture against current source before any owner review, and read `docs/design/GRAPHICS_EVOLUTION_PLAN.md` §10 for why the capture itself is currently blocked.
+
 **Gate:** 4 of `docs/RC2_REMAINING_GATES_CHECKLIST.md` (owner visual acceptance).
 **Status:** **READY FOR OWNER REVIEW.** Nothing here is acceptance; no baseline has been
 promoted. This package supersedes `docs/OWNER_VISUAL_REVIEW_2026-07-27.md` (retained as

@@ -1,5 +1,8 @@
 # Rivet Ridge Rally Toolchain and MCP Inventory
 
+> **STATUS 2026-09-06 — STALE IN PART.** Three facts recorded here had drifted and are corrected in place: the graphics row claimed `GameEngine.ts` uses Three.js `RoomEnvironment` (removed by commit `8b116f8` for per-venue skies), the dependency audit reported 24 vulnerabilities (now 11), and Chrome was listed as `150.0.7871.129` (installed: `152.0.7977.76`).
+> The version pins — Node `26.4.0`, npm `11.17.0`, and the TypeScript alias — are still correct and unchanged. Re-verify any other recorded version before relying on it.
+
 Recorded: 2026-07-25
 Project folder: `/Users/john/Sandbox/Rivet Ridge Rally`
 Repository: `https://github.com/jbrackens/rivet-ridge-rally.git`
@@ -40,11 +43,11 @@ export PATH="/opt/homebrew/bin:$PATH"
 
 ### Dependency-audit status (recorded 2026-07-25)
 
-`npm run audit` currently **fails** at `bb10ce4` with 24 vulnerabilities (18 moderate, 6 high). Every affected package is a devDependency and none reaches the shipped browser runtime: `brace-expansion`/`minimatch` and the `@sentry/node` + `@opentelemetry/*` cluster arrive via `@danielsogl/lighthouse-mcp` and `chrome-devtools-mcp`; `sharp`/libvips arrives via `@gltf-transform/functions` in the asset optimizer. The `sharp` remediation is breaking. Details and options in `docs/RC2_RECONCILIATION_2026-07-25.md` §5; tracked as row 15 of `docs/RC2_REMAINING_GATES_CHECKLIST.md`.
+`npm run audit` currently **fails** with 11 vulnerabilities (3 moderate, 8 high) as re-run on 2026-09-06; the 2026-07-25 reading at `bb10ce4` was 24 (18 moderate, 6 high). Every affected package is a devDependency and none reaches the shipped browser runtime: `brace-expansion`/`minimatch` and the `@sentry/node` + `@opentelemetry/*` cluster arrive via `@danielsogl/lighthouse-mcp` and `chrome-devtools-mcp`; `sharp`/libvips arrives via `@gltf-transform/functions` in the asset optimizer. The `sharp` remediation is breaking. Details and options in `docs/RC2_RECONCILIATION_2026-07-25.md` §5; tracked as row 15 of `docs/RC2_REMAINING_GATES_CHECKLIST.md`.
 | Git | Apple Git `2.50.1` at `/usr/bin/git` | Source control, release provenance, tags, branches, and review history. |
 | GitHub CLI | `gh 2.94.0` at `/opt/homebrew/bin/gh` | GitHub authentication, remote status, pull request checks, and push/PR workflow support. |
 | Blender | `4.5.11 LTS` at `/opt/homebrew/bin/blender` and `/Applications/Blender.app/Contents/MacOS/Blender` | Authors the original 3D assets: hero bike/rider, rival pack, and Canyon kit source `.blend` and raw GLB outputs. |
-| Google Chrome | `150.0.7871.129` at `/Applications/Google Chrome.app` | Real-browser smoke, service-worker, offline, performance, and visual/debug validation. |
+| Google Chrome | `152.0.7977.76` at `/Applications/Google Chrome.app` | Real-browser smoke, service-worker, offline, performance, and visual/debug validation. |
 | Python 3 | `/usr/bin/python3` | Supports Blender Python authoring scripts and local utility scripting. |
 
 ## Runtime libraries
@@ -98,7 +101,7 @@ This table separates tools that are already active in the repository from tools 
 | 2 | [Material Maker](https://github.com/RodZill4/material-maker) | Consistent dirt, mud, rubber, painted metal, rock, grass, and track-surface PBR materials. | MIT | Planned/recommended. Not verified as installed and not currently a package/runtime dependency. | Adopt for the next material/texture pass. |
 | 3 | [Krita](https://krita.org/en/about/license/) | Concept paintovers, liveries, decals, signs, VFX sprites, UI art, and color keys. | GPL; created artwork remains project-owned. | Planned/recommended. Not verified as installed and not currently required by the checked-in asset pipeline. | Adopt for concept/art-direction and texture-support work. |
 | 4 | [glTF Transform](https://github.com/donmccurdy/glTF-Transform), [meshoptimizer](https://github.com/zeux/meshoptimizer), and KTX2 | Optimize Blender exports, generate LODs, compress geometry/textures, and validate assets. | MIT / Apache-family components depending on package. | Current and verified. glTF Transform, meshoptimizer, glTF validator, KTX2 encoder, and Basis runtime support are pinned in the repo. | Already present; extend the pipeline as authored content grows. |
-| 5 | [Three.js PMREM / environment lighting](https://threejs.org/docs/pages/MeshStandardMaterial.html) | Real ambient/specular response across PBR materials instead of hemisphere/direct light alone. | MIT | Current and verified. `GameEngine.ts` uses Three.js `RoomEnvironment` and `PMREMGenerator`. | First runtime upgrade; already active as the baseline PBR lighting path. |
+| 5 | [Three.js PMREM / environment lighting](https://threejs.org/docs/pages/MeshStandardMaterial.html) | Real ambient/specular response across PBR materials instead of hemisphere/direct light alone. | MIT | Current and verified. `GameEngine.ts` uses Three.js `PMREMGenerator`; `RoomEnvironment` was removed by commit `8b116f8` in favour of per-venue skies (`src/game/engine/render/venueSky.ts`). | First runtime upgrade; already active as the baseline PBR lighting path. |
 | 6 | [pmndrs/postprocessing](https://github.com/pmndrs/postprocessing) | Subtle AO, selective emissive bloom, SMAA, and concept-matched LUT/color grading. | Zlib | Planned. Not currently installed in `package.json` and not wired into the renderer. | Adopt after IBL/material baseline is accepted. Treat as polish, not a substitute for better authored assets. |
 | 7 | [three.quarks](https://github.com/Alchemist0823/three.quarks) | Batched dust, exhaust, impact dirt, cooling mist, sparks, finish effects, and celebratory particles. | MIT | Planned pilot. Not currently installed in `package.json`; current dust/VFX are custom runtime effects. | Pilot after core art and performance budgets are stable. |
 | 8 | [Blockbench](https://github.com/JannisX11/blockbench) | Rapid chunky props, fencing, bleachers, crates, signs, and low-poly set dressing. | GPL-3.0; created assets remain project-owned. | Optional/recommended. Not verified as installed and not part of the current hero/Canyon/rival pipeline. | Useful selectively; avoid making the game look voxel/Minecraft-like. |

@@ -1,5 +1,8 @@
 # Release attestation contract
 
+> **STATUS 2026-09-06 — STALE IN PART.** This contract reads as live but is entirely bound to `1.0.0-rc.2` — 32 mentions, a schema example pinned to `1.0.0-rc.2`, and the goal of an `attestation/v1.0.0-rc.2` tag — while the working candidate is now `1.0.0-rc.3`.
+> The mechanics described below are still correct; only the version binding is stale. Read every `rc.2` reference as `rc.3` and confirm the candidate identity against `docs/OPERATIONS.md` before generating an attestation.
+
 ## Status
 
 Schema version 3 is implemented by `scripts/release-attestation.mjs`. The local annotated `v1.0.0-rc.2` product tag now points to `2b4069538c242da37c8c43d6581e097149fa1994`, tag object `19d9fd992bac6e3e356a7ff871fea966dbfb456b`. The current evidence branch contains a format-2 manifest, manifest-bound production/offline smoke, headed local performance, and full 30-minute headed Rival soak for that product tag, as recorded in `QA_REPORT.md` and `LAUNCH_READINESS.md`. All 71 release-attestation fixtures pass within the 452-check `npm test` command: 302 Vitest, 45 release-manifest, 71 release-attestation, and 34 production-smoke/service-worker/release-scope checks.
