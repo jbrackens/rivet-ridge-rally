@@ -51,6 +51,7 @@ interface CalibrationEntrant {
   recoveryDelaySeconds: number;
   lastObstacleKey: string;
   finishTimeMs?: number;
+  overheated: boolean;
 }
 
 function positiveModulo(value: number, modulus: number): number {
@@ -116,6 +117,7 @@ function createCalibrationField(): CalibrationEntrant[] {
     routeTimerSeconds: index * 0.1,
     recoveryDelaySeconds: 0,
     lastObstacleKey: "",
+    overheated: false,
   }));
 }
 
@@ -212,6 +214,7 @@ function stepCalibrationEntrant(
   if (finishTimeMs !== undefined) entrant.finishTimeMs = finishTimeMs;
 
   const after = afterState.bike;
+  entrant.overheated ||= after.overheated;
   if (bike.phase !== "crashed" && after.phase === "crashed") {
     entrant.recoveryDelaySeconds = profile.recoveryDelaySeconds;
   } else if (after.phase === "grounded" && bike.phase === "recovering") {
@@ -240,6 +243,7 @@ function stepCalibrationEntrant(
 function classifyCalibrationRace(track: TrackDefinition, difficulty: Difficulty): {
   readonly aiTimes: readonly number[];
   readonly classification: readonly { name: string; timeMs: number; isPlayer: boolean }[];
+  readonly overheatedRiders: readonly string[];
 } {
   const field = createCalibrationField();
   const representativePlayerMs = track.parTimeMs;
@@ -270,8 +274,11 @@ function classifyCalibrationRace(track: TrackDefinition, difficulty: Difficulty)
     })),
     { name: "You", timeMs: representativePlayerMs, isPlayer: true },
   ].sort((left, right) => left.timeMs - right.timeMs);
+  const overheatedRiders = field
+    .filter((entrant) => entrant.overheated)
+    .map((entrant) => entrant.name);
 
-  return { aiTimes, classification };
+  return { aiTimes, classification, overheatedRiders };
 }
 
 function obstacle(
@@ -610,8 +617,12 @@ describe("shared rider simulation contract", () => {
     for (const difficulty of ["rookie", "rider", "ace"] as const) {
       const allAiTimes: number[] = [];
       for (const track of TRACKS) {
-        const { aiTimes, classification } = classifyCalibrationRace(track, difficulty);
+        const { aiTimes, classification, overheatedRiders } = classifyCalibrationRace(track, difficulty);
         allAiTimes.push(...aiTimes);
+
+        // The overheat stall length cannot move Rival classification while no
+        // AI heat limit lets a rider reach it.
+        expect(overheatedRiders, `${difficulty} ${track.name} AI overheat stalls`).toEqual([]);
 
         expect(classification, `${difficulty} ${track.name} field size`).toHaveLength(6);
         expect(classification.filter((entry) => entry.isPlayer), `${difficulty} ${track.name} player row`).toHaveLength(1);

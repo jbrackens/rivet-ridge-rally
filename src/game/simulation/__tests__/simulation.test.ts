@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   FIXED_DT,
   LANE_POSITIONS,
+  OVERHEAT_STALL_SECONDS,
   RaceSimulation,
   type SimulationEnvironment,
   type SimulationInput,
@@ -135,6 +136,79 @@ describe("heat and surfaces", () => {
     simulation.advance(4, neutralInput);
     expect(simulation.snapshot.bike.heat).toBeLessThanOrEqual(35);
     expect(simulation.snapshot.bike.overheated).toBe(false);
+  });
+
+  it("stalls an overheated engine for exactly 3.5 seconds with acceleration and control cut", () => {
+    expect(OVERHEAT_STALL_SECONDS).toBe(3.5);
+    const stallSteps = Math.round(OVERHEAT_STALL_SECONDS / FIXED_DT);
+    const simulation = new RaceSimulation();
+    const heldInput = input({ throttle: true, turbo: true, pitch: 1 });
+
+    runUntil(
+      simulation,
+      () => simulation.snapshot.bike.overheated,
+      input({ throttle: true, turbo: true }),
+      60 * 20,
+    );
+    const firstStalledStep = simulation.snapshot.stepCount;
+    expect(simulation.snapshot.bike.heat).toBe(100);
+
+    let previousSpeed = simulation.snapshot.bike.speed;
+    let laneCommand: -1 | 0 | 1 = 1;
+    for (let stalled = 1; stalled < stallSteps; stalled += 1) {
+      laneCommand = laneCommand === 1 ? 0 : 1;
+      simulation.advance(FIXED_DT, { ...heldInput, laneChange: laneCommand });
+      const { bike } = simulation.snapshot;
+      expect(bike.overheated).toBe(true);
+      expect(bike.speed).toBeLessThanOrEqual(previousSpeed);
+      expect(bike.lane).toBe(1);
+      expect(bike.pitch).toBeLessThanOrEqual(0.001);
+      previousSpeed = bike.speed;
+    }
+    expect(simulation.snapshot.stepCount - firstStalledStep).toBe(stallSteps - 1);
+    expect(simulation.snapshot.bike.speed).toBe(0);
+
+    simulation.advance(FIXED_DT, heldInput);
+    const released = simulation.snapshot.bike;
+    expect(released.overheated).toBe(false);
+    expect(released.heat).toBeCloseTo(30, 8);
+    expect(released.speed).toBeGreaterThan(0);
+  });
+
+  it("keeps the full stall when a cooling gate drops heat during it", () => {
+    const stallSteps = Math.round(OVERHEAT_STALL_SECONDS / FIXED_DT);
+    const simulation = new RaceSimulation();
+
+    runUntil(simulation, () => simulation.snapshot.bike.overheated, input({ turbo: true }), 60 * 20);
+    simulation.advance(FIXED_DT, input({ throttle: true }), environment("cooling"));
+    expect(simulation.snapshot.bike.heat).toBeLessThan(100 - 18);
+
+    for (let stalled = 2; stalled < stallSteps; stalled += 1) {
+      simulation.advance(FIXED_DT, input({ throttle: true }), environment("cooling"));
+      expect(simulation.snapshot.bike.overheated).toBe(true);
+    }
+    expect(simulation.snapshot.bike.heat).toBe(0);
+
+    simulation.advance(FIXED_DT, input({ throttle: true }), environment("cooling"));
+    expect(simulation.snapshot.bike.overheated).toBe(false);
+  });
+
+  it("stalls identically for equivalent chunking and clears a stall on reset", () => {
+    const oneCall = new RaceSimulation();
+    const manyFrames = new RaceSimulation();
+    const heldInput = input({ throttle: true, turbo: true });
+
+    oneCall.advance(17, heldInput);
+    for (let frame = 0; frame < 17 * 120; frame += 1) {
+      manyFrames.advance(1 / 120, heldInput);
+    }
+    expect(oneCall.snapshot.bike.overheated).toBe(true);
+    expect(oneCall.snapshot).toEqual(manyFrames.snapshot);
+
+    oneCall.reset();
+    expect(oneCall.snapshot.bike.overheated).toBe(false);
+    oneCall.advance(17, heldInput);
+    expect(oneCall.snapshot).toEqual(manyFrames.snapshot);
   });
 
   it("builds standard throttle to a safe heat ceiling while preserving cooling", () => {

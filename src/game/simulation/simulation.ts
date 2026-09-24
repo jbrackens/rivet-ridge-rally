@@ -22,6 +22,13 @@ export const BIKE_PERFORMANCE_LIMITS = Object.freeze({
   turboAcceleration: 23,
 });
 
+/**
+ * An overheat stalls the engine for exactly this long on the fixed clock. A
+ * cooling gate still drops heat during the stall but cannot shorten it.
+ */
+export const OVERHEAT_STALL_SECONDS = 3.5;
+const OVERHEAT_STALL_STEPS = Math.round(OVERHEAT_STALL_SECONDS / FIXED_DT);
+
 const PHYSICS = Object.freeze({
   standardSpeed: BIKE_PERFORMANCE_LIMITS.standardSpeed,
   turboSpeed: BIKE_PERFORMANCE_LIMITS.turboSpeed,
@@ -40,7 +47,6 @@ const PHYSICS = Object.freeze({
   coolingZonePerSecond: 80,
   coolingZoneEntryDrop: 18,
   maximumHeat: 100,
-  overheatRecoveryHeat: 35,
   gravity: 9.8,
   defaultRampImpulse: 8,
   minimumRampSpeed: 4,
@@ -138,6 +144,7 @@ export class RaceSimulation {
   private laneLatch: LaneChange = 0;
   private previousSurface: SurfaceKind = "dirt";
   private wheelieSeconds = 0;
+  private overheatSteps = 0;
   private recoverLatch = false;
 
   constructor(options: SimulationOptions = {}) {
@@ -201,6 +208,7 @@ export class RaceSimulation {
     this.laneLatch = 0;
     this.previousSurface = "dirt";
     this.wheelieSeconds = 0;
+    this.overheatSteps = 0;
     this.recoverLatch = false;
   }
 
@@ -395,10 +403,17 @@ export class RaceSimulation {
 
     bike.heat = clamp(bike.heat, 0, PHYSICS.maximumHeat);
 
+    // The step that reaches maximum heat is the first stalled step; control
+    // returns on the step after OVERHEAT_STALL_STEPS stalled steps.
     if (!bike.overheated && bike.heat >= PHYSICS.maximumHeat) {
       bike.overheated = true;
-    } else if (bike.overheated && bike.heat <= PHYSICS.overheatRecoveryHeat) {
-      bike.overheated = false;
+      this.overheatSteps = 0;
+    } else if (bike.overheated) {
+      this.overheatSteps += 1;
+      if (this.overheatSteps >= OVERHEAT_STALL_STEPS) {
+        bike.overheated = false;
+        this.overheatSteps = 0;
+      }
     }
   }
 

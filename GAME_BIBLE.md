@@ -109,7 +109,7 @@ Four clearly marked lanes create discrete, intentional choices. Lane changes are
 - Turbo can push beyond that safe ceiling into warning and overheat territory.
 - Turbo remains controllable for at least 11 seconds from cold and at least 4 seconds from the normal 62% operating ceiling before lockout.
 - A prominent meter and escalating visual/audio warnings precede overheating; gamepad warning feedback is optional where supported.
-- Overheating forces a short, readable loss-of-control or recovery state until cooling completes.
+- Overheating stalls the engine for a fixed 3.5 seconds: Ride and Turbo are cut and the bike coasts while a thick cloud of dark smoke and embers pours from the tailpipe. A cooling gate can drain heat during the stall but cannot cut it short.
 - Cooling zones are visible before entry and reduce heat immediately.
 - Turbo before ramps and hazards must offer a tactical advantage rather than a cosmetic speed effect.
 
@@ -121,6 +121,7 @@ Four clearly marked lanes create discrete, intentional choices. Lane changes are
 - A controlled grounded wheelie clears a striped barrier but retains only 60% of entry speed; a front-wheel-down barrier hit still causes a crash, for player and rivals alike.
 - Clean two-wheel landings preserve momentum.
 - Bad landings cause a readable crash or meaningful speed penalty.
+- A crash throws the rider clear: the rider tumbles down the course while the bike slides on its side, and holding Recover brings rider and bike back together where the bike went down.
 
 ### Terrain and recovery
 

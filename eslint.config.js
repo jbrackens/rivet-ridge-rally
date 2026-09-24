@@ -59,6 +59,7 @@ export default defineConfig([
       'src/game/content/**/*.ts',
       'src/game/replay/**/*.ts',
       'src/game/engine/aiRules.ts',
+      'src/game/engine/crashRagdoll.ts',
       'src/game/engine/obstacleContacts.ts',
       'src/game/engine/racePresentation.ts',
       'src/game/engine/tutorialLessonGate.ts',

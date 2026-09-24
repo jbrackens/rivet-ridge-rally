@@ -395,7 +395,7 @@ test("captions and critical race state have visible non-color labels", async ({ 
   await expect(heat).toHaveAccessibleName(/Heat \d+ percent/);
   await expect(page.locator(".caption-cue")).toContainText(/Heat critical|Overheated/);
   await expect(page.locator(".race-hint")).toHaveText(
-    /Release turbo or line up a cyan cooling gate|Release throttle and coast until controls return|Controls return when heat cools to 35%/,
+    /Release turbo or line up a cyan cooling gate|Release throttle and coast until controls return|Engine stalled — controls return after 3\.5 s/,
   );
   await page.evaluate(() => {
     for (const code of ["KeyW", "ShiftLeft", "Space"]) {

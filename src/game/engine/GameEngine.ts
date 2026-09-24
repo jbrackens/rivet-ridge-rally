@@ -52,6 +52,7 @@ import {
 import {
   FIXED_DT,
   LANE_POSITIONS,
+  OVERHEAT_STALL_SECONDS,
   RaceSimulation,
   type BikeState,
   type BikePhase,
@@ -85,6 +86,14 @@ import {
   CoursePresentationRoute,
   createCourseRibbonGeometry,
 } from "./CoursePresentationRoute";
+import {
+  advanceCrashRagdoll,
+  createCrashRagdoll,
+  resolveCrashRagdollWeight,
+  type CrashRagdollBody,
+  type CrashRagdollRotation,
+  type CrashRagdollState,
+} from "./crashRagdoll";
 import {
   resolveObstacleContacts,
   type ObstacleContactSection,
@@ -151,6 +160,16 @@ const COOLING = 0x1ddfe6;
 const START_GRID_NUMBER_PROGRESS = 7;
 const START_GRID_LINE_PROGRESS = 10.4;
 export const CRITICAL_HEAT_WARNING = 78;
+/** The dirt surface sits this far above the course sample, as the blob shadow does. */
+const CRASH_RAGDOLL_SURFACE_ELEVATION = 0.1;
+/** Keeps a tumbling rider or bike inside the ±7.7 m safety walls. */
+const CRASH_RAGDOLL_MAX_LATERAL = 6.4;
+/** Rider half extents for the crash tumble, in unscaled rider units. */
+const CRASH_RAGDOLL_RIDER_SHAPE = { halfWidth: 0.34, halfHeight: 0.62, halfLength: 0.2 } as const;
+const UNIT_SCALE = new THREE.Vector3(1, 1, 1);
+const EXHAUST_NODE_NAMES = ["Bike_Exhaust", "rear-right-exhaust-tip"] as const;
+const EXHAUST_SMOKE_COLOR = 0x1c1a19;
+const EXHAUST_SMOKE_SPREAD_COLOR = 0x4f4a46;
 const FRONT_WHEEL_CLEAR_PITCH = 0.18;
 export const TUTORIAL_USABLE_SPEED = 5;
 export const TUTORIAL_OBSTACLES = [
@@ -528,6 +547,58 @@ interface WheelPoseMemory {
   rearRestPosition: THREE.Vector3;
 }
 
+interface CrashRagdollBinding {
+  readonly node: THREE.Object3D;
+  /** Seated transform about the body centre, in the rider group's course frame. */
+  readonly centreRelative: THREE.Matrix4;
+  readonly centreForward: number;
+  readonly centreLateral: number;
+}
+
+interface ActiveCrashRagdoll {
+  readonly state: CrashRagdollState;
+  readonly anchorProgress: number;
+  readonly anchorLateral: number;
+  readonly rider: CrashRagdollBinding;
+  readonly bike: CrashRagdollBinding;
+  readonly bikeRestPosition: THREE.Vector3;
+  readonly bikeRestQuaternion: THREE.Quaternion;
+}
+
+interface CrashRagdollTrack {
+  entrySpeed: number;
+  entryPitch: number;
+  weight: number;
+  active: ActiveCrashRagdoll | null;
+}
+
+interface ExhaustSmokeParticle {
+  readonly mesh: THREE.Mesh;
+  readonly material: THREE.MeshBasicMaterial;
+  readonly velocity: THREE.Vector3;
+  readonly shade: THREE.Color;
+  life: number;
+  maxLife: number;
+  baseScale: number;
+  growth: number;
+  baseOpacity: number;
+}
+
+interface ExhaustSparkParticle {
+  readonly position: THREE.Vector3;
+  readonly velocity: THREE.Vector3;
+  life: number;
+  maxLife: number;
+  size: number;
+}
+
+interface ExhaustEmitter {
+  stalled: boolean;
+  stallSeconds: number;
+  smoke: number;
+  sparks: number;
+}
+
 interface HeroBikeRiderNodes {
   root: THREE.Object3D;
   bike: THREE.Object3D;
@@ -796,6 +867,24 @@ const WORLD_VISUAL_PROFILES = {
     terraceHeight: 1.35,
   },
 } as const satisfies Record<TrackDefinition["id"], WorldVisualProfile>;
+
+/** Deterministic value in [0, 1) so effect particles vary without Math.random. */
+function effectJitter(index: number, salt: number): number {
+  const value = Math.sin(index * 12.9898 + salt * 78.233) * 43_758.5453;
+  return value - Math.floor(value);
+}
+
+function blendPivotRotation(
+  pivot: THREE.Object3D,
+  target: CrashRagdollRotation,
+  weight: number,
+): void {
+  pivot.rotation.set(
+    THREE.MathUtils.lerp(pivot.rotation.x, target[0], weight),
+    THREE.MathUtils.lerp(pivot.rotation.y, target[1], weight),
+    THREE.MathUtils.lerp(pivot.rotation.z, target[2], weight),
+  );
+}
 
 function clamp(value: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, value));
@@ -3406,6 +3495,29 @@ export class GameEngine {
   private dustCursor = 0;
   private dustAccumulator = 0;
   private dustEventBurstCount = 0;
+  private readonly crashRagdolls = new WeakMap<THREE.Object3D, CrashRagdollTrack>();
+  private readonly bikeLocalBounds = new WeakMap<THREE.Object3D, THREE.Box3>();
+  private readonly ragdollMatrix = new THREE.Matrix4();
+  private readonly ragdollParentInverse = new THREE.Matrix4();
+  private readonly ragdollPoint = new THREE.Vector3();
+  private readonly ragdollPosition = new THREE.Vector3();
+  private readonly ragdollQuaternion = new THREE.Quaternion();
+  private readonly ragdollScale = new THREE.Vector3();
+  private readonly ragdollEuler = new THREE.Euler(0, 0, 0, "YXZ");
+  private readonly exhaustOutlets = new WeakMap<THREE.Object3D, THREE.Vector3>();
+  private readonly exhaustEmitters = new WeakMap<THREE.Object3D, ExhaustEmitter>();
+  private readonly exhaustSmoke: ExhaustSmokeParticle[] = [];
+  private readonly exhaustSparks: ExhaustSparkParticle[] = [];
+  private exhaustSparkMesh: THREE.InstancedMesh | null = null;
+  private exhaustSmokeCursor = 0;
+  private exhaustSparkCursor = 0;
+  private exhaustLiveSparks = 0;
+  private exhaustEmissionCount = 0;
+  private readonly exhaustOrigin = new THREE.Vector3();
+  private readonly exhaustRearward = new THREE.Vector3();
+  private readonly exhaustMatrix = new THREE.Matrix4();
+  private readonly exhaustScale = new THREE.Vector3();
+  private readonly exhaustColor = new THREE.Color();
   private droppedSimulationMs = 0;
   private disposed = false;
   private lifecycleActive = false;
@@ -3564,6 +3676,7 @@ export class GameEngine {
       this.scene.add(this.playerShadow, this.player);
       this.createWorld();
       this.createDustPool();
+      this.createExhaustEffects();
       this.createAiField();
       this.createGhostRider();
       this.applyQaVisualDistance();
@@ -3683,6 +3796,7 @@ export class GameEngine {
       if (material instanceof THREE.MeshBasicMaterial) material.opacity = 0;
       particle.mesh.visible = false;
     }
+    this.clearExhaustEffects();
 
     const state = this.simulation.snapshot;
     this.audio.updateEngine(0, false, state.bike.surface);
@@ -4972,9 +5086,253 @@ export class GameEngine {
     return pose;
   }
 
+  /**
+   * Tracks the speed carried into a crash (the simulation zeroes it on impact)
+   * and returns how much of the presentation tumble to show this frame.
+   */
+  private trackCrashRagdollWeight(
+    rider: THREE.Object3D,
+    bike: SimulationState["bike"],
+    reducedMotion: boolean,
+  ): number {
+    let track = this.crashRagdolls.get(rider);
+    if (!track) {
+      track = { entrySpeed: 0, entryPitch: 0, weight: 0, active: null };
+      this.crashRagdolls.set(rider, track);
+    }
+    if (bike.phase !== "crashed") {
+      track.entrySpeed = bike.speed;
+      track.entryPitch = bike.pitch;
+    }
+    track.weight = resolveCrashRagdollWeight(
+      bike.phase,
+      this.riderPoseMemory.get(rider)?.presentationRecoveryProgress ?? 0,
+      reducedMotion,
+    );
+    return track.weight;
+  }
+
+  /**
+   * Separates the rider from the bike while crashed: the rider tumbles down
+   * the course and the bike slides on its side, blended over the static crash
+   * pose by the tumble weight. Presentation only — the authoritative bike stays
+   * where the simulation stopped it, and recovery respawns it there.
+   */
+  private presentCrashRagdoll(
+    rider: THREE.Object3D,
+    bike: SimulationState["bike"],
+    groundOffset: number,
+    delta: number,
+  ): void {
+    const track = this.crashRagdolls.get(rider);
+    if (!track) return;
+    const riderNode = rider.userData.riderVisual as THREE.Object3D | undefined;
+    const bikeNode = rider.userData.bikeVisual as THREE.Object3D | undefined;
+    if (
+      track.active
+      && (
+        track.weight <= 0
+        || track.active.rider.node !== riderNode
+        || track.active.bike.node !== bikeNode
+      )
+    ) {
+      this.endCrashRagdoll(track);
+    }
+    if (track.weight <= 0 || !riderNode || !bikeNode) return;
+
+    track.active ??= this.startCrashRagdoll(rider, riderNode, bikeNode, bike, track, groundOffset);
+    const active = track.active;
+    advanceCrashRagdoll(active.state, delta);
+
+    bikeNode.position.copy(active.bikeRestPosition);
+    bikeNode.quaternion.copy(active.bikeRestQuaternion);
+    this.placeCrashRagdollBody(active, active.rider, active.state.rider, track.weight);
+    this.placeCrashRagdollBody(active, active.bike, active.state.bike, track.weight);
+
+    const rig = rider.userData.riderPoseRig as RiderPoseRig | undefined;
+    if (rig) {
+      const limbs = active.state.limbs;
+      blendPivotRotation(rig.torso, limbs.torso, track.weight);
+      blendPivotRotation(rig.head, limbs.head, track.weight);
+      blendPivotRotation(rig.leftArm, limbs.leftArm, track.weight);
+      blendPivotRotation(rig.rightArm, limbs.rightArm, track.weight);
+      blendPivotRotation(rig.leftLeg, limbs.leftLeg, track.weight);
+      blendPivotRotation(rig.rightLeg, limbs.rightLeg, track.weight);
+    }
+    const wheelSpin = active.state.wheelSpinRate * delta * track.weight;
+    const frontWheel = rider.userData.frontWheel as THREE.Object3D | undefined;
+    const rearWheel = rider.userData.backWheel as THREE.Object3D | undefined;
+    if (frontWheel) frontWheel.rotation.x -= wheelSpin;
+    if (rearWheel) rearWheel.rotation.x -= wheelSpin;
+  }
+
+  private startCrashRagdoll(
+    rider: THREE.Object3D,
+    riderNode: THREE.Object3D,
+    bikeNode: THREE.Object3D,
+    bike: SimulationState["bike"],
+    track: CrashRagdollTrack,
+    groundOffset: number,
+  ): ActiveCrashRagdoll {
+    const scale = rider.scale.x;
+    const bikeRestPosition = bikeNode.position.clone();
+    const bikeRestQuaternion = bikeNode.quaternion.clone();
+    const riderSeated = this.crashRagdollSeatedMatrix(
+      rider,
+      riderNode,
+      new THREE.Matrix4().makeScale(riderNode.scale.x, riderNode.scale.y, riderNode.scale.z),
+    );
+    const rig = rider.userData.riderPoseRig as RiderPoseRig | undefined;
+    const riderCentre = (rig ? rig.torso.position.clone() : new THREE.Vector3(0, 1, 0.3))
+      .applyMatrix4(riderSeated);
+    const bikeSeated = this.crashRagdollSeatedMatrix(
+      rider,
+      bikeNode,
+      new THREE.Matrix4().compose(bikeRestPosition, bikeRestQuaternion, bikeNode.scale),
+    );
+    const bikeBounds = this.measureBikeLocalBounds(bikeNode).clone().applyMatrix4(bikeSeated);
+    const bikeCentre = bikeBounds.getCenter(new THREE.Vector3());
+    const bikeHalfSize = bikeBounds.getSize(new THREE.Vector3()).multiplyScalar(0.5);
+    const surfaceOffset = groundOffset - CRASH_RAGDOLL_SURFACE_ELEVATION;
+    const state = createCrashRagdoll({
+      cause: bike.crashCause,
+      entrySpeed: track.entrySpeed,
+      entryPitch: track.entryPitch,
+      riderRestHeight: surfaceOffset + riderCentre.y,
+      rider: {
+        halfWidth: CRASH_RAGDOLL_RIDER_SHAPE.halfWidth * scale,
+        halfHeight: CRASH_RAGDOLL_RIDER_SHAPE.halfHeight * scale,
+        halfLength: CRASH_RAGDOLL_RIDER_SHAPE.halfLength * scale,
+      },
+      bikeRestHeight: surfaceOffset + bikeCentre.y,
+      bike: {
+        halfWidth: bikeHalfSize.x,
+        halfHeight: bikeHalfSize.y,
+        halfLength: bikeHalfSize.z,
+      },
+      seed: Math.round(bike.forwardPosition * 10) + bike.lane * 97,
+    });
+    const binding = (
+      node: THREE.Object3D,
+      seated: THREE.Matrix4,
+      centre: THREE.Vector3,
+    ): CrashRagdollBinding => ({
+      node,
+      centreRelative: new THREE.Matrix4()
+        .makeTranslation(-centre.x, -centre.y, -centre.z)
+        .multiply(seated),
+      centreForward: -centre.z,
+      centreLateral: centre.x,
+    });
+    return {
+      state,
+      anchorProgress: bike.forwardPosition,
+      anchorLateral: bike.lanePosition,
+      rider: binding(riderNode, riderSeated, riderCentre),
+      bike: binding(bikeNode, bikeSeated, bikeCentre),
+      bikeRestPosition,
+      bikeRestQuaternion,
+    };
+  }
+
+  /** A node's seated transform in its rider group's unrolled course frame, scale included. */
+  private crashRagdollSeatedMatrix(
+    rider: THREE.Object3D,
+    node: THREE.Object3D,
+    local: THREE.Matrix4,
+  ): THREE.Matrix4 {
+    const matrix = local.clone();
+    for (let parent = node.parent; parent && parent !== rider; parent = parent.parent) {
+      parent.updateMatrix();
+      matrix.premultiply(parent.matrix);
+    }
+    return matrix.premultiply(
+      new THREE.Matrix4().makeScale(rider.scale.x, rider.scale.y, rider.scale.z),
+    );
+  }
+
+  private placeCrashRagdollBody(
+    active: ActiveCrashRagdoll,
+    binding: CrashRagdollBinding,
+    body: CrashRagdollBody,
+    weight: number,
+  ): void {
+    const parent = binding.node.parent;
+    if (!parent) return;
+    const progress = active.anchorProgress + binding.centreForward + body.forward;
+    const lateral = clamp(
+      active.anchorLateral + binding.centreLateral + body.lateral,
+      -CRASH_RAGDOLL_MAX_LATERAL,
+      CRASH_RAGDOLL_MAX_LATERAL,
+    );
+    const orientation = this.courseRoute.sample(
+      progress,
+      lateral,
+      this.authoredRouteHeight(progress % this.track.courseLength, lateral)
+        + CRASH_RAGDOLL_SURFACE_ELEVATION
+        + body.height,
+      this.ragdollPoint,
+    );
+    this.courseYaw.setFromAxisAngle(WORLD_UP, orientation.yaw);
+    this.coursePitch.setFromAxisAngle(WORLD_RIGHT, orientation.pitch);
+    this.ragdollEuler.set(body.pitch, body.yaw, body.roll, "YXZ");
+    this.ragdollQuaternion
+      .setFromEuler(this.ragdollEuler)
+      .premultiply(this.coursePitch)
+      .premultiply(this.courseYaw);
+    this.ragdollMatrix
+      .compose(this.ragdollPoint, this.ragdollQuaternion, UNIT_SCALE)
+      .multiply(binding.centreRelative);
+    parent.updateWorldMatrix(true, false);
+    this.ragdollParentInverse.copy(parent.matrixWorld).invert();
+    this.ragdollMatrix
+      .premultiply(this.ragdollParentInverse)
+      .decompose(this.ragdollPosition, this.ragdollQuaternion, this.ragdollScale);
+    binding.node.position.lerp(this.ragdollPosition, weight);
+    binding.node.quaternion.slerp(this.ragdollQuaternion, weight);
+  }
+
+  private endCrashRagdoll(track: CrashRagdollTrack): void {
+    const active = track.active;
+    if (!active) return;
+    active.bike.node.position.copy(active.bikeRestPosition);
+    active.bike.node.quaternion.copy(active.bikeRestQuaternion);
+    track.active = null;
+  }
+
+  /** Bike bounds in its own local space, measured once per bike visual. */
+  private measureBikeLocalBounds(bikeNode: THREE.Object3D): THREE.Box3 {
+    const cached = this.bikeLocalBounds.get(bikeNode);
+    if (cached) return cached;
+    bikeNode.updateWorldMatrix(true, true);
+    const toBike = new THREE.Matrix4().copy(bikeNode.matrixWorld).invert();
+    const relative = new THREE.Matrix4();
+    const meshBounds = new THREE.Box3();
+    const bounds = new THREE.Box3();
+    bikeNode.traverse((object) => {
+      if (!(object instanceof THREE.Mesh)) return;
+      if (object instanceof THREE.InstancedMesh) {
+        object.computeBoundingBox();
+        if (!object.boundingBox) return;
+        meshBounds.copy(object.boundingBox);
+      } else {
+        object.geometry.computeBoundingBox();
+        if (!object.geometry.boundingBox) return;
+        meshBounds.copy(object.geometry.boundingBox);
+      }
+      bounds.union(meshBounds.applyMatrix4(relative.multiplyMatrices(toBike, object.matrixWorld)));
+    });
+    if (bounds.isEmpty()) {
+      bounds.set(new THREE.Vector3(-0.45, -0.6, -1.3), new THREE.Vector3(0.45, 1, 1.3));
+    }
+    this.bikeLocalBounds.set(bikeNode, bounds);
+    return bounds;
+  }
+
   private recordQaPlayerMotionSnapshot(
     bike: SimulationState["bike"],
     steeringRoll: number,
+    presentationRoll: number,
     presentationPitch: number,
     reducedMotion: boolean,
     pose: ResolvedRiderPose,
@@ -5021,9 +5379,11 @@ export class GameEngine {
       lastLanding: bike.lastLanding,
       crashCause: bike.crashCause,
       recoveryProgress: round(bike.recoveryProgress),
+      heat: round(bike.heat),
+      overheated: bike.overheated,
       inputDevice: this.input.activeDevice,
       steeringRoll: round(steeringRoll),
-      presentationRoll: round(steeringRoll),
+      presentationRoll: round(presentationRoll),
       steeringDirection,
       reducedMotion,
       actionState: pose.actionState,
@@ -5063,7 +5423,40 @@ export class GameEngine {
         leftLeg: rotation(rig.leftLeg),
         rightLeg: rotation(rig.rightLeg),
       },
+      crashRagdoll: this.crashRagdollDiagnostics(this.player, round),
     });
+  }
+
+  private crashRagdollDiagnostics(
+    rider: THREE.Object3D,
+    round: (value: number) => number,
+  ): Record<string, unknown> | null {
+    const track = this.crashRagdolls.get(rider);
+    const active = track?.active;
+    if (!track || !active) return null;
+    const { state } = active;
+    const body = (value: CrashRagdollBody) => ({
+      forward: round(value.forward),
+      lateral: round(value.lateral),
+      height: round(value.height),
+      pitch: round(value.pitch),
+      yaw: round(value.yaw),
+      roll: round(value.roll),
+    });
+    return {
+      weight: round(track.weight),
+      elapsedSeconds: round(state.elapsedSeconds),
+      settled: state.settled,
+      riderImpacts: state.riderImpacts,
+      rider: body(state.rider),
+      bike: body(state.bike),
+      separation: round(Math.hypot(
+        active.rider.centreForward + state.rider.forward
+          - active.bike.centreForward - state.bike.forward,
+        active.rider.centreLateral + state.rider.lateral
+          - active.bike.centreLateral - state.bike.lateral,
+      )),
+    };
   }
 
   private addCourseAnchored(...objects: THREE.Object3D[]): void {
@@ -5136,6 +5529,8 @@ export class GameEngine {
     const state = this.simulation.snapshot;
     const bike = state.bike;
     const reducedMotion = this.settings.accessibility.reducedMotion;
+    // Render-time effects hold still while the race is paused.
+    const effectsDelta = this.paused ? 0 : delta;
     const wheelSpin = delta * bike.speed * 1.7;
     const localDistance = bike.forwardPosition % this.track.courseLength;
     const playerRouteHeight = this.authoredRouteHeight(localDistance, bike.lanePosition);
@@ -5180,14 +5575,18 @@ export class GameEngine {
       playerPose.landingCompression,
       reducedMotion,
     );
+    const playerGroundOffset = playerBaseY + bike.height;
+    const playerRagdollWeight = this.trackCrashRagdollWeight(this.player, bike, reducedMotion);
+    const playerPresentationRoll = playerSteeringRoll * (1 - playerRagdollWeight);
     this.setRiderPresentation(
       this.player,
       bike.forwardPosition,
       bike.lanePosition,
-      playerBaseY + playerRouteHeight + bike.height,
+      playerRouteHeight + playerGroundOffset,
       playerPresentationPitch,
-      playerSteeringRoll,
+      playerPresentationRoll,
     );
+    this.presentCrashRagdoll(this.player, bike, playerGroundOffset, effectsDelta);
     const shadowOrientation = this.courseRoute.sample(
       bike.forwardPosition - 0.36,
       bike.lanePosition,
@@ -5217,6 +5616,7 @@ export class GameEngine {
       this.recordQaPlayerMotionSnapshot(
         bike,
         playerSteeringRoll,
+        playerPresentationRoll,
         playerPresentationPitch,
         reducedMotion,
         playerPose,
@@ -5253,14 +5653,17 @@ export class GameEngine {
         aiPose.landingCompression,
         reducedMotion,
       );
+      const aiGroundOffset = 0.72 + bike.height;
+      const aiRagdollWeight = this.trackCrashRagdollWeight(ai.group, bike, reducedMotion);
       this.setRiderPresentation(
         ai.group,
         bike.forwardPosition,
         bike.lanePosition,
-        0.72 + routeHeight + bike.height,
+        routeHeight + aiGroundOffset,
         aiPresentationPitch,
-        steeringRoll,
+        steeringRoll * (1 - aiRagdollWeight),
       );
+      this.presentCrashRagdoll(ai.group, bike, aiGroundOffset, effectsDelta);
       ai.group.visible = true;
       if (!crashed) {
         ai.group.userData.frontWheel.rotation.x -= delta * bike.speed * 1.7;
@@ -5360,6 +5763,7 @@ export class GameEngine {
         this.heroFillLight.position,
       );
     }
+    this.updateExhaustEffects(effectsDelta, reducedMotion);
     this.gpuTimer?.begin();
     this.renderer.render(this.scene, this.camera);
     this.gpuTimer?.end();
@@ -5575,7 +5979,7 @@ export class GameEngine {
 
     if (bike.overheated && !this.lastOverheated) {
       this.overheats += 1;
-      this.captionEvent("Overheated — controls return at 35% heat", "overheat");
+      this.captionEvent(`Overheated — engine stalled for ${OVERHEAT_STALL_SECONDS} s`, "overheat");
     }
     this.lastOverheated = bike.overheated;
   }
@@ -5870,7 +6274,7 @@ export class GameEngine {
     this.hint = state.bike.phase === "crashed"
       ? recoverPrompt
       : state.bike.overheated
-        ? "Controls return when heat cools to 35%"
+        ? `Engine stalled — controls return after ${OVERHEAT_STALL_SECONDS} s`
         : state.bike.heat >= CRITICAL_HEAT_WARNING
           ? "Release turbo or line up a cyan cooling gate"
           : state.bike.phase === "airborne"
@@ -6247,6 +6651,346 @@ export class GameEngine {
     }
     this.dustEventBurstCount += 1;
     this.canvas.dataset.groundedDustBurstCount = String(this.dustEventBurstCount);
+  }
+
+  private createExhaustEffects(): void {
+    const smokeCount = this.quality === "low" ? 10 : this.quality === "medium" ? 16 : 24;
+    const sparkCount = this.quality === "low" ? 12 : this.quality === "medium" ? 20 : 28;
+    const texture = createSoftDustTexture();
+    this.ownedTextures.push(texture);
+    const smokeGeometry = new THREE.PlaneGeometry(1, 1);
+    for (let index = 0; index < smokeCount; index += 1) {
+      const material = new THREE.MeshBasicMaterial({
+        color: EXHAUST_SMOKE_COLOR,
+        transparent: true,
+        opacity: 0,
+        alphaMap: texture,
+        depthWrite: false,
+        side: THREE.DoubleSide,
+        toneMapped: WORLD_SURFACE_TONE_MAPPED,
+      });
+      const mesh = new THREE.Mesh(smokeGeometry, material);
+      mesh.name = "overheat-exhaust-smoke";
+      mesh.visible = false;
+      mesh.castShadow = false;
+      mesh.receiveShadow = false;
+      mesh.renderOrder = 2;
+      this.scene.add(mesh);
+      this.exhaustSmoke.push({
+        mesh,
+        material,
+        velocity: new THREE.Vector3(),
+        shade: new THREE.Color(EXHAUST_SMOKE_COLOR),
+        life: 0,
+        maxLife: 1,
+        baseScale: 0.4,
+        growth: 1,
+        baseOpacity: 0.7,
+      });
+    }
+
+    // Additive embers fade to black, so one instanced batch needs no per-spark
+    // alpha. They are light itself and the stall's cue, so they skip the grade.
+    const sparks = new THREE.InstancedMesh(
+      new THREE.PlaneGeometry(1, 1),
+      new THREE.MeshBasicMaterial({
+        map: texture,
+        transparent: true,
+        depthWrite: false,
+        blending: THREE.AdditiveBlending,
+        side: THREE.DoubleSide,
+        toneMapped: EMISSIVE_SIGNAL_TONE_MAPPED,
+      }),
+      sparkCount,
+    );
+    sparks.name = "overheat-exhaust-sparks";
+    sparks.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+    sparks.frustumCulled = false;
+    sparks.castShadow = false;
+    sparks.receiveShadow = false;
+    sparks.renderOrder = 3;
+    sparks.visible = false;
+    this.exhaustMatrix.makeScale(0, 0, 0);
+    this.exhaustColor.setRGB(0, 0, 0);
+    for (let index = 0; index < sparkCount; index += 1) {
+      sparks.setMatrixAt(index, this.exhaustMatrix);
+      sparks.setColorAt(index, this.exhaustColor);
+      this.exhaustSparks.push({
+        position: new THREE.Vector3(),
+        velocity: new THREE.Vector3(),
+        life: 0,
+        maxLife: 1,
+        size: 1,
+      });
+    }
+    this.scene.add(sparks);
+    this.exhaustSparkMesh = sparks;
+    this.canvas.dataset.overheatExhaustStyle = "dark-smoke-ember-sparks";
+    this.canvas.dataset.overheatExhaust = "idle";
+  }
+
+  private clearExhaustEffects(): void {
+    for (const particle of this.exhaustSmoke) {
+      particle.life = 0;
+      particle.material.opacity = 0;
+      particle.mesh.visible = false;
+    }
+    for (const spark of this.exhaustSparks) spark.life = 0;
+    if (this.exhaustSparkMesh) this.exhaustSparkMesh.visible = false;
+    this.exhaustLiveSparks = 0;
+  }
+
+  /** Overheat stall: a thick dark smoke cloud and embers from each stalled tailpipe. */
+  private updateExhaustEffects(delta: number, reducedMotion: boolean): void {
+    if (this.exhaustSmoke.length === 0) return;
+    let stalled = this.emitOverheatExhaust(
+      this.player,
+      this.simulation.snapshot.bike,
+      delta,
+      reducedMotion,
+    );
+    for (const ai of this.aiRiders) {
+      stalled = this.emitOverheatExhaust(
+        ai.group,
+        ai.simulation.snapshot.bike,
+        delta,
+        reducedMotion,
+      ) || stalled;
+    }
+
+    let visibleSmoke = 0;
+    for (const particle of this.exhaustSmoke) {
+      if (particle.life <= 0) continue;
+      particle.life -= delta;
+      if (particle.life <= 0) {
+        particle.mesh.visible = false;
+        continue;
+      }
+      visibleSmoke += 1;
+      particle.mesh.position.addScaledVector(particle.velocity, delta);
+      // Air drag sheds the bike's carried speed quickly; the rise lingers.
+      const horizontalDrag = Math.exp(-2.4 * delta);
+      particle.velocity.x *= horizontalDrag;
+      particle.velocity.z *= horizontalDrag;
+      particle.velocity.y *= Math.exp(-0.5 * delta);
+      const age = particle.maxLife - particle.life;
+      particle.mesh.scale.setScalar(particle.baseScale + particle.growth * age);
+      particle.mesh.lookAt(this.camera.position);
+      // Near-black at the pipe, thinning to charcoal as the cloud spreads.
+      particle.material.color.copy(particle.shade).lerp(
+        this.exhaustColor.setHex(EXHAUST_SMOKE_SPREAD_COLOR),
+        clamp(age / particle.maxLife, 0, 1),
+      );
+      const fadeIn = clamp(age / 0.12, 0, 1);
+      particle.material.opacity = particle.baseOpacity
+        * fadeIn
+        * Math.pow(clamp(particle.life / particle.maxLife, 0, 1), 1.2);
+    }
+
+    const sparks = this.exhaustSparkMesh;
+    if (sparks && (stalled || this.exhaustLiveSparks > 0)) {
+      let liveSparks = 0;
+      for (const [index, spark] of this.exhaustSparks.entries()) {
+        if (spark.life > 0) {
+          spark.life -= delta;
+          spark.velocity.y -= 9.8 * delta;
+          spark.position.addScaledVector(spark.velocity, delta);
+        }
+        if (spark.life <= 0) {
+          this.exhaustMatrix.makeScale(0, 0, 0);
+          this.exhaustColor.setRGB(0, 0, 0);
+        } else {
+          const remaining = clamp(spark.life / spark.maxLife, 0, 1);
+          this.exhaustMatrix.compose(
+            spark.position,
+            this.camera.quaternion,
+            this.exhaustScale.setScalar((0.1 + 0.08 * remaining) * spark.size),
+          );
+          // White-yellow at the pipe, cooling through orange to nothing.
+          const glow = Math.sqrt(remaining);
+          this.exhaustColor.setRGB(
+            glow,
+            (0.28 + 0.62 * remaining * remaining) * glow,
+            0.12 * remaining * remaining * glow,
+          );
+          liveSparks += 1;
+        }
+        sparks.setMatrixAt(index, this.exhaustMatrix);
+        sparks.setColorAt(index, this.exhaustColor);
+      }
+      sparks.instanceMatrix.needsUpdate = true;
+      if (sparks.instanceColor) sparks.instanceColor.needsUpdate = true;
+      sparks.visible = liveSparks > 0;
+      this.exhaustLiveSparks = liveSparks;
+    }
+
+    const exhaustState = stalled ? "stalled" : "idle";
+    if (this.canvas.dataset.overheatExhaust !== exhaustState) {
+      this.canvas.dataset.overheatExhaust = exhaustState;
+    }
+    if (stalled) {
+      this.canvas.dataset.overheatExhaustEmissions = String(this.exhaustEmissionCount);
+      this.canvas.dataset.overheatExhaustSmoke = String(visibleSmoke);
+      this.canvas.dataset.overheatExhaustSparks = String(this.exhaustLiveSparks);
+    }
+  }
+
+  private emitOverheatExhaust(
+    rider: THREE.Object3D,
+    bike: SimulationState["bike"],
+    delta: number,
+    reducedMotion: boolean,
+  ): boolean {
+    let emitter = this.exhaustEmitters.get(rider);
+    if (!emitter) {
+      emitter = { stalled: false, stallSeconds: 0, smoke: 0, sparks: 0 };
+      this.exhaustEmitters.set(rider, emitter);
+    }
+    const bikeNode = rider.userData.bikeVisual as THREE.Object3D | undefined;
+    if (!bike.overheated || !rider.visible || !bikeNode) {
+      emitter.stalled = false;
+      emitter.stallSeconds = 0;
+      emitter.smoke = 0;
+      emitter.sparks = 0;
+      return false;
+    }
+
+    const outlet = this.resolveExhaustOutlet(bikeNode);
+    bikeNode.updateWorldMatrix(true, false);
+    this.exhaustOrigin.copy(outlet).applyMatrix4(bikeNode.matrixWorld);
+    this.exhaustRearward.set(0, 0, 1).transformDirection(bikeNode.matrixWorld);
+    // Thick for most of the stall, thinning over its last two seconds. Stall
+    // time rather than heat, since a cooling gate can empty heat mid-stall.
+    emitter.stallSeconds += delta;
+    const intensity = 1 - 0.6 * clamp((emitter.stallSeconds - 1.5) / 2, 0, 1);
+    const size = rider.scale.x;
+    const carriedSpeed = bike.phase === "crashed" || bike.phase === "recovering" ? 0 : bike.speed;
+    if (!emitter.stalled) {
+      // The stall announces itself with a burst before the steady plume.
+      emitter.stalled = true;
+      emitter.smoke = 4;
+      emitter.sparks = reducedMotion ? 0 : 6;
+    }
+    emitter.smoke += delta * intensity
+      * (this.quality === "low" ? 6 : this.quality === "medium" ? 10 : 14);
+    while (emitter.smoke >= 1) {
+      emitter.smoke -= 1;
+      this.spawnExhaustSmoke(intensity, size, carriedSpeed);
+    }
+    if (reducedMotion) {
+      emitter.sparks = 0;
+    } else {
+      emitter.sparks += delta * intensity
+        * (this.quality === "low" ? 10 : this.quality === "medium" ? 18 : 26);
+      while (emitter.sparks >= 1) {
+        emitter.sparks -= 1;
+        this.spawnExhaustSpark(size, carriedSpeed);
+      }
+    }
+    return true;
+  }
+
+  private spawnExhaustSmoke(intensity: number, size: number, carriedSpeed: number): void {
+    const index = this.exhaustSmokeCursor;
+    const particle = this.exhaustSmoke[index % this.exhaustSmoke.length];
+    this.exhaustSmokeCursor += 1;
+    if (!particle) return;
+    // Carry part of the bike's speed so the cloud hangs around the coasting
+    // bike, then billow up over it rather than trail back into the chase
+    // camera.
+    particle.mesh.position.copy(this.exhaustOrigin);
+    particle.velocity
+      .copy(this.exhaustRearward)
+      .multiplyScalar(0.2 + effectJitter(index, 1) * 0.25 - carriedSpeed * 0.7);
+    particle.velocity.x += (effectJitter(index, 2) - 0.5) * 0.9;
+    particle.velocity.y += 1.3 + effectJitter(index, 3) * 0.6;
+    particle.velocity.z += (effectJitter(index, 4) - 0.5) * 0.9;
+    particle.life = 1.5 + effectJitter(index, 5) * 0.7;
+    particle.maxLife = particle.life;
+    particle.baseScale = (0.42 + effectJitter(index, 6) * 0.2) * size;
+    particle.growth = (1.4 + effectJitter(index, 7) * 0.6) * size;
+    particle.baseOpacity = 0.55 + 0.3 * intensity;
+    particle.shade
+      .setHex(EXHAUST_SMOKE_COLOR)
+      .offsetHSL(0, 0, (effectJitter(index, 8) - 0.5) * 0.06);
+    particle.material.color.copy(particle.shade);
+    particle.material.opacity = 0;
+    particle.mesh.scale.setScalar(particle.baseScale);
+    particle.mesh.visible = true;
+    this.exhaustEmissionCount += 1;
+  }
+
+  private spawnExhaustSpark(size: number, carriedSpeed: number): void {
+    const index = this.exhaustSparkCursor;
+    const spark = this.exhaustSparks[index % this.exhaustSparks.length];
+    this.exhaustSparkCursor += 1;
+    if (!spark) return;
+    spark.position.copy(this.exhaustOrigin);
+    spark.velocity
+      .copy(this.exhaustRearward)
+      .multiplyScalar(1.2 + effectJitter(index, 11) * 1.4 - carriedSpeed * 0.8);
+    spark.velocity.x += (effectJitter(index, 12) - 0.5) * 2;
+    spark.velocity.y += 1.6 + effectJitter(index, 13) * 1.6;
+    spark.velocity.z += (effectJitter(index, 14) - 0.5) * 2;
+    spark.life = 0.25 + effectJitter(index, 15) * 0.35;
+    spark.maxLife = spark.life;
+    spark.size = size;
+    this.exhaustLiveSparks = Math.max(1, this.exhaustLiveSparks);
+  }
+
+  /** Where the tailpipe opens, in the bike visual's own space, found once per bike. */
+  private resolveExhaustOutlet(bikeNode: THREE.Object3D): THREE.Vector3 {
+    const cached = this.exhaustOutlets.get(bikeNode);
+    if (cached) return cached;
+    const outlet = new THREE.Vector3();
+    const exhaust = EXHAUST_NODE_NAMES
+      .map((name) => bikeNode.getObjectByName(name))
+      .find((node) => node !== undefined);
+    if (exhaust) {
+      bikeNode.updateWorldMatrix(true, true);
+      const toBike = new THREE.Matrix4().copy(bikeNode.matrixWorld).invert();
+      const relative = new THREE.Matrix4();
+      const vertex = new THREE.Vector3();
+      const visitVertices = (visit: (point: THREE.Vector3) => void) => {
+        exhaust.traverse((object) => {
+          if (!(object instanceof THREE.Mesh)) return;
+          const positions = object.geometry.getAttribute("position");
+          if (!positions) return;
+          relative.multiplyMatrices(toBike, object.matrixWorld);
+          for (let index = 0; index < positions.count; index += 1) {
+            visit(vertex.fromBufferAttribute(positions, index).applyMatrix4(relative));
+          }
+        });
+      };
+      // The pipe exits rearward (+Z); average its rear-most ring of vertices.
+      let rearmost = Number.NEGATIVE_INFINITY;
+      visitVertices((point) => {
+        rearmost = Math.max(rearmost, point.z);
+      });
+      let count = 0;
+      visitVertices((point) => {
+        if (point.z < rearmost - 0.05) return;
+        outlet.add(point);
+        count += 1;
+      });
+      if (count > 0) outlet.divideScalar(count);
+    }
+    if (!exhaust || outlet.lengthSq() === 0) {
+      const bounds = this.measureBikeLocalBounds(bikeNode);
+      outlet.set(
+        bounds.max.x * 0.6,
+        THREE.MathUtils.lerp(bounds.min.y, bounds.max.y, 0.45),
+        bounds.max.z,
+      );
+    }
+    this.exhaustOutlets.set(bikeNode, outlet);
+    if (bikeNode === this.player.userData.bikeVisual) {
+      this.canvas.dataset.overheatExhaustOutlet = [
+        exhaust ? exhaust.name : "bounds",
+        ...outlet.toArray().map((value) => value.toFixed(3)),
+      ].join(" ");
+    }
+    return outlet;
   }
 
   private createWorld(): void {

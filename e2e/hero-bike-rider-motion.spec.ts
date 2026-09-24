@@ -17,6 +17,25 @@ type RiderActionState =
   | "recovery"
   | "reduced-motion";
 
+interface CrashRagdollBodySnapshot {
+  forward: number;
+  lateral: number;
+  height: number;
+  pitch: number;
+  yaw: number;
+  roll: number;
+}
+
+interface CrashRagdollSnapshot {
+  weight: number;
+  elapsedSeconds: number;
+  settled: boolean;
+  riderImpacts: number;
+  rider: CrashRagdollBodySnapshot;
+  bike: CrashRagdollBodySnapshot;
+  separation: number;
+}
+
 interface PlayerMotionSnapshot {
   asset: string;
   fallbackReason: string | null;
@@ -36,6 +55,8 @@ interface PlayerMotionSnapshot {
   lastLanding: "clean" | "rough" | "crash" | null;
   crashCause: "wheelie-timeout" | "landing" | "obstacle" | "rider-contact" | "external" | null;
   recoveryProgress: number;
+  heat: number;
+  overheated: boolean;
   inputDevice: string;
   steeringRoll: number;
   presentationRoll: number;
@@ -67,6 +88,7 @@ interface PlayerMotionSnapshot {
     leftLeg: Rotation;
     rightLeg: Rotation;
   };
+  crashRagdoll: CrashRagdollSnapshot | null;
 }
 
 interface MotionHistoryWindow extends Window {
@@ -176,8 +198,8 @@ function expectedAmplifiedPitch(pitch: number): number {
   return Math.max(-0.72, Math.min(0.72, pitch * 1.45));
 }
 
-async function startPractice(page: Page): Promise<Locator> {
-  await page.goto("/");
+async function startPractice(page: Page, path = "/"): Promise<Locator> {
+  await page.goto(path);
   const skip = page.getByRole("button", { name: "Skip training" });
   await expect(skip).toBeVisible({ timeout: 15_000 });
   await skip.click();
@@ -341,7 +363,7 @@ test.describe("authored hero motion integration", () => {
     await page.keyboard.up("w");
   });
 
-  test("reports wheelie, crash hold, and interpolated recovery through public Canyon controls", async ({ page }, testInfo) => {
+  test("reports wheelie, crash tumble, crash hold, and interpolated recovery through public Canyon controls", async ({ page }, testInfo) => {
     test.skip(testInfo.project.name !== "chromium", "Public Canyon rider action evidence runs once in Chromium");
     test.setTimeout(120_000);
 
@@ -387,32 +409,53 @@ test.describe("authored hero motion integration", () => {
     const crashDust = await readDustDiagnostics(canvas);
     expect(crashDust.style).toBe("soft-speed-reactive-twin-wheel-plume");
     expect(crashDust.burstCount).toBeGreaterThanOrEqual(1);
+    // The simulation still owns the crash: cause, stop, and the static pose the
+    // resolver hands back to. The tumble is layered over it at full weight
+    // until Recover is held, so the bike group itself stays upright.
     expect(crashed).toMatchObject({
       phase: "crashed",
       wheelie: false,
+      speed: 0,
       crashCause: "wheelie-timeout",
       recoveryProgress: 0,
       actionState: "crash",
       steeringRoll: -1.22,
-      presentationRoll: -1.22,
+      presentationRoll: 0,
       presentationPitch: 0,
       steeringDirection: "none",
-      riderRoot: {
-        rotationX: -0.12,
-        rotationY: 0.18,
-        rotationZ: 0.62,
-        positionX: 0.72,
-        positionY: 0.48,
-        positionZ: -0.18,
-      },
     });
-    expect(crashed.rig).toEqual({
+    expect(crashed.crashRagdoll?.weight).toBe(1);
+
+    // The tumble runs on clamped render time, so a slow headless renderer
+    // stretches it in wall time exactly as it stretches the simulation.
+    await expect.poll(
+      async () => (await readMotionSnapshot(canvas)).crashRagdoll?.elapsedSeconds ?? 0,
+      { timeout: 30_000 },
+    ).toBeGreaterThan(1.8);
+    const tumbled = await readMotionSnapshot(canvas);
+    const tumble = tumbled.crashRagdoll;
+    if (!tumble) throw new Error("The crash tumble diagnostics are unavailable.");
+    expect(tumbled.phase).toBe("crashed");
+    expect(tumbled.forwardPosition).toBe(crashed.forwardPosition);
+    expect(tumble.weight).toBe(1);
+    // Rider thrown clear and turned over; bike down on its side and slid.
+    expect(tumble.separation).toBeGreaterThan(1.5);
+    expect(Math.abs(tumble.rider.pitch)).toBeGreaterThan(1);
+    expect(tumble.rider.height).toBeLessThan(1);
+    expect(tumble.bike.roll).toBeLessThan(-1.2);
+    expect(tumble.bike.forward).toBeGreaterThan(0.1);
+    expect(tumbled.riderRoot).not.toEqual(crashed.riderRoot);
+    expect(tumbled.rig).not.toEqual({
       torso: [-0.32, 0.18, 0.5],
       head: [0.38, -0.24, 0.28],
       leftArm: [0.62, -0.2, 0.82],
       rightArm: [-0.32, 0.18, -0.72],
       leftLeg: [-0.52, 0.16, 0.4],
       rightLeg: [0.44, -0.12, -0.34],
+    });
+    await testInfo.attach("crash-tumble-wheelie-timeout", {
+      body: await page.screenshot(),
+      contentType: "image/png",
     });
 
     await page.keyboard.down("Space");
@@ -424,11 +467,11 @@ test.describe("authored hero motion integration", () => {
     expect(crashHold.phase).toBe("crashed");
     expect(crashHold.actionState).toBe("recovery-hold");
     expect(crashHold.recoveryProgress).toBeLessThan(1);
-    expect(crashHold.presentationRoll).toBe(-1.22);
     expect(crashHold.presentationPitch).toBe(0);
-    expect(crashHold.riderRoot.positionX).toBeLessThan(crashed.riderRoot.positionX);
-    expect(crashHold.riderRoot.positionY).toBeGreaterThan(crashed.riderRoot.positionY);
-    expect(crashHold.rig).not.toEqual(crashed.rig);
+    // Holding Recover hands the tumble back toward the static crash pose.
+    const holdWeight = crashHold.crashRagdoll?.weight ?? 0;
+    expect(holdWeight).toBeLessThan(1);
+    expect(crashHold.presentationRoll).toBeCloseTo(-1.22 * (1 - holdWeight), 3);
 
     await expect.poll(
       async () => (await readMotionSnapshot(canvas)).phase,
@@ -443,6 +486,7 @@ test.describe("authored hero motion integration", () => {
     const recoveryFrames = history
       .filter((snapshot) => snapshot.actionState === "recovery")
       .sort((first, second) => first.recoveryProgress - second.recoveryProgress);
+    expect(recoveryFrames.every((snapshot) => snapshot.crashRagdoll === null)).toBe(true);
     const earlyRecovery = recoveryFrames[0];
     const lateRecovery = recoveryFrames.at(-1);
     expect(earlyRecovery, "an early recovering frame should be recorded").toBeDefined();
@@ -722,6 +766,73 @@ test.describe("authored hero motion integration", () => {
         leftLeg: [-0.52, 0.16, 0.4],
         rightLeg: [0.44, -0.12, -0.34],
       },
+      // Reduced Motion keeps the static crash silhouette: no tumble.
+      crashRagdoll: null,
     });
+  });
+
+  test("stalls an overheated engine for 3.5 s with acceleration cut and exhaust smoke and embers", async ({ page }, testInfo) => {
+    test.skip(testInfo.project.name !== "chromium", "Overheat stall presentation runs once in Chromium");
+    test.setTimeout(180_000);
+    const failures: string[] = [];
+    page.on("pageerror", (error) => failures.push(`pageerror: ${error.message}`));
+    page.on("console", (message) => {
+      if (message.type() === "error") failures.push(`console: ${message.text()}`);
+    });
+    page.on("requestfailed", (request) => failures.push(`requestfailed: ${request.url()}`));
+
+    const canvas = await startPractice(page, "/?qa-near-overheat=1");
+    await expect(canvas).toHaveAttribute("data-overheat-exhaust-style", "dark-smoke-ember-sparks");
+    await expect(canvas).toHaveAttribute("data-overheat-exhaust", "idle");
+    await armMotionHistory(page);
+    await canvas.focus();
+    await page.keyboard.down("w");
+    await page.keyboard.down("Shift");
+
+    // Heat starts at 99 but cools while the race gate opens; a loaded renderer
+    // can stretch the Turbo climb back to 100 well past real time.
+    await expect(canvas).toHaveAttribute("data-overheat-exhaust", "stalled", { timeout: 60_000 });
+    await expect(page.locator(".caption-cue")).toContainText("Overheated — engine stalled for 3.5 s");
+    await expect(page.locator(".race-hint")).toHaveText("Engine stalled — controls return after 3.5 s");
+    await expect(page.locator(".heat-meter")).toHaveClass(/overheated/);
+    await expect.poll(
+      async () => Number(await canvas.getAttribute("data-overheat-exhaust-smoke") ?? "0"),
+      { timeout: 15_000 },
+    ).toBeGreaterThanOrEqual(4);
+    await expect.poll(
+      async () => Number(await canvas.getAttribute("data-overheat-exhaust-emissions") ?? "0"),
+      { timeout: 15_000 },
+    ).toBeGreaterThanOrEqual(8);
+    await testInfo.attach("overheat-stall-exhaust", {
+      body: await page.screenshot(),
+      contentType: "image/png",
+    });
+
+    // Ride and Turbo stay held for the whole stall; control returns after it.
+    // The stall is 3.5 s of simulation time, which a slow headless renderer
+    // stretches in wall time.
+    await expect(canvas).toHaveAttribute("data-overheat-exhaust", "idle", { timeout: 30_000 });
+    await expect.poll(async () => (await readMotionSnapshot(canvas)).speed, { timeout: 10_000 })
+      .toBeGreaterThan(1);
+    await page.keyboard.up("Shift");
+    await page.keyboard.up("w");
+
+    const history = await readMotionHistory(page);
+    const firstStalled = history.findIndex((snapshot) => snapshot.overheated);
+    const released = history.findIndex(
+      (snapshot, index) => index > firstStalled && !snapshot.overheated,
+    );
+    expect(firstStalled, "a stalled frame should be recorded").toBeGreaterThanOrEqual(0);
+    expect(released, "a released frame should be recorded").toBeGreaterThan(firstStalled);
+    const stalledFrames = history.slice(firstStalled, released);
+    const stallSteps = history[released]!.stepCount - history[firstStalled]!.stepCount;
+    expect(stallSteps).toBeGreaterThanOrEqual(205);
+    expect(stallSteps).toBeLessThanOrEqual(214);
+    for (const [index, snapshot] of stalledFrames.entries()) {
+      if (index > 0) expect(snapshot.speed).toBeLessThanOrEqual(stalledFrames[index - 1]!.speed);
+    }
+    expect(stalledFrames.at(-1)?.speed).toBe(0);
+    expect(history[released]!.heat).toBeLessThanOrEqual(35);
+    expect(failures).toEqual([]);
   });
 });
