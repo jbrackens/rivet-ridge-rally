@@ -167,6 +167,7 @@ export async function verifyServedReleaseAfterJourney(
     && servedAfter.aggregateSha256 === servedBefore.aggregateSha256
     && servedAfter.fileCount === servedBefore.fileCount
     && servedAfter.totalBytes === servedBefore.totalBytes
+    && servedAfter.totalGzipBytes === servedBefore.totalGzipBytes
     && servedAfter.entrypoint?.sha256 === servedBefore.entrypoint?.sha256;
   if (!stable) {
     throw new Error("Production smoke served candidate changed during the browser journey.");

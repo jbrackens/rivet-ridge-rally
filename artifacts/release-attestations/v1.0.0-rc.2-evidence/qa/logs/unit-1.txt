@@ -1,0 +1,209 @@
+$ npm test
+startedAt=2026-07-19T13:00:58.708Z
+completedAt=2026-07-19T13:01:45.568Z
+exitCode=0
+
+
+> rivet-ridge-rally@1.0.0-rc.2 test
+> vitest run && npm run test:release-manifest && npm run test:release-attestation && npm run test:production-smoke-support
+
+
+ RUN  v4.1.10 /Users/john/Sandbox/Rivet Ridge Rally
+
+
+ Test Files  32 passed (32)
+      Tests  302 passed (302)
+   Start at  15:00:59
+   Duration  4.38s (transform 2.68s, setup 0ms, import 5.59s, tests 3.32s, environment 22.79s)
+
+
+> rivet-ridge-rally@1.0.0-rc.2 test:release-manifest
+> node --test scripts/release-manifest.test.mjs
+
+✔ builds format-2 bytes from tracked source with the exact npm package in a detached checkout (2013.719125ms)
+✔ qualifies the installed npm package tree against a detached fixture (3106.512542ms)
+✔ builds a pre-tag visual candidate bound to the same complete npm package tree (1175.540459ms)
+✔ allows short token-prefix coincidences that are not token-shaped (1342.694ms)
+▶ rejects visual candidates captured after the expected annotated or lightweight tag
+  ✔ annotated (646.60275ms)
+  ✔ lightweight (628.911875ms)
+✔ rejects visual candidates captured after the expected annotated or lightweight tag (1276.085125ms)
+✔ rejects a symlinked release sidecar parent before touching outside files (1081.037417ms)
+▶ fails closed for invalid provenance inputs
+  ✔ dirty tracked source (212.523542ms)
+  ✔ untracked source (218.29675ms)
+  ✔ lightweight release tag (647.4355ms)
+  ✔ missing exact release tag (640.025625ms)
+  ✔ release tag not at HEAD (715.22375ms)
+  ✔ package-lock identity mismatch (649.132417ms)
+  ✔ Node pin mismatch (609.078209ms)
+  ✔ missing npm_execpath (658.800333ms)
+  ✔ sidecar directory is preserved before root output replacement starts (672.048458ms)
+  ✔ relative npm_execpath (666.035958ms)
+  ✔ npm CLI version mismatch (681.830792ms)
+  ✔ non-exact npm declaration (609.293083ms)
+✔ fails closed for invalid provenance inputs (6981.432208ms)
+▶ fails closed on unexpected ignored detached-checkout inputs at every build phase
+  ✔ before install (604.730459ms)
+  ✔ after npm ci (915.024709ms)
+  ✔ after build (1025.717ms)
+✔ fails closed on unexpected ignored detached-checkout inputs at every build phase (2546.014791ms)
+▶ fails closed when exact tag or npm package provenance changes during build
+  ✔ annotated tag object replaced at the same commit (1274.959334ms)
+  ✔ npm CLI mutated during build (937.809125ms)
+  ✔ non-entry npm implementation mutated during build (932.009583ms)
+✔ fails closed when exact tag or npm package provenance changes during build (3145.343333ms)
+▶ fails closed for invalid isolated build outputs
+  ✔ source-map (1106.423375ms)
+  ✔ missing-notice (1091.637833ms)
+  ✔ qa-marker (1109.292625ms)
+  ✔ performance-capture-marker (1117.308417ms)
+  ✔ product-performance-marker (1095.038792ms)
+  ✔ local-path (1114.750833ms)
+  ✔ source-path (1114.076209ms)
+  ✔ worktree-path (1101.561667ms)
+  ✔ temp-path (1080.190667ms)
+  ✔ linux-path (1108.232125ms)
+  ✔ windows-path (1125.674125ms)
+  ✔ file-url (1102.27725ms)
+  ✔ private-key (1089.973208ms)
+  ✔ live-token (1072.235709ms)
+  ✔ symlink (1074.8865ms)
+✔ fails closed for invalid isolated build outputs (16505.473125ms)
+ℹ tests 45
+ℹ suites 0
+ℹ pass 45
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 39234.996083
+
+> rivet-ridge-rally@1.0.0-rc.2 test:release-attestation
+> node --test scripts/release-attestation.test.mjs
+
+✔ producer-facing release validation rejects nonqualifying settings and unsafe output paths (14.548333ms)
+✔ accepts one clean annotated product/evidence chain with passing mandatory evidence (59.923625ms)
+✔ schema rejects unknown fields (0.204042ms)
+✔ schema rejects a pending human decision (17.930625ms)
+✔ rejects evidence bytes changed after attestation (19.328375ms)
+✔ rejects a hash-updated but headless performance record (22.143208ms)
+✔ rejects performance evidence with missing restart timing (21.228ms)
+✔ rejects performance evidence measured with a hero fallback (19.798208ms)
+✔ rejects performance duration that disagrees with completion chronology (18.965458ms)
+✔ rejects unknown fields in schema-4 performance evidence (19.040334ms)
+✔ rejects performance and soak records that agree with each other but not the manifest (19.418625ms)
+✔ rejects a performance gzip record that is not bound to the release manifest (17.204959ms)
+✔ rejects a passing render summary that does not match its raw samples (19.019541ms)
+✔ rejects a named mobile profile recorded at the desktop viewport (18.698333ms)
+✔ rejects a performance profile whose selected quality does not match its identity (19.20325ms)
+✔ rejects passing-labelled performance evidence whose measured FPS misses the fixed threshold (17.46425ms)
+✔ rejects duplicate performance profiles even when every criterion says PASS (19.839416ms)
+✔ rejects a passing-labelled soak shorter than 30 active minutes (18.740917ms)
+✔ rejects soak restart summaries that do not recompute from raw timings (18.399375ms)
+✔ rejects soak evidence with missing fixed-step attempt records (19.128ms)
+✔ rejects soak evidence without its diagnostic gate (17.981584ms)
+✔ rejects a soak whose racing clock begins outside the racing state (18.305459ms)
+✔ rejects coercible string soak durations (18.0745ms)
+✔ rejects asserted 30-minute soak duration with a sparse measured sample set (16.895375ms)
+✔ rejects a soak profile whose touch/mobile emulation does not match its identity (18.053416ms)
+✔ rejects soak summaries that do not recompute from raw samples (18.156417ms)
+✔ rejects a missing mandatory candidate-bound QA check (14.405625ms)
+✔ rejects a mandatory QA record that substitutes another command (22.666291ms)
+✔ rejects a QA approval that predates mandatory evidence (38.403833ms)
+✔ rejects a QA approval issued after smoke start but before smoke completion (30.295916ms)
+✔ rejects a accessibility approval that predates completed mandatory evidence (30.8005ms)
+✔ rejects a legal approval that predates completed mandatory evidence (30.241792ms)
+✔ rejects a hash-valid approval record bound to another candidate commit (28.500125ms)
+✔ rejects a QA approval whose exact decision retains an open P1 (24.169958ms)
+✔ rejects an accessibility approval with unresolved mandatory findings (29.722875ms)
+✔ rejects a legal approval without explicit privacy clearance (35.909083ms)
+✔ rejects QA approval when the bound report still says NOT READY (30.642375ms)
+✔ rejects a READY QA report marker bound to another candidate (30.593125ms)
+✔ rejects QA approval that does not hash-bind launch readiness (28.164708ms)
+✔ rejects QA approval that omits docs/design/RACE_CURVED_CANYON_BASELINE_APPROVAL.json (27.293791ms)
+✔ rejects QA approval that omits e2e/visual-regression.spec.ts-snapshots/race-curved-course-canyon-chromium-darwin.png (28.162375ms)
+✔ rejects a visual approval record whose promoted hash differs from the owner-approved capture (30.10875ms)
+✔ rejects a visual approval record with an incomplete controlled capture matrix (32.146291ms)
+✔ rejects a generic visual owner attribution (26.530333ms)
+✔ rejects visual owner attribution with surrounding whitespace (27.912458ms)
+✔ rejects product source changes after the owner-reviewed visual candidate (31.30325ms)
+✔ rejects evidence-commit changes to the product-bound visual baseline (34.214917ms)
+✔ rejects QA approval when bound launch readiness still says NOT READY (26.089083ms)
+✔ rejects a READY launch marker bound to another candidate (25.6895ms)
+✔ rejects a moved product tag (16.568958ms)
+✔ rejects an incomplete production-smoke screenshot bundle (20.397041ms)
+✔ rejects production smoke whose completion predates its start (18.457958ms)
+✔ rejects production smoke bound to the wrong service-worker cache generation (19.562167ms)
+✔ rejects production smoke with an incomplete served-file inventory (18.449458ms)
+✔ rejects hash-matched screenshot placeholders that are not real PNG images (19.31675ms)
+✔ rejects a source-unbound format-1 rollback manifest (29.145917ms)
+✔ schema rejects a rollback locator that is not content-addressed (16.924417ms)
+✔ schema rejects a moving rollback alias even when the canonical hash suffix is present (13.693125ms)
+✔ schema rejects a rollback locator with a noncanonical trailing slash (14.239458ms)
+✔ schema rejects a credential-bearing rollback locator even when content-addressed (15.336875ms)
+✔ rejects rollback retrieval evidence bound to another source commit (41.342583ms)
+✔ rejects rollback retrieval evidence with another archive SHA-256 (61.860584ms)
+✔ rejects rollback smoke evidence with an incomplete staged journey (42.374ms)
+✔ rejects rollback smoke evidence with another archive byte count (51.225209ms)
+✔ rejects rollback smoke evidence with substituted served bytes (30.552083ms)
+✔ rejects rollback smoke served inventory from another root URL (30.93475ms)
+✔ rejects rollback evidence that clears site data to bypass the version downgrade (35.930292ms)
+✔ rejects rollback data-safety evidence that tests native version 50 instead of the tagged predecessor (34.549709ms)
+✔ rejects vacuous rollback data-safety evidence with no persisted records (34.768625ms)
+✔ rejects an evidence commit that is not descended from the product release (16.533417ms)
+✔ rejects product-source changes in the evidence-only commit (42.209333ms)
+ℹ tests 71
+ℹ suites 0
+ℹ pass 71
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 1897.726958
+
+> rivet-ridge-rally@1.0.0-rc.2 test:production-smoke-support
+> node --test scripts/production-smoke-support.test.mjs scripts/production-smoke-flow.test.mjs scripts/service-worker-install.test.mjs scripts/release-scope-audit.test.mjs
+
+✔ rejects a symlinked evidence ancestor before creating files outside the repository (5.32ms)
+✔ rejects an evidence-root anchor replaced by a symlink after preparation (2.621875ms)
+✔ records screenshot bytes and SHA-256 under safe names with a deterministic aggregate (0.920416ms)
+✔ rejects unsafe, empty, duplicate, or malformed screenshot evidence (0.215ms)
+✔ waits for a racing gate and observes a restart transition before racing resumes (0.191458ms)
+✔ creates the candidate parent before atomically promoting a completed staging bundle (0.132ms)
+✔ reverifies served release bytes after the journey and rejects identity drift (0.181458ms)
+✔ binds every served production file to a valid format-2 manifest (11.5345ms)
+✔ fails when a served file differs from the manifest (1.116708ms)
+✔ fails when the served root differs from manifest index.html or leaves the origin (1.005417ms)
+✔ normalizes a root URL and rejects embedded credentials (0.12275ms)
+✔ rejects unsafe paths and internally inconsistent manifest aggregates (0.564833ms)
+✔ bounds an unsettled production-smoke operation (11.075792ms)
+✔ collects tracked shipped files and optional current dist files (127.930208ms)
+✔ passes a clean release scope without scanning docs or test fixtures (108.303708ms)
+✔ fails on prohibited product marks, local paths, trackers, and live secret shapes (96.839333ms)
+✔ installs only freshly reloaded, validated core and discovered assets (15.084708ms)
+✔ fails installation before activation when any fresh core response is not successful (0.909375ms)
+✔ fails installation when a core request resolves to a cross-origin response (0.651ms)
+✔ fails installation when a fresh core response forbids storage (0.690416ms)
+✔ installs an ordinary Vary response and matches it safely while offline (0.891792ms)
+✔ fails installation when a fresh core response has Vary star (0.634208ms)
+✔ fails installation before cache creation when the complete shell exceeds its entry cap (1.682334ms)
+✔ falls back to the cached shell when navigation resolves with a same-origin 5xx (0.559083ms)
+✔ returns a same-origin 4xx navigation response without masking it (0.44525ms)
+✔ falls back to the cached shell when navigation fetch rejects (0.533ms)
+✔ falls back to the cached shell when navigation resolves cross-origin (0.417333ms)
+✔ runtime warming rejects cross-origin final responses and does not claim readiness (0.512083ms)
+✔ runtime warming rejects Vary star responses (0.385375ms)
+✔ runtime warming rejects a same-origin final URL outside the static allowlist (0.444875ms)
+✔ runtime cache growth is capped across batches and generic misses (1.390125ms)
+✔ generic cache fill returns but does not retain a cross-origin final response (0.396792ms)
+✔ runtime caching rejects non-static paths and generic fetch leaves them untouched (0.36125ms)
+✔ runtime caching rejects oversized batches before fetching (0.335667ms)
+ℹ tests 34
+ℹ suites 0
+ℹ pass 34
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 393.988125

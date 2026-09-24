@@ -1,5 +1,6 @@
 import { EDITOR_MODULE_BY_ID, type EditorModuleDefinition } from "./modules";
 import type { CustomTrackData, CustomTrackModule } from "../persistence/database";
+import { LANE_POSITIONS as LANE_CENTERS } from "../simulation";
 
 export interface TrackValidationResult {
   valid: boolean;
@@ -18,7 +19,6 @@ interface CollisionFootprint {
   maxRoute: number;
 }
 
-const LANE_CENTERS = [-4.5, -1.5, 1.5, 4.5] as const;
 const TRACK_HALF_WIDTH = 6;
 export const CUSTOM_TRACK_ROUTE_LIMIT = 20_000;
 export const CUSTOM_TRACK_NAME_MAX_CHARS = 42;

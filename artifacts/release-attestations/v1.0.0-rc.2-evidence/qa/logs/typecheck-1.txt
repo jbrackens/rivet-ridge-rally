@@ -1,0 +1,12 @@
+command: npm run typecheck
+startedAt: 2026-07-19T12:53:25.479Z
+completedAt: 2026-07-19T12:53:26.004Z
+exitCode: 0
+
+--- stdout ---
+
+> rivet-ridge-rally@1.0.0-rc.2 typecheck
+> node node_modules/typescript-7/bin/tsc -b --pretty false
+
+
+--- stderr ---

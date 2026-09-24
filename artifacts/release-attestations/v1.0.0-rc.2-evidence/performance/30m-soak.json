@@ -1,0 +1,5727 @@
+{
+  "schemaVersion": 4,
+  "kind": "performance-soak",
+  "startedAt": "2026-07-19T12:12:32.355Z",
+  "completedAt": "2026-07-19T12:43:39.794Z",
+  "createdAt": "2026-07-19T12:43:39.794Z",
+  "baseURL": "http://127.0.0.1:4173/",
+  "browser": {
+    "name": "chromium",
+    "version": "149.0.7827.55",
+    "headless": false
+  },
+  "host": {
+    "node": "v26.4.0",
+    "platform": "darwin",
+    "architecture": "arm64",
+    "os": {
+      "type": "Darwin",
+      "release": "25.5.0",
+      "version": "Darwin Kernel Version 25.5.0: Tue Jun  9 22:18:58 PDT 2026; root:xnu-12377.121.10~1/RELEASE_ARM64_T6000"
+    },
+    "cpu": {
+      "model": "Apple M1 Max",
+      "logicalCores": 10
+    },
+    "totalMemoryBytes": 34359738368
+  },
+  "device": {
+    "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/149.0.0.0 Safari/537.36",
+    "browserPlatform": "MacIntel",
+    "languages": [
+      "en-US"
+    ],
+    "hardwareConcurrency": 10,
+    "deviceMemoryGiB": 32,
+    "viewport": {
+      "width": 1920,
+      "height": 1080
+    },
+    "screen": {
+      "width": 1920,
+      "height": 1080,
+      "colorDepth": 24,
+      "pixelDepth": 24
+    },
+    "devicePixelRatio": 1,
+    "pointer": {
+      "coarse": false,
+      "hover": true
+    },
+    "webgl": {
+      "version": "WebGL 2.0 (OpenGL ES 3.0 Chromium)",
+      "shadingLanguageVersion": "WebGL GLSL ES 3.00 (OpenGL ES GLSL ES 3.0 Chromium)",
+      "vendor": "Google Inc. (Apple)",
+      "renderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M1 Max, Unspecified Version)"
+    }
+  },
+  "runtime": {
+    "title": "Rivet Ridge Rally",
+    "qaApiPresent": false,
+    "productPerformanceApiPresent": false,
+    "performanceCaptureHarnessPresent": true,
+    "version": "1.0.0-rc.2",
+    "versionPresent": true,
+    "build": {
+      "commit": "2b4069538c242da37c8c43d6581e097149fa1994",
+      "dirty": false
+    }
+  },
+  "setup": {
+    "method": "native-indexeddb-progress-record",
+    "database": "rivet-ridge-rally",
+    "nativeIndexedDbVersion": 60,
+    "profileId": "rider-01",
+    "trackId": "canyon-kickoff",
+    "expectedTrackIds": [
+      "canyon-kickoff",
+      "pine-run",
+      "coastline-clash",
+      "foundry-flight",
+      "summit-showdown"
+    ],
+    "bestSoloMs": 190000,
+    "rivalUnlocked": true,
+    "verifiedViaPublicUi": true
+  },
+  "candidate": {
+    "source": {
+      "commit": "2b4069538c242da37c8c43d6581e097149fa1994",
+      "packageVersion": "1.0.0-rc.2",
+      "expectedTag": "v1.0.0-rc.2",
+      "tagsAtCommit": [
+        "v1.0.0-rc.2"
+      ],
+      "expectedTagAtCommit": true,
+      "expectedTagObjectType": "tag",
+      "expectedTagAnnotated": true,
+      "dirty": false,
+      "dirtyEntryCount": 0
+    },
+    "localBuild": {
+      "directory": "dist",
+      "fileCount": 33,
+      "totalBytes": 8011146,
+      "totalGzipBytes": 5466253,
+      "aggregateSha256": "e7af57d55db8df4d4c16b008c7cccfa2769b370ff845262c8eb9cb1eff3114d0",
+      "files": [
+        {
+          "path": "THIRD_PARTY_NOTICES.txt",
+          "bytes": 43872,
+          "gzipBytes": 8449,
+          "gzipSha256": "634c7e56b6407f5d0f65bf956ac13bb28df123f71de707c2c667951a9cd56975",
+          "sha256": "f837ed705667d0f3976bbd419f42d8c63844a3eb4b52f76db88ed3a1d6e270c2"
+        },
+        {
+          "path": "assets/3d/asset-manifest.json",
+          "bytes": 15165,
+          "gzipBytes": 4250,
+          "gzipSha256": "b70835d43816645c90eb48e47768c5376719bf50bf270ee193845f98ac2a207b",
+          "sha256": "005ed98f7c4e365abb104da79352eb78b3bc3d7340f9dc074a3e84c772918918"
+        },
+        {
+          "path": "assets/3d/hero-bike-rider.glb",
+          "bytes": 517664,
+          "gzipBytes": 241430,
+          "gzipSha256": "c4097605fde517b7963d1d99d5fd13c0cf0b991c145a7c81c3cf31e02be0eefa",
+          "sha256": "538be4269927544fa91cfc405742523a60422d77d546ce9c8859f407deb2e6e8"
+        },
+        {
+          "path": "assets/CoursePresentationRoute-BrMJ3DCB.js",
+          "bytes": 17403,
+          "gzipBytes": 5652,
+          "gzipSha256": "b3279b1e07cf909f2991f1f4cb3b3560c70a8ac33e7a2706c20a2956901efe2a",
+          "sha256": "a81e4b27c0ddaec991f1f599c89576a9e611108ea4429b4ee97959591dd21eac"
+        },
+        {
+          "path": "assets/GameView-BTqB6Yt0.js",
+          "bytes": 217703,
+          "gzipBytes": 64139,
+          "gzipSha256": "bd2ba754a8333b49134a53c3742ffe360092a91f6554ec4b2ede66856ee839f6",
+          "sha256": "2831329f20fcd6e117f32b88ae49d37fd29ad43bcb30252514a878230b17f672"
+        },
+        {
+          "path": "assets/TrackEditorScreen-Dcx-OE-u.js",
+          "bytes": 70271,
+          "gzipBytes": 20820,
+          "gzipSha256": "6ce6416cbe4a70961cfb3fe641f168887b36d983180087525ec5ff6a50f6804f",
+          "sha256": "d1bbc97657d9cb64c6b2c3c49cae9f3ecf0d451e6ddfe71b11c15ffb252434ec"
+        },
+        {
+          "path": "assets/art/canyon-festival-panorama.png",
+          "bytes": 1801764,
+          "gzipBytes": 1787783,
+          "gzipSha256": "fe8fbdbd99b9163c7040a76524e57988a1199732520bb3567c723f260b005069",
+          "sha256": "43b39c9075428e9bc081b3d8f216fae0027e889f89caa59586aa6097080b26a5"
+        },
+        {
+          "path": "assets/art/title-background.png",
+          "bytes": 2129759,
+          "gzipBytes": 2115848,
+          "gzipSha256": "562bbe419f018f6c4686069f68c2e5b4157cd230b585daa62b60e25686e5b17c",
+          "sha256": "292ffdf20edcb4c483b30a5a4f6882f3ecbaf8ff1f28815d8fe28a9aeb6e3e78"
+        },
+        {
+          "path": "assets/basis_transcoder-VXdx5NbI.wasm",
+          "bytes": 527333,
+          "gzipBytes": 244553,
+          "gzipSha256": "222ff2aa9a44fc3f8b88c04813c0fb2049dc95e270d0a6787c5f4d467e5d5ca4",
+          "sha256": "6cf17dc889352c42e9acf8897107978d127005fe3386c36a0e3845e27967630a"
+        },
+        {
+          "path": "assets/basis_transcoder-o4Hde_L7.js",
+          "bytes": 57529,
+          "gzipBytes": 15063,
+          "gzipSha256": "7a86d3f9835fdcc6467dd3b40a18fd6d4d7d5d73a81bfcf52660e395b2958df7",
+          "sha256": "8478b5b6d6b74e7d3082b89f6417321d8d1dc0307f2b30d4484bb11b441696a1"
+        },
+        {
+          "path": "assets/canyon/asset-manifest.json",
+          "bytes": 4909,
+          "gzipBytes": 1959,
+          "gzipSha256": "8524577dd1fa95a3a509e1f583aaf20e2b7654aa4f38bba2e291590f89a59450",
+          "sha256": "7bc99fdaa7d8ce99fb3f20ebac94910261bc74344b23fa42fcb2e93e98f448ad"
+        },
+        {
+          "path": "assets/canyon/canyon-kit.glb",
+          "bytes": 427028,
+          "gzipBytes": 138204,
+          "gzipSha256": "357783d0a79e7c1917cf8773147d3d0cb30c7c06363d05f594cebc21dfef78cf",
+          "sha256": "283be67d91cce4b0dc7b0f7e291811c62c77384f5e3f226cca71d41ce890ff7d"
+        },
+        {
+          "path": "assets/fonts/barlow-condensed-700-latin.woff2",
+          "bytes": 14888,
+          "gzipBytes": 14911,
+          "gzipSha256": "2f2c1b422e44fd130af0f2b07658adffc4b69dc5c1db8b7883c41680475418e4",
+          "sha256": "e3e520cb7468f2efd60bc2ce96694567c3312f4ef414fffbe605e3ad146b24e6"
+        },
+        {
+          "path": "assets/fonts/barlow-condensed-900-latin.woff2",
+          "bytes": 13940,
+          "gzipBytes": 13963,
+          "gzipSha256": "1028bfe4366a70e06b01dc586a5a9542ebdf7ab7f8221da55b07c1cbac90e0d5",
+          "sha256": "2036f7f4aacc7759dcf8c6be2bd5bbde873c25a860f24dca0530ad14d4937723"
+        },
+        {
+          "path": "assets/icons/app-icon-192.png",
+          "bytes": 8560,
+          "gzipBytes": 8580,
+          "gzipSha256": "5ac58adb3d5e883546733cd75beb0e15a6a78b24207b9d11befe2eda80c361f6",
+          "sha256": "b45e0ac35c9a1eb45a06d2487a75c5ae977854a95bb48f669d668ce0219b5a7e"
+        },
+        {
+          "path": "assets/icons/app-icon-512.png",
+          "bytes": 27595,
+          "gzipBytes": 26667,
+          "gzipSha256": "ab8bb39d4e935eaafc34918c5cf2ae922b0d38b077a1f95c37df8ffa5c471f1a",
+          "sha256": "9a1666c7fe34cc2c79270f6498dcbf948a4febda0ef04576dd5f38dd3875ad4e"
+        },
+        {
+          "path": "assets/icons/app-icon-maskable-512.png",
+          "bytes": 19855,
+          "gzipBytes": 16781,
+          "gzipSha256": "2975f2903edd8346f323d00478a70ff8bd3096408e86a773f4d331ad20768d5e",
+          "sha256": "214cafc22adfcb95d013b4ed7b0843db64cd32e21756096d44cd010e6fcccff8"
+        },
+        {
+          "path": "assets/icons/app-icon.svg",
+          "bytes": 477,
+          "gzipBytes": 318,
+          "gzipSha256": "f94207b33fb90458c8d39c428f975fb1d47b978b35362a91f87ad19f2895e958",
+          "sha256": "7d55e5fe2392a4d091f962e01e2a09dc6a21def5c1e9886a2bb39bb478f395a5"
+        },
+        {
+          "path": "assets/icons/apple-touch-icon-180.png",
+          "bytes": 5426,
+          "gzipBytes": 5087,
+          "gzipSha256": "50a69f3d3b5f4ad207b4570b597b612110b439dcf754bdeaeb01057fc9de2369",
+          "sha256": "b82b791567ecc66dec30f9e3c6d5b7d8d146e9476198e8a8cebf2ae9ec7b9bd0"
+        },
+        {
+          "path": "assets/index-74KsKi0H.css",
+          "bytes": 72880,
+          "gzipBytes": 16653,
+          "gzipSha256": "d31133ec7163111b567dc671cb5b38316d7e609da3479d43c19cb505c050776b",
+          "sha256": "4cab749ee7bef959a392fd9aef2c84035cd1cf750dc2022f1203e51242ac0e19"
+        },
+        {
+          "path": "assets/index-CP0Fy9ck.js",
+          "bytes": 474703,
+          "gzipBytes": 142615,
+          "gzipSha256": "37d1d059bb468d5f94ed723cd040be432923a7ade7eeee04138003927f90599b",
+          "sha256": "a740c1efba44dd0368532d150fc6b6c8e46b97f4b3004b312e9968d90e65c9fc"
+        },
+        {
+          "path": "assets/rivals/asset-manifest.json",
+          "bytes": 6661,
+          "gzipBytes": 2342,
+          "gzipSha256": "87a0f49f19326e28bc6a6c51951a9dda0b09cad7bb8bd2697d836748bee5e08d",
+          "sha256": "11afda3c61870315c41dc769c777a6b712427d939946b10ee6ca4b0240c44bc8"
+        },
+        {
+          "path": "assets/rivals/rival-pack.glb",
+          "bytes": 193884,
+          "gzipBytes": 107697,
+          "gzipSha256": "3e4e64c0cb16b0f68f369a6ac760cefa5075dfe2399b32e16b8766c64050e33e",
+          "sha256": "09043547981c80d66fca23aa208971b6b2f457890cafabeed4258dbc0fdbb805"
+        },
+        {
+          "path": "assets/transcoders/basis/LICENSE.txt",
+          "bytes": 9197,
+          "gzipBytes": 3331,
+          "gzipSha256": "34d10b98cc3af69712eb6464f6ca626610f931ede48e60c99eba5bf8be4ccf24",
+          "sha256": "a7d00bfd54525bc694b6e32f64c7ebcf5e6b7ae3657be5cc12767bce74654a47"
+        },
+        {
+          "path": "assets/transcoders/basis/NOTICE.txt",
+          "bytes": 917,
+          "gzipBytes": 514,
+          "gzipSha256": "d86eb757ee07b944fb4beeeed898defc16df44cecee6a85f69363770d7c3743d",
+          "sha256": "42beeb6710c933778e30f62886e0790ebba120debbb0545ab46c7292d3e5a061"
+        },
+        {
+          "path": "assets/transcoders/basis/README.md",
+          "bytes": 1388,
+          "gzipBytes": 702,
+          "gzipSha256": "0e048bde542cd2af7435b2a728d6da65e588212aadac772010f2cd647b012abe",
+          "sha256": "a578df416c1e0852e9c36a1cf91b4d28d91a251294f87ce610a3bc7ca4df15e0"
+        },
+        {
+          "path": "assets/transcoders/basis/basis_transcoder.js",
+          "bytes": 57529,
+          "gzipBytes": 15063,
+          "gzipSha256": "7a86d3f9835fdcc6467dd3b40a18fd6d4d7d5d73a81bfcf52660e395b2958df7",
+          "sha256": "8478b5b6d6b74e7d3082b89f6417321d8d1dc0307f2b30d4484bb11b441696a1"
+        },
+        {
+          "path": "assets/transcoders/basis/basis_transcoder.wasm",
+          "bytes": 527333,
+          "gzipBytes": 244553,
+          "gzipSha256": "222ff2aa9a44fc3f8b88c04813c0fb2049dc95e270d0a6787c5f4d467e5d5ca4",
+          "sha256": "6cf17dc889352c42e9acf8897107978d127005fe3386c36a0e3845e27967630a"
+        },
+        {
+          "path": "assets/vendor-three-_L_YAsy5.js",
+          "bytes": 598505,
+          "gzipBytes": 148836,
+          "gzipSha256": "4dc6d7538762d902d1fc9c6a23f3184178e816e273ccb25d46c5f92cea4ed42f",
+          "sha256": "ad793e90e46ee2c215ce5a818f9d7ebc7ac608fa5c8dde2723c2fd9cf975d5bd"
+        },
+        {
+          "path": "assets/vendor-three-addons-kpozWyf3.js",
+          "bytes": 135491,
+          "gzipBytes": 45815,
+          "gzipSha256": "95072bc958775095885f8b832e2e0fac6d268762ef692fe7ef0faac17e719ea0",
+          "sha256": "115007f768b8376d80164d66e8edce7559b3729e3809cf2911785c5193258301"
+        },
+        {
+          "path": "index.html",
+          "bytes": 1632,
+          "gzipBytes": 690,
+          "gzipSha256": "6584c2441381ccde06cdbe665dda9e57d62e583f0de233103d929707dd79c0cd",
+          "sha256": "21fd4e3f7e5e33d5c2fc46057665226f001e780998160b19258c1d9a45bbffaa"
+        },
+        {
+          "path": "manifest.webmanifest",
+          "bytes": 856,
+          "gzipBytes": 309,
+          "gzipSha256": "fbef3032f37477db0dc3242bd5b6c55bf7e6593f2cd38428a543ed9dab73503b",
+          "sha256": "04d309ebb9d9488686d273cee253c72d57a81f8499edc9940dc40594b4e04f24"
+        },
+        {
+          "path": "sw.js",
+          "bytes": 9029,
+          "gzipBytes": 2676,
+          "gzipSha256": "9830760b1beb6726ae883ffe14d266b6eaa10e7f155af2a32375ab6728172c8f",
+          "sha256": "424803d26c443c0b4ad7c1337220e68a6f4806e3206afc5f8e2e7a17dd6d36c2"
+        }
+      ]
+    },
+    "servedBefore": {
+      "verified": true,
+      "baseURL": "http://127.0.0.1:4173/",
+      "origin": "http://127.0.0.1:4173",
+      "fileCount": 33,
+      "totalBytes": 8011146,
+      "totalGzipBytes": 5466253,
+      "aggregateSha256": "e7af57d55db8df4d4c16b008c7cccfa2769b370ff845262c8eb9cb1eff3114d0",
+      "entrypoint": {
+        "requestedURL": "http://127.0.0.1:4173/",
+        "finalURL": "http://127.0.0.1:4173/",
+        "bytes": 1632,
+        "sha256": "21fd4e3f7e5e33d5c2fc46057665226f001e780998160b19258c1d9a45bbffaa"
+      },
+      "files": [
+        {
+          "path": "THIRD_PARTY_NOTICES.txt",
+          "bytes": 43872,
+          "gzipBytes": 8449,
+          "gzipSha256": "634c7e56b6407f5d0f65bf956ac13bb28df123f71de707c2c667951a9cd56975",
+          "sha256": "f837ed705667d0f3976bbd419f42d8c63844a3eb4b52f76db88ed3a1d6e270c2"
+        },
+        {
+          "path": "assets/3d/asset-manifest.json",
+          "bytes": 15165,
+          "gzipBytes": 4250,
+          "gzipSha256": "b70835d43816645c90eb48e47768c5376719bf50bf270ee193845f98ac2a207b",
+          "sha256": "005ed98f7c4e365abb104da79352eb78b3bc3d7340f9dc074a3e84c772918918"
+        },
+        {
+          "path": "assets/3d/hero-bike-rider.glb",
+          "bytes": 517664,
+          "gzipBytes": 241430,
+          "gzipSha256": "c4097605fde517b7963d1d99d5fd13c0cf0b991c145a7c81c3cf31e02be0eefa",
+          "sha256": "538be4269927544fa91cfc405742523a60422d77d546ce9c8859f407deb2e6e8"
+        },
+        {
+          "path": "assets/CoursePresentationRoute-BrMJ3DCB.js",
+          "bytes": 17403,
+          "gzipBytes": 5652,
+          "gzipSha256": "b3279b1e07cf909f2991f1f4cb3b3560c70a8ac33e7a2706c20a2956901efe2a",
+          "sha256": "a81e4b27c0ddaec991f1f599c89576a9e611108ea4429b4ee97959591dd21eac"
+        },
+        {
+          "path": "assets/GameView-BTqB6Yt0.js",
+          "bytes": 217703,
+          "gzipBytes": 64139,
+          "gzipSha256": "bd2ba754a8333b49134a53c3742ffe360092a91f6554ec4b2ede66856ee839f6",
+          "sha256": "2831329f20fcd6e117f32b88ae49d37fd29ad43bcb30252514a878230b17f672"
+        },
+        {
+          "path": "assets/TrackEditorScreen-Dcx-OE-u.js",
+          "bytes": 70271,
+          "gzipBytes": 20820,
+          "gzipSha256": "6ce6416cbe4a70961cfb3fe641f168887b36d983180087525ec5ff6a50f6804f",
+          "sha256": "d1bbc97657d9cb64c6b2c3c49cae9f3ecf0d451e6ddfe71b11c15ffb252434ec"
+        },
+        {
+          "path": "assets/art/canyon-festival-panorama.png",
+          "bytes": 1801764,
+          "gzipBytes": 1787783,
+          "gzipSha256": "fe8fbdbd99b9163c7040a76524e57988a1199732520bb3567c723f260b005069",
+          "sha256": "43b39c9075428e9bc081b3d8f216fae0027e889f89caa59586aa6097080b26a5"
+        },
+        {
+          "path": "assets/art/title-background.png",
+          "bytes": 2129759,
+          "gzipBytes": 2115848,
+          "gzipSha256": "562bbe419f018f6c4686069f68c2e5b4157cd230b585daa62b60e25686e5b17c",
+          "sha256": "292ffdf20edcb4c483b30a5a4f6882f3ecbaf8ff1f28815d8fe28a9aeb6e3e78"
+        },
+        {
+          "path": "assets/basis_transcoder-VXdx5NbI.wasm",
+          "bytes": 527333,
+          "gzipBytes": 244553,
+          "gzipSha256": "222ff2aa9a44fc3f8b88c04813c0fb2049dc95e270d0a6787c5f4d467e5d5ca4",
+          "sha256": "6cf17dc889352c42e9acf8897107978d127005fe3386c36a0e3845e27967630a"
+        },
+        {
+          "path": "assets/basis_transcoder-o4Hde_L7.js",
+          "bytes": 57529,
+          "gzipBytes": 15063,
+          "gzipSha256": "7a86d3f9835fdcc6467dd3b40a18fd6d4d7d5d73a81bfcf52660e395b2958df7",
+          "sha256": "8478b5b6d6b74e7d3082b89f6417321d8d1dc0307f2b30d4484bb11b441696a1"
+        },
+        {
+          "path": "assets/canyon/asset-manifest.json",
+          "bytes": 4909,
+          "gzipBytes": 1959,
+          "gzipSha256": "8524577dd1fa95a3a509e1f583aaf20e2b7654aa4f38bba2e291590f89a59450",
+          "sha256": "7bc99fdaa7d8ce99fb3f20ebac94910261bc74344b23fa42fcb2e93e98f448ad"
+        },
+        {
+          "path": "assets/canyon/canyon-kit.glb",
+          "bytes": 427028,
+          "gzipBytes": 138204,
+          "gzipSha256": "357783d0a79e7c1917cf8773147d3d0cb30c7c06363d05f594cebc21dfef78cf",
+          "sha256": "283be67d91cce4b0dc7b0f7e291811c62c77384f5e3f226cca71d41ce890ff7d"
+        },
+        {
+          "path": "assets/fonts/barlow-condensed-700-latin.woff2",
+          "bytes": 14888,
+          "gzipBytes": 14911,
+          "gzipSha256": "2f2c1b422e44fd130af0f2b07658adffc4b69dc5c1db8b7883c41680475418e4",
+          "sha256": "e3e520cb7468f2efd60bc2ce96694567c3312f4ef414fffbe605e3ad146b24e6"
+        },
+        {
+          "path": "assets/fonts/barlow-condensed-900-latin.woff2",
+          "bytes": 13940,
+          "gzipBytes": 13963,
+          "gzipSha256": "1028bfe4366a70e06b01dc586a5a9542ebdf7ab7f8221da55b07c1cbac90e0d5",
+          "sha256": "2036f7f4aacc7759dcf8c6be2bd5bbde873c25a860f24dca0530ad14d4937723"
+        },
+        {
+          "path": "assets/icons/app-icon-192.png",
+          "bytes": 8560,
+          "gzipBytes": 8580,
+          "gzipSha256": "5ac58adb3d5e883546733cd75beb0e15a6a78b24207b9d11befe2eda80c361f6",
+          "sha256": "b45e0ac35c9a1eb45a06d2487a75c5ae977854a95bb48f669d668ce0219b5a7e"
+        },
+        {
+          "path": "assets/icons/app-icon-512.png",
+          "bytes": 27595,
+          "gzipBytes": 26667,
+          "gzipSha256": "ab8bb39d4e935eaafc34918c5cf2ae922b0d38b077a1f95c37df8ffa5c471f1a",
+          "sha256": "9a1666c7fe34cc2c79270f6498dcbf948a4febda0ef04576dd5f38dd3875ad4e"
+        },
+        {
+          "path": "assets/icons/app-icon-maskable-512.png",
+          "bytes": 19855,
+          "gzipBytes": 16781,
+          "gzipSha256": "2975f2903edd8346f323d00478a70ff8bd3096408e86a773f4d331ad20768d5e",
+          "sha256": "214cafc22adfcb95d013b4ed7b0843db64cd32e21756096d44cd010e6fcccff8"
+        },
+        {
+          "path": "assets/icons/app-icon.svg",
+          "bytes": 477,
+          "gzipBytes": 318,
+          "gzipSha256": "f94207b33fb90458c8d39c428f975fb1d47b978b35362a91f87ad19f2895e958",
+          "sha256": "7d55e5fe2392a4d091f962e01e2a09dc6a21def5c1e9886a2bb39bb478f395a5"
+        },
+        {
+          "path": "assets/icons/apple-touch-icon-180.png",
+          "bytes": 5426,
+          "gzipBytes": 5087,
+          "gzipSha256": "50a69f3d3b5f4ad207b4570b597b612110b439dcf754bdeaeb01057fc9de2369",
+          "sha256": "b82b791567ecc66dec30f9e3c6d5b7d8d146e9476198e8a8cebf2ae9ec7b9bd0"
+        },
+        {
+          "path": "assets/index-74KsKi0H.css",
+          "bytes": 72880,
+          "gzipBytes": 16653,
+          "gzipSha256": "d31133ec7163111b567dc671cb5b38316d7e609da3479d43c19cb505c050776b",
+          "sha256": "4cab749ee7bef959a392fd9aef2c84035cd1cf750dc2022f1203e51242ac0e19"
+        },
+        {
+          "path": "assets/index-CP0Fy9ck.js",
+          "bytes": 474703,
+          "gzipBytes": 142615,
+          "gzipSha256": "37d1d059bb468d5f94ed723cd040be432923a7ade7eeee04138003927f90599b",
+          "sha256": "a740c1efba44dd0368532d150fc6b6c8e46b97f4b3004b312e9968d90e65c9fc"
+        },
+        {
+          "path": "assets/rivals/asset-manifest.json",
+          "bytes": 6661,
+          "gzipBytes": 2342,
+          "gzipSha256": "87a0f49f19326e28bc6a6c51951a9dda0b09cad7bb8bd2697d836748bee5e08d",
+          "sha256": "11afda3c61870315c41dc769c777a6b712427d939946b10ee6ca4b0240c44bc8"
+        },
+        {
+          "path": "assets/rivals/rival-pack.glb",
+          "bytes": 193884,
+          "gzipBytes": 107697,
+          "gzipSha256": "3e4e64c0cb16b0f68f369a6ac760cefa5075dfe2399b32e16b8766c64050e33e",
+          "sha256": "09043547981c80d66fca23aa208971b6b2f457890cafabeed4258dbc0fdbb805"
+        },
+        {
+          "path": "assets/transcoders/basis/LICENSE.txt",
+          "bytes": 9197,
+          "gzipBytes": 3331,
+          "gzipSha256": "34d10b98cc3af69712eb6464f6ca626610f931ede48e60c99eba5bf8be4ccf24",
+          "sha256": "a7d00bfd54525bc694b6e32f64c7ebcf5e6b7ae3657be5cc12767bce74654a47"
+        },
+        {
+          "path": "assets/transcoders/basis/NOTICE.txt",
+          "bytes": 917,
+          "gzipBytes": 514,
+          "gzipSha256": "d86eb757ee07b944fb4beeeed898defc16df44cecee6a85f69363770d7c3743d",
+          "sha256": "42beeb6710c933778e30f62886e0790ebba120debbb0545ab46c7292d3e5a061"
+        },
+        {
+          "path": "assets/transcoders/basis/README.md",
+          "bytes": 1388,
+          "gzipBytes": 702,
+          "gzipSha256": "0e048bde542cd2af7435b2a728d6da65e588212aadac772010f2cd647b012abe",
+          "sha256": "a578df416c1e0852e9c36a1cf91b4d28d91a251294f87ce610a3bc7ca4df15e0"
+        },
+        {
+          "path": "assets/transcoders/basis/basis_transcoder.js",
+          "bytes": 57529,
+          "gzipBytes": 15063,
+          "gzipSha256": "7a86d3f9835fdcc6467dd3b40a18fd6d4d7d5d73a81bfcf52660e395b2958df7",
+          "sha256": "8478b5b6d6b74e7d3082b89f6417321d8d1dc0307f2b30d4484bb11b441696a1"
+        },
+        {
+          "path": "assets/transcoders/basis/basis_transcoder.wasm",
+          "bytes": 527333,
+          "gzipBytes": 244553,
+          "gzipSha256": "222ff2aa9a44fc3f8b88c04813c0fb2049dc95e270d0a6787c5f4d467e5d5ca4",
+          "sha256": "6cf17dc889352c42e9acf8897107978d127005fe3386c36a0e3845e27967630a"
+        },
+        {
+          "path": "assets/vendor-three-_L_YAsy5.js",
+          "bytes": 598505,
+          "gzipBytes": 148836,
+          "gzipSha256": "4dc6d7538762d902d1fc9c6a23f3184178e816e273ccb25d46c5f92cea4ed42f",
+          "sha256": "ad793e90e46ee2c215ce5a818f9d7ebc7ac608fa5c8dde2723c2fd9cf975d5bd"
+        },
+        {
+          "path": "assets/vendor-three-addons-kpozWyf3.js",
+          "bytes": 135491,
+          "gzipBytes": 45815,
+          "gzipSha256": "95072bc958775095885f8b832e2e0fac6d268762ef692fe7ef0faac17e719ea0",
+          "sha256": "115007f768b8376d80164d66e8edce7559b3729e3809cf2911785c5193258301"
+        },
+        {
+          "path": "index.html",
+          "bytes": 1632,
+          "gzipBytes": 690,
+          "gzipSha256": "6584c2441381ccde06cdbe665dda9e57d62e583f0de233103d929707dd79c0cd",
+          "sha256": "21fd4e3f7e5e33d5c2fc46057665226f001e780998160b19258c1d9a45bbffaa"
+        },
+        {
+          "path": "manifest.webmanifest",
+          "bytes": 856,
+          "gzipBytes": 309,
+          "gzipSha256": "fbef3032f37477db0dc3242bd5b6c55bf7e6593f2cd38428a543ed9dab73503b",
+          "sha256": "04d309ebb9d9488686d273cee253c72d57a81f8499edc9940dc40594b4e04f24"
+        },
+        {
+          "path": "sw.js",
+          "bytes": 9029,
+          "gzipBytes": 2676,
+          "gzipSha256": "9830760b1beb6726ae883ffe14d266b6eaa10e7f155af2a32375ab6728172c8f",
+          "sha256": "424803d26c443c0b4ad7c1337220e68a6f4806e3206afc5f8e2e7a17dd6d36c2"
+        }
+      ]
+    },
+    "servedAfter": {
+      "verified": true,
+      "baseURL": "http://127.0.0.1:4173/",
+      "origin": "http://127.0.0.1:4173",
+      "fileCount": 33,
+      "totalBytes": 8011146,
+      "totalGzipBytes": 5466253,
+      "aggregateSha256": "e7af57d55db8df4d4c16b008c7cccfa2769b370ff845262c8eb9cb1eff3114d0",
+      "entrypoint": {
+        "requestedURL": "http://127.0.0.1:4173/",
+        "finalURL": "http://127.0.0.1:4173/",
+        "bytes": 1632,
+        "sha256": "21fd4e3f7e5e33d5c2fc46057665226f001e780998160b19258c1d9a45bbffaa"
+      },
+      "files": [
+        {
+          "path": "THIRD_PARTY_NOTICES.txt",
+          "bytes": 43872,
+          "gzipBytes": 8449,
+          "gzipSha256": "634c7e56b6407f5d0f65bf956ac13bb28df123f71de707c2c667951a9cd56975",
+          "sha256": "f837ed705667d0f3976bbd419f42d8c63844a3eb4b52f76db88ed3a1d6e270c2"
+        },
+        {
+          "path": "assets/3d/asset-manifest.json",
+          "bytes": 15165,
+          "gzipBytes": 4250,
+          "gzipSha256": "b70835d43816645c90eb48e47768c5376719bf50bf270ee193845f98ac2a207b",
+          "sha256": "005ed98f7c4e365abb104da79352eb78b3bc3d7340f9dc074a3e84c772918918"
+        },
+        {
+          "path": "assets/3d/hero-bike-rider.glb",
+          "bytes": 517664,
+          "gzipBytes": 241430,
+          "gzipSha256": "c4097605fde517b7963d1d99d5fd13c0cf0b991c145a7c81c3cf31e02be0eefa",
+          "sha256": "538be4269927544fa91cfc405742523a60422d77d546ce9c8859f407deb2e6e8"
+        },
+        {
+          "path": "assets/CoursePresentationRoute-BrMJ3DCB.js",
+          "bytes": 17403,
+          "gzipBytes": 5652,
+          "gzipSha256": "b3279b1e07cf909f2991f1f4cb3b3560c70a8ac33e7a2706c20a2956901efe2a",
+          "sha256": "a81e4b27c0ddaec991f1f599c89576a9e611108ea4429b4ee97959591dd21eac"
+        },
+        {
+          "path": "assets/GameView-BTqB6Yt0.js",
+          "bytes": 217703,
+          "gzipBytes": 64139,
+          "gzipSha256": "bd2ba754a8333b49134a53c3742ffe360092a91f6554ec4b2ede66856ee839f6",
+          "sha256": "2831329f20fcd6e117f32b88ae49d37fd29ad43bcb30252514a878230b17f672"
+        },
+        {
+          "path": "assets/TrackEditorScreen-Dcx-OE-u.js",
+          "bytes": 70271,
+          "gzipBytes": 20820,
+          "gzipSha256": "6ce6416cbe4a70961cfb3fe641f168887b36d983180087525ec5ff6a50f6804f",
+          "sha256": "d1bbc97657d9cb64c6b2c3c49cae9f3ecf0d451e6ddfe71b11c15ffb252434ec"
+        },
+        {
+          "path": "assets/art/canyon-festival-panorama.png",
+          "bytes": 1801764,
+          "gzipBytes": 1787783,
+          "gzipSha256": "fe8fbdbd99b9163c7040a76524e57988a1199732520bb3567c723f260b005069",
+          "sha256": "43b39c9075428e9bc081b3d8f216fae0027e889f89caa59586aa6097080b26a5"
+        },
+        {
+          "path": "assets/art/title-background.png",
+          "bytes": 2129759,
+          "gzipBytes": 2115848,
+          "gzipSha256": "562bbe419f018f6c4686069f68c2e5b4157cd230b585daa62b60e25686e5b17c",
+          "sha256": "292ffdf20edcb4c483b30a5a4f6882f3ecbaf8ff1f28815d8fe28a9aeb6e3e78"
+        },
+        {
+          "path": "assets/basis_transcoder-VXdx5NbI.wasm",
+          "bytes": 527333,
+          "gzipBytes": 244553,
+          "gzipSha256": "222ff2aa9a44fc3f8b88c04813c0fb2049dc95e270d0a6787c5f4d467e5d5ca4",
+          "sha256": "6cf17dc889352c42e9acf8897107978d127005fe3386c36a0e3845e27967630a"
+        },
+        {
+          "path": "assets/basis_transcoder-o4Hde_L7.js",
+          "bytes": 57529,
+          "gzipBytes": 15063,
+          "gzipSha256": "7a86d3f9835fdcc6467dd3b40a18fd6d4d7d5d73a81bfcf52660e395b2958df7",
+          "sha256": "8478b5b6d6b74e7d3082b89f6417321d8d1dc0307f2b30d4484bb11b441696a1"
+        },
+        {
+          "path": "assets/canyon/asset-manifest.json",
+          "bytes": 4909,
+          "gzipBytes": 1959,
+          "gzipSha256": "8524577dd1fa95a3a509e1f583aaf20e2b7654aa4f38bba2e291590f89a59450",
+          "sha256": "7bc99fdaa7d8ce99fb3f20ebac94910261bc74344b23fa42fcb2e93e98f448ad"
+        },
+        {
+          "path": "assets/canyon/canyon-kit.glb",
+          "bytes": 427028,
+          "gzipBytes": 138204,
+          "gzipSha256": "357783d0a79e7c1917cf8773147d3d0cb30c7c06363d05f594cebc21dfef78cf",
+          "sha256": "283be67d91cce4b0dc7b0f7e291811c62c77384f5e3f226cca71d41ce890ff7d"
+        },
+        {
+          "path": "assets/fonts/barlow-condensed-700-latin.woff2",
+          "bytes": 14888,
+          "gzipBytes": 14911,
+          "gzipSha256": "2f2c1b422e44fd130af0f2b07658adffc4b69dc5c1db8b7883c41680475418e4",
+          "sha256": "e3e520cb7468f2efd60bc2ce96694567c3312f4ef414fffbe605e3ad146b24e6"
+        },
+        {
+          "path": "assets/fonts/barlow-condensed-900-latin.woff2",
+          "bytes": 13940,
+          "gzipBytes": 13963,
+          "gzipSha256": "1028bfe4366a70e06b01dc586a5a9542ebdf7ab7f8221da55b07c1cbac90e0d5",
+          "sha256": "2036f7f4aacc7759dcf8c6be2bd5bbde873c25a860f24dca0530ad14d4937723"
+        },
+        {
+          "path": "assets/icons/app-icon-192.png",
+          "bytes": 8560,
+          "gzipBytes": 8580,
+          "gzipSha256": "5ac58adb3d5e883546733cd75beb0e15a6a78b24207b9d11befe2eda80c361f6",
+          "sha256": "b45e0ac35c9a1eb45a06d2487a75c5ae977854a95bb48f669d668ce0219b5a7e"
+        },
+        {
+          "path": "assets/icons/app-icon-512.png",
+          "bytes": 27595,
+          "gzipBytes": 26667,
+          "gzipSha256": "ab8bb39d4e935eaafc34918c5cf2ae922b0d38b077a1f95c37df8ffa5c471f1a",
+          "sha256": "9a1666c7fe34cc2c79270f6498dcbf948a4febda0ef04576dd5f38dd3875ad4e"
+        },
+        {
+          "path": "assets/icons/app-icon-maskable-512.png",
+          "bytes": 19855,
+          "gzipBytes": 16781,
+          "gzipSha256": "2975f2903edd8346f323d00478a70ff8bd3096408e86a773f4d331ad20768d5e",
+          "sha256": "214cafc22adfcb95d013b4ed7b0843db64cd32e21756096d44cd010e6fcccff8"
+        },
+        {
+          "path": "assets/icons/app-icon.svg",
+          "bytes": 477,
+          "gzipBytes": 318,
+          "gzipSha256": "f94207b33fb90458c8d39c428f975fb1d47b978b35362a91f87ad19f2895e958",
+          "sha256": "7d55e5fe2392a4d091f962e01e2a09dc6a21def5c1e9886a2bb39bb478f395a5"
+        },
+        {
+          "path": "assets/icons/apple-touch-icon-180.png",
+          "bytes": 5426,
+          "gzipBytes": 5087,
+          "gzipSha256": "50a69f3d3b5f4ad207b4570b597b612110b439dcf754bdeaeb01057fc9de2369",
+          "sha256": "b82b791567ecc66dec30f9e3c6d5b7d8d146e9476198e8a8cebf2ae9ec7b9bd0"
+        },
+        {
+          "path": "assets/index-74KsKi0H.css",
+          "bytes": 72880,
+          "gzipBytes": 16653,
+          "gzipSha256": "d31133ec7163111b567dc671cb5b38316d7e609da3479d43c19cb505c050776b",
+          "sha256": "4cab749ee7bef959a392fd9aef2c84035cd1cf750dc2022f1203e51242ac0e19"
+        },
+        {
+          "path": "assets/index-CP0Fy9ck.js",
+          "bytes": 474703,
+          "gzipBytes": 142615,
+          "gzipSha256": "37d1d059bb468d5f94ed723cd040be432923a7ade7eeee04138003927f90599b",
+          "sha256": "a740c1efba44dd0368532d150fc6b6c8e46b97f4b3004b312e9968d90e65c9fc"
+        },
+        {
+          "path": "assets/rivals/asset-manifest.json",
+          "bytes": 6661,
+          "gzipBytes": 2342,
+          "gzipSha256": "87a0f49f19326e28bc6a6c51951a9dda0b09cad7bb8bd2697d836748bee5e08d",
+          "sha256": "11afda3c61870315c41dc769c777a6b712427d939946b10ee6ca4b0240c44bc8"
+        },
+        {
+          "path": "assets/rivals/rival-pack.glb",
+          "bytes": 193884,
+          "gzipBytes": 107697,
+          "gzipSha256": "3e4e64c0cb16b0f68f369a6ac760cefa5075dfe2399b32e16b8766c64050e33e",
+          "sha256": "09043547981c80d66fca23aa208971b6b2f457890cafabeed4258dbc0fdbb805"
+        },
+        {
+          "path": "assets/transcoders/basis/LICENSE.txt",
+          "bytes": 9197,
+          "gzipBytes": 3331,
+          "gzipSha256": "34d10b98cc3af69712eb6464f6ca626610f931ede48e60c99eba5bf8be4ccf24",
+          "sha256": "a7d00bfd54525bc694b6e32f64c7ebcf5e6b7ae3657be5cc12767bce74654a47"
+        },
+        {
+          "path": "assets/transcoders/basis/NOTICE.txt",
+          "bytes": 917,
+          "gzipBytes": 514,
+          "gzipSha256": "d86eb757ee07b944fb4beeeed898defc16df44cecee6a85f69363770d7c3743d",
+          "sha256": "42beeb6710c933778e30f62886e0790ebba120debbb0545ab46c7292d3e5a061"
+        },
+        {
+          "path": "assets/transcoders/basis/README.md",
+          "bytes": 1388,
+          "gzipBytes": 702,
+          "gzipSha256": "0e048bde542cd2af7435b2a728d6da65e588212aadac772010f2cd647b012abe",
+          "sha256": "a578df416c1e0852e9c36a1cf91b4d28d91a251294f87ce610a3bc7ca4df15e0"
+        },
+        {
+          "path": "assets/transcoders/basis/basis_transcoder.js",
+          "bytes": 57529,
+          "gzipBytes": 15063,
+          "gzipSha256": "7a86d3f9835fdcc6467dd3b40a18fd6d4d7d5d73a81bfcf52660e395b2958df7",
+          "sha256": "8478b5b6d6b74e7d3082b89f6417321d8d1dc0307f2b30d4484bb11b441696a1"
+        },
+        {
+          "path": "assets/transcoders/basis/basis_transcoder.wasm",
+          "bytes": 527333,
+          "gzipBytes": 244553,
+          "gzipSha256": "222ff2aa9a44fc3f8b88c04813c0fb2049dc95e270d0a6787c5f4d467e5d5ca4",
+          "sha256": "6cf17dc889352c42e9acf8897107978d127005fe3386c36a0e3845e27967630a"
+        },
+        {
+          "path": "assets/vendor-three-_L_YAsy5.js",
+          "bytes": 598505,
+          "gzipBytes": 148836,
+          "gzipSha256": "4dc6d7538762d902d1fc9c6a23f3184178e816e273ccb25d46c5f92cea4ed42f",
+          "sha256": "ad793e90e46ee2c215ce5a818f9d7ebc7ac608fa5c8dde2723c2fd9cf975d5bd"
+        },
+        {
+          "path": "assets/vendor-three-addons-kpozWyf3.js",
+          "bytes": 135491,
+          "gzipBytes": 45815,
+          "gzipSha256": "95072bc958775095885f8b832e2e0fac6d268762ef692fe7ef0faac17e719ea0",
+          "sha256": "115007f768b8376d80164d66e8edce7559b3729e3809cf2911785c5193258301"
+        },
+        {
+          "path": "index.html",
+          "bytes": 1632,
+          "gzipBytes": 690,
+          "gzipSha256": "6584c2441381ccde06cdbe665dda9e57d62e583f0de233103d929707dd79c0cd",
+          "sha256": "21fd4e3f7e5e33d5c2fc46057665226f001e780998160b19258c1d9a45bbffaa"
+        },
+        {
+          "path": "manifest.webmanifest",
+          "bytes": 856,
+          "gzipBytes": 309,
+          "gzipSha256": "fbef3032f37477db0dc3242bd5b6c55bf7e6593f2cd38428a543ed9dab73503b",
+          "sha256": "04d309ebb9d9488686d273cee253c72d57a81f8499edc9940dc40594b4e04f24"
+        },
+        {
+          "path": "sw.js",
+          "bytes": 9029,
+          "gzipBytes": 2676,
+          "gzipSha256": "9830760b1beb6726ae883ffe14d266b6eaa10e7f155af2a32375ab6728172c8f",
+          "sha256": "424803d26c443c0b4ad7c1337220e68a6f4806e3206afc5f8e2e7a17dd6d36c2"
+        }
+      ]
+    }
+  },
+  "configuration": {
+    "minutes": 30,
+    "configuredDurationMs": 1800000,
+    "workloadDurationBasis": "mutation-observed-game-shell-racing-gate",
+    "sampleIntervalSeconds": 10,
+    "attemptTimeoutMs": 720000,
+    "profile": "desktop",
+    "mode": "rival",
+    "qualification": "release",
+    "controlPolicy": {
+      "throttle": "held-KeyW",
+      "recovery": "held-Space-recovery-only",
+      "turboPulseTargetMs": 520,
+      "turboCoastTargetMs": 620,
+      "lane": "right-edge-restored-after-ArrowLeft-input-probe"
+    },
+    "quality": {
+      "requested": "high",
+      "selected": "high",
+      "effective": "high",
+      "effectiveDerivation": "explicit-non-auto-renderer-preset"
+    },
+    "viewport": {
+      "width": 1920,
+      "height": 1080
+    },
+    "emulation": {
+      "hasTouch": false,
+      "isMobile": false
+    }
+  },
+  "actualDurationMs": 1867381,
+  "workloadDurationMs": 1800234,
+  "wallWorkloadDurationMs": 1858463,
+  "racingClock": {
+    "apiVersion": 1,
+    "method": "mutation-observed-game-shell-racing-gate",
+    "measuredDurationMs": 1858461.5,
+    "durationMs": 1800233.5,
+    "maximumTransitions": 1024,
+    "overflowed": false,
+    "visibilityLost": false,
+    "transitionCount": 23,
+    "transitions": [
+      {
+        "elapsedMs": 0,
+        "racing": true
+      },
+      {
+        "elapsedMs": 155515.4,
+        "racing": false
+      },
+      {
+        "elapsedMs": 160914.4,
+        "racing": true
+      },
+      {
+        "elapsedMs": 316983.2,
+        "racing": false
+      },
+      {
+        "elapsedMs": 322297.4,
+        "racing": true
+      },
+      {
+        "elapsedMs": 478233,
+        "racing": false
+      },
+      {
+        "elapsedMs": 483631.7,
+        "racing": true
+      },
+      {
+        "elapsedMs": 638383.8,
+        "racing": false
+      },
+      {
+        "elapsedMs": 643783.8,
+        "racing": true
+      },
+      {
+        "elapsedMs": 805284,
+        "racing": false
+      },
+      {
+        "elapsedMs": 810415,
+        "racing": true
+      },
+      {
+        "elapsedMs": 972016.6,
+        "racing": false
+      },
+      {
+        "elapsedMs": 977317.5,
+        "racing": true
+      },
+      {
+        "elapsedMs": 1134937.8,
+        "racing": false
+      },
+      {
+        "elapsedMs": 1140401.1,
+        "racing": true
+      },
+      {
+        "elapsedMs": 1296584.7,
+        "racing": false
+      },
+      {
+        "elapsedMs": 1301936.7,
+        "racing": true
+      },
+      {
+        "elapsedMs": 1458001.5,
+        "racing": false
+      },
+      {
+        "elapsedMs": 1463302.9,
+        "racing": true
+      },
+      {
+        "elapsedMs": 1636370,
+        "racing": false
+      },
+      {
+        "elapsedMs": 1641219,
+        "racing": true
+      },
+      {
+        "elapsedMs": 1797285.2,
+        "racing": false
+      },
+      {
+        "elapsedMs": 1802603.7,
+        "racing": true
+      }
+    ]
+  },
+  "harnessError": null,
+  "harnessErrors": [],
+  "completedRaces": 11,
+  "completedRaceEvidence": [
+    {
+      "attempt": 1,
+      "mode": "rival",
+      "resultVisible": true,
+      "retryVisible": true,
+      "fatalScreenVisible": false,
+      "finalTime": "02:35.60",
+      "breakdownLabels": [
+        "Lap 1",
+        "Lap 2",
+        "Target gap",
+        "Crashes",
+        "Overheats"
+      ],
+      "lapTimes": [
+        "01:19.15",
+        "01:16.45"
+      ],
+      "crashes": 3,
+      "overheats": 0,
+      "positionLabel": "POSITION 1 / 6",
+      "classificationLabel": "Official 6-rider classification",
+      "classificationRows": 6
+    },
+    {
+      "attempt": 2,
+      "mode": "rival",
+      "resultVisible": true,
+      "retryVisible": true,
+      "fatalScreenVisible": false,
+      "finalTime": "02:36.05",
+      "breakdownLabels": [
+        "Lap 1",
+        "Lap 2",
+        "Target gap",
+        "Crashes",
+        "Overheats"
+      ],
+      "lapTimes": [
+        "01:19.45",
+        "01:16.60"
+      ],
+      "crashes": 3,
+      "overheats": 0,
+      "positionLabel": "POSITION 1 / 6",
+      "classificationLabel": "Official 6-rider classification",
+      "classificationRows": 6
+    },
+    {
+      "attempt": 3,
+      "mode": "rival",
+      "resultVisible": true,
+      "retryVisible": true,
+      "fatalScreenVisible": false,
+      "finalTime": "02:35.91",
+      "breakdownLabels": [
+        "Lap 1",
+        "Lap 2",
+        "Target gap",
+        "Crashes",
+        "Overheats"
+      ],
+      "lapTimes": [
+        "01:19.50",
+        "01:16.41"
+      ],
+      "crashes": 3,
+      "overheats": 0,
+      "positionLabel": "POSITION 1 / 6",
+      "classificationLabel": "Official 6-rider classification",
+      "classificationRows": 6
+    },
+    {
+      "attempt": 4,
+      "mode": "rival",
+      "resultVisible": true,
+      "retryVisible": true,
+      "fatalScreenVisible": false,
+      "finalTime": "02:34.73",
+      "breakdownLabels": [
+        "Lap 1",
+        "Lap 2",
+        "Target gap",
+        "Crashes",
+        "Overheats"
+      ],
+      "lapTimes": [
+        "01:19.28",
+        "01:15.45"
+      ],
+      "crashes": 3,
+      "overheats": 0,
+      "positionLabel": "POSITION 1 / 6",
+      "classificationLabel": "Official 6-rider classification",
+      "classificationRows": 6
+    },
+    {
+      "attempt": 5,
+      "mode": "rival",
+      "resultVisible": true,
+      "retryVisible": true,
+      "fatalScreenVisible": false,
+      "finalTime": "02:41.48",
+      "breakdownLabels": [
+        "Lap 1",
+        "Lap 2",
+        "Target gap",
+        "Crashes",
+        "Overheats"
+      ],
+      "lapTimes": [
+        "01:23.58",
+        "01:17.90"
+      ],
+      "crashes": 3,
+      "overheats": 0,
+      "positionLabel": "POSITION 1 / 6",
+      "classificationLabel": "Official 6-rider classification",
+      "classificationRows": 6
+    },
+    {
+      "attempt": 6,
+      "mode": "rival",
+      "resultVisible": true,
+      "retryVisible": true,
+      "fatalScreenVisible": false,
+      "finalTime": "02:41.58",
+      "breakdownLabels": [
+        "Lap 1",
+        "Lap 2",
+        "Target gap",
+        "Crashes",
+        "Overheats"
+      ],
+      "lapTimes": [
+        "01:23.60",
+        "01:17.98"
+      ],
+      "crashes": 3,
+      "overheats": 0,
+      "positionLabel": "POSITION 1 / 6",
+      "classificationLabel": "Official 6-rider classification",
+      "classificationRows": 6
+    },
+    {
+      "attempt": 7,
+      "mode": "rival",
+      "resultVisible": true,
+      "retryVisible": true,
+      "fatalScreenVisible": false,
+      "finalTime": "02:37.61",
+      "breakdownLabels": [
+        "Lap 1",
+        "Lap 2",
+        "Target gap",
+        "Crashes",
+        "Overheats"
+      ],
+      "lapTimes": [
+        "01:21.31",
+        "01:16.30"
+      ],
+      "crashes": 4,
+      "overheats": 0,
+      "positionLabel": "POSITION 1 / 6",
+      "classificationLabel": "Official 6-rider classification",
+      "classificationRows": 6
+    },
+    {
+      "attempt": 8,
+      "mode": "rival",
+      "resultVisible": true,
+      "retryVisible": true,
+      "fatalScreenVisible": false,
+      "finalTime": "02:36.16",
+      "breakdownLabels": [
+        "Lap 1",
+        "Lap 2",
+        "Target gap",
+        "Crashes",
+        "Overheats"
+      ],
+      "lapTimes": [
+        "01:19.41",
+        "01:16.75"
+      ],
+      "crashes": 3,
+      "overheats": 0,
+      "positionLabel": "POSITION 1 / 6",
+      "classificationLabel": "Official 6-rider classification",
+      "classificationRows": 6
+    },
+    {
+      "attempt": 9,
+      "mode": "rival",
+      "resultVisible": true,
+      "retryVisible": true,
+      "fatalScreenVisible": false,
+      "finalTime": "02:36.05",
+      "breakdownLabels": [
+        "Lap 1",
+        "Lap 2",
+        "Target gap",
+        "Crashes",
+        "Overheats"
+      ],
+      "lapTimes": [
+        "01:19.25",
+        "01:16.80"
+      ],
+      "crashes": 3,
+      "overheats": 0,
+      "positionLabel": "POSITION 1 / 6",
+      "classificationLabel": "Official 6-rider classification",
+      "classificationRows": 6
+    },
+    {
+      "attempt": 10,
+      "mode": "rival",
+      "resultVisible": true,
+      "retryVisible": true,
+      "fatalScreenVisible": false,
+      "finalTime": "02:53.05",
+      "breakdownLabels": [
+        "Lap 1",
+        "Lap 2",
+        "Target gap",
+        "Crashes",
+        "Overheats"
+      ],
+      "lapTimes": [
+        "01:29.11",
+        "01:23.93"
+      ],
+      "crashes": 13,
+      "overheats": 0,
+      "positionLabel": "POSITION 3 / 6",
+      "classificationLabel": "Official 6-rider classification",
+      "classificationRows": 6
+    },
+    {
+      "attempt": 11,
+      "mode": "rival",
+      "resultVisible": true,
+      "retryVisible": true,
+      "fatalScreenVisible": false,
+      "finalTime": "02:36.05",
+      "breakdownLabels": [
+        "Lap 1",
+        "Lap 2",
+        "Target gap",
+        "Crashes",
+        "Overheats"
+      ],
+      "lapTimes": [
+        "01:19.46",
+        "01:16.58"
+      ],
+      "crashes": 3,
+      "overheats": 0,
+      "positionLabel": "POSITION 1 / 6",
+      "classificationLabel": "Official 6-rider classification",
+      "classificationRows": 6
+    }
+  ],
+  "timedOutRaces": 0,
+  "restartTimesMs": [
+    4142.64,
+    4138.64,
+    4118.83,
+    4142.34,
+    4137.38,
+    4134.85,
+    4145.4,
+    4118.21,
+    4148.19,
+    4112.38,
+    4137.26
+  ],
+  "restartSummaryMs": {
+    "samples": 11,
+    "min": 4112.38,
+    "mean": 4134.19,
+    "p95": 4148.19,
+    "max": 4148.19
+  },
+  "memory": {
+    "samples": 186,
+    "firstUsedBytes": 28022148,
+    "lastUsedBytes": 31589564,
+    "growthBytes": 3567416,
+    "usedBytes": {
+      "samples": 186,
+      "min": 18680760,
+      "mean": 37719146.09,
+      "p95": 52946144,
+      "max": 58315268
+    },
+    "trend": {
+      "samples": 186,
+      "windowSamples": 38,
+      "firstWindowMean": 32861049.05,
+      "lastWindowMean": 40990897.05,
+      "changeBetweenWindows": 8129848,
+      "linearRatePerMinute": 351480.25
+    }
+  },
+  "inputResponsiveness": {
+    "dispatchDelayMs": {
+      "samples": 186,
+      "min": 0.1,
+      "mean": 0.29,
+      "p95": 0.5,
+      "max": 2.8
+    },
+    "keydownToFrameMs": {
+      "samples": 186,
+      "min": 2,
+      "mean": 10.13,
+      "p95": 16.4,
+      "max": 18.3
+    },
+    "dispatchDelayTrend": {
+      "samples": 186,
+      "windowSamples": 38,
+      "firstWindowMean": 0.32,
+      "lastWindowMean": 0.31,
+      "changeBetweenWindows": -0.01,
+      "linearRatePerMinute": 0
+    },
+    "keydownToFrameTrend": {
+      "samples": 186,
+      "windowSamples": 38,
+      "firstWindowMean": 10.34,
+      "lastWindowMean": 10.62,
+      "changeBetweenWindows": 0.28,
+      "linearRatePerMinute": 0.03
+    }
+  },
+  "fixedStepTiming": {
+    "droppedSimulationMs": {
+      "samples": 186,
+      "min": 0,
+      "mean": 0,
+      "p95": 0,
+      "max": 0
+    },
+    "maxAccumulatedDroppedMs": 0,
+    "cumulativeDroppedSimulationMs": {
+      "startMs": 0,
+      "endMs": 0,
+      "growthMs": 0,
+      "samples": {
+        "samples": 186,
+        "min": 0,
+        "mean": 0,
+        "p95": 0,
+        "max": 0
+      },
+      "firstSampleMs": 0,
+      "lastSampleMs": 0,
+      "growthAcrossSamplesMs": 0,
+      "finalObservedMs": 0,
+      "observedRatePerMinute": 0,
+      "trend": {
+        "samples": 186,
+        "windowSamples": 38,
+        "firstWindowMean": 0,
+        "lastWindowMean": 0,
+        "changeBetweenWindows": 0,
+        "linearRatePerMinute": 0
+      }
+    },
+    "attempts": [
+      {
+        "attempt": 1,
+        "outcome": "completed",
+        "elapsedMs": 165697,
+        "durationMs": 157238,
+        "samples": 16,
+        "maxObservedDroppedSimulationMs": 0,
+        "cumulativeDroppedSimulationMs": 0
+      },
+      {
+        "attempt": 2,
+        "outcome": "completed",
+        "elapsedMs": 327075,
+        "durationMs": 157236,
+        "samples": 16,
+        "maxObservedDroppedSimulationMs": 0,
+        "cumulativeDroppedSimulationMs": 0
+      },
+      {
+        "attempt": 3,
+        "outcome": "completed",
+        "elapsedMs": 488411,
+        "durationMs": 157197,
+        "samples": 16,
+        "maxObservedDroppedSimulationMs": 0,
+        "cumulativeDroppedSimulationMs": 0
+      },
+      {
+        "attempt": 4,
+        "outcome": "completed",
+        "elapsedMs": 648543,
+        "durationMs": 156014,
+        "samples": 16,
+        "maxObservedDroppedSimulationMs": 0,
+        "cumulativeDroppedSimulationMs": 0
+      },
+      {
+        "attempt": 5,
+        "outcome": "completed",
+        "elapsedMs": 815189,
+        "durationMs": 162504,
+        "samples": 17,
+        "maxObservedDroppedSimulationMs": 0,
+        "cumulativeDroppedSimulationMs": 0
+      },
+      {
+        "attempt": 6,
+        "outcome": "completed",
+        "elapsedMs": 982088,
+        "durationMs": 162761,
+        "samples": 17,
+        "maxObservedDroppedSimulationMs": 0,
+        "cumulativeDroppedSimulationMs": 0
+      },
+      {
+        "attempt": 7,
+        "outcome": "completed",
+        "elapsedMs": 1145148,
+        "durationMs": 158925,
+        "samples": 16,
+        "maxObservedDroppedSimulationMs": 0,
+        "cumulativeDroppedSimulationMs": 0
+      },
+      {
+        "attempt": 8,
+        "outcome": "completed",
+        "elapsedMs": 1306664,
+        "durationMs": 157371,
+        "samples": 16,
+        "maxObservedDroppedSimulationMs": 0,
+        "cumulativeDroppedSimulationMs": 0
+      },
+      {
+        "attempt": 9,
+        "outcome": "completed",
+        "elapsedMs": 1468082,
+        "durationMs": 157299,
+        "samples": 16,
+        "maxObservedDroppedSimulationMs": 0,
+        "cumulativeDroppedSimulationMs": 0
+      },
+      {
+        "attempt": 10,
+        "outcome": "completed",
+        "elapsedMs": 1646002,
+        "durationMs": 173773,
+        "samples": 18,
+        "maxObservedDroppedSimulationMs": 0,
+        "cumulativeDroppedSimulationMs": 0
+      },
+      {
+        "attempt": 11,
+        "outcome": "completed",
+        "elapsedMs": 1807368,
+        "durationMs": 157253,
+        "samples": 16,
+        "maxObservedDroppedSimulationMs": 0,
+        "cumulativeDroppedSimulationMs": 0
+      },
+      {
+        "attempt": 12,
+        "outcome": "deadline",
+        "elapsedMs": 1866919,
+        "durationMs": 55414,
+        "samples": 7,
+        "maxObservedDroppedSimulationMs": 0,
+        "cumulativeDroppedSimulationMs": 0
+      }
+    ],
+    "perAttemptMaxDroppedSimulationMs": {
+      "samples": 12,
+      "min": 0,
+      "mean": 0,
+      "p95": 0,
+      "max": 0
+    },
+    "perAttemptTrend": {
+      "samples": 12,
+      "windowSamples": 3,
+      "firstWindowMean": 0,
+      "lastWindowMean": 0,
+      "changeBetweenWindows": 0,
+      "linearRatePerMinute": 0
+    }
+  },
+  "network": {
+    "failedRequestCount": 0,
+    "httpErrorResponseCount": 0,
+    "failedRequests": [],
+    "httpErrorResponses": []
+  },
+  "consoleSummary": {
+    "total": 0,
+    "knownDiagnosticWarnings": 0,
+    "unexpected": 0,
+    "unexpectedMessages": []
+  },
+  "diagnosticGate": {
+    "status": "PASS",
+    "criteria": [
+      {
+        "id": "no-harness-error",
+        "passed": true,
+        "actual": 0
+      },
+      {
+        "id": "source-identity-recorded",
+        "passed": true,
+        "actual": "2b4069538c242da37c8c43d6581e097149fa1994"
+      },
+      {
+        "id": "source-worktree-clean",
+        "passed": true,
+        "actual": false
+      },
+      {
+        "id": "served-candidate-verified-before",
+        "passed": true,
+        "actual": true
+      },
+      {
+        "id": "served-candidate-verified-after",
+        "passed": true,
+        "actual": true
+      },
+      {
+        "id": "served-candidate-stable",
+        "passed": true,
+        "actual": {
+          "before": "e7af57d55db8df4d4c16b008c7cccfa2769b370ff845262c8eb9cb1eff3114d0",
+          "after": "e7af57d55db8df4d4c16b008c7cccfa2769b370ff845262c8eb9cb1eff3114d0"
+        }
+      },
+      {
+        "id": "explicit-quality-applied",
+        "passed": true,
+        "actual": {
+          "requested": "high",
+          "selected": "high",
+          "effective": "high",
+          "effectiveDerivation": "explicit-non-auto-renderer-preset"
+        }
+      },
+      {
+        "id": "production-runtime-identity",
+        "passed": true,
+        "actual": {
+          "title": "Rivet Ridge Rally",
+          "qaApiPresent": false,
+          "productPerformanceApiPresent": false,
+          "performanceCaptureHarnessPresent": true,
+          "version": "1.0.0-rc.2",
+          "versionPresent": true,
+          "build": {
+            "commit": "2b4069538c242da37c8c43d6581e097149fa1994",
+            "dirty": false
+          }
+        }
+      },
+      {
+        "id": "runtime-source-commit-binding",
+        "passed": true,
+        "actual": {
+          "sourceCommit": "2b4069538c242da37c8c43d6581e097149fa1994",
+          "runtimeBuild": {
+            "commit": "2b4069538c242da37c8c43d6581e097149fa1994",
+            "dirty": false
+          }
+        }
+      },
+      {
+        "id": "configured-duration-completed",
+        "passed": true,
+        "requiredMs": 1800000,
+        "actualMs": 1800234
+      },
+      {
+        "id": "racing-gate-clock-complete",
+        "passed": true,
+        "actual": {
+          "transitionCount": 23,
+          "initialState": {
+            "elapsedMs": 0,
+            "racing": true
+          },
+          "overflowed": false,
+          "visibilityLost": false
+        }
+      },
+      {
+        "id": "race-completed",
+        "passed": true,
+        "actual": 11
+      },
+      {
+        "id": "no-race-timeouts",
+        "passed": true,
+        "actual": 0
+      },
+      {
+        "id": "no-failed-requests",
+        "passed": true,
+        "actual": 0
+      },
+      {
+        "id": "no-http-error-responses",
+        "passed": true,
+        "actual": 0
+      },
+      {
+        "id": "no-unexpected-console-or-page-messages",
+        "passed": true,
+        "actual": 0
+      },
+      {
+        "id": "memory-samples-complete",
+        "passed": true,
+        "actual": {
+          "expected": 186,
+          "received": 186
+        }
+      },
+      {
+        "id": "input-samples-complete",
+        "passed": true,
+        "actual": {
+          "expected": 186,
+          "keydownToFrame": 186,
+          "dispatchDelay": 186
+        }
+      },
+      {
+        "id": "fixed-step-samples-complete",
+        "passed": true,
+        "actual": {
+          "expected": 186,
+          "received": 186
+        }
+      },
+      {
+        "id": "cumulative-fixed-step-telemetry-monotonic",
+        "passed": true,
+        "actual": {
+          "expected": 186,
+          "received": 186,
+          "monotonic": true
+        }
+      }
+    ],
+    "failedCriteria": []
+  },
+  "releaseGate": {
+    "status": "PASS",
+    "criteria": [
+      {
+        "id": "no-harness-error",
+        "passed": true,
+        "actual": 0
+      },
+      {
+        "id": "source-identity-recorded",
+        "passed": true,
+        "actual": "2b4069538c242da37c8c43d6581e097149fa1994"
+      },
+      {
+        "id": "source-worktree-clean",
+        "passed": true,
+        "actual": false
+      },
+      {
+        "id": "served-candidate-verified-before",
+        "passed": true,
+        "actual": true
+      },
+      {
+        "id": "served-candidate-verified-after",
+        "passed": true,
+        "actual": true
+      },
+      {
+        "id": "served-candidate-stable",
+        "passed": true,
+        "actual": {
+          "before": "e7af57d55db8df4d4c16b008c7cccfa2769b370ff845262c8eb9cb1eff3114d0",
+          "after": "e7af57d55db8df4d4c16b008c7cccfa2769b370ff845262c8eb9cb1eff3114d0"
+        }
+      },
+      {
+        "id": "explicit-quality-applied",
+        "passed": true,
+        "actual": {
+          "requested": "high",
+          "selected": "high",
+          "effective": "high",
+          "effectiveDerivation": "explicit-non-auto-renderer-preset"
+        }
+      },
+      {
+        "id": "production-runtime-identity",
+        "passed": true,
+        "actual": {
+          "title": "Rivet Ridge Rally",
+          "qaApiPresent": false,
+          "productPerformanceApiPresent": false,
+          "performanceCaptureHarnessPresent": true,
+          "version": "1.0.0-rc.2",
+          "versionPresent": true,
+          "build": {
+            "commit": "2b4069538c242da37c8c43d6581e097149fa1994",
+            "dirty": false
+          }
+        }
+      },
+      {
+        "id": "runtime-source-commit-binding",
+        "passed": true,
+        "actual": {
+          "sourceCommit": "2b4069538c242da37c8c43d6581e097149fa1994",
+          "runtimeBuild": {
+            "commit": "2b4069538c242da37c8c43d6581e097149fa1994",
+            "dirty": false
+          }
+        }
+      },
+      {
+        "id": "configured-duration-completed",
+        "passed": true,
+        "requiredMs": 1800000,
+        "actualMs": 1800234
+      },
+      {
+        "id": "racing-gate-clock-complete",
+        "passed": true,
+        "actual": {
+          "transitionCount": 23,
+          "initialState": {
+            "elapsedMs": 0,
+            "racing": true
+          },
+          "overflowed": false,
+          "visibilityLost": false
+        }
+      },
+      {
+        "id": "race-completed",
+        "passed": true,
+        "actual": 11
+      },
+      {
+        "id": "no-race-timeouts",
+        "passed": true,
+        "actual": 0
+      },
+      {
+        "id": "no-failed-requests",
+        "passed": true,
+        "actual": 0
+      },
+      {
+        "id": "no-http-error-responses",
+        "passed": true,
+        "actual": 0
+      },
+      {
+        "id": "no-unexpected-console-or-page-messages",
+        "passed": true,
+        "actual": 0
+      },
+      {
+        "id": "memory-samples-complete",
+        "passed": true,
+        "actual": {
+          "expected": 186,
+          "received": 186
+        }
+      },
+      {
+        "id": "input-samples-complete",
+        "passed": true,
+        "actual": {
+          "expected": 186,
+          "keydownToFrame": 186,
+          "dispatchDelay": 186
+        }
+      },
+      {
+        "id": "fixed-step-samples-complete",
+        "passed": true,
+        "actual": {
+          "expected": 186,
+          "received": 186
+        }
+      },
+      {
+        "id": "cumulative-fixed-step-telemetry-monotonic",
+        "passed": true,
+        "actual": {
+          "expected": 186,
+          "received": 186,
+          "monotonic": true
+        }
+      },
+      {
+        "id": "rival-release-workload",
+        "passed": true,
+        "required": "rival",
+        "actual": "rival"
+      },
+      {
+        "id": "minimum-30-minute-active-duration",
+        "passed": true,
+        "requiredMs": 1800000,
+        "actualMs": 1800234
+      }
+    ],
+    "failedCriteria": [],
+    "manualTrendReviewRequired": [
+      "memory.trend",
+      "inputResponsiveness.dispatchDelayTrend",
+      "inputResponsiveness.keydownToFrameTrend",
+      "fixedStepTiming.cumulativeDroppedSimulationMs.trend"
+    ]
+  },
+  "status": "PASS",
+  "samples": [
+    {
+      "elapsedMs": 8900,
+      "race": 1,
+      "attempt": 1,
+      "hud": {
+        "fps": 60,
+        "frameTimeMs": 2.25,
+        "drawCalls": 412,
+        "droppedSimulationMs": 0
+      },
+      "cumulativeDroppedSimulationMs": 0,
+      "heap": {
+        "available": true,
+        "usedBytes": 28022148,
+        "totalBytes": 53084160
+      },
+      "input": {
+        "dispatchDelayMs": 0.09999999403953552,
+        "keydownToFrameMs": 10.600000008940697
+      }
+    },
+    {
+      "elapsedMs": 19006,
+      "race": 1,
+      "attempt": 1,
+      "hud": {
+        "fps": 60,
+        "frameTimeMs": 2.28,
+        "drawCalls": 352,
+        "droppedSimulationMs": 0
+      },
+      "cumulativeDroppedSimulationMs": 0,
+      "heap": {
+        "available": true,
+        "usedBytes": 30691652,
+        "totalBytes": 55443456
+      },
+      "input": {
+        "dispatchDelayMs": 0.29999999701976776,
+        "keydownToFrameMs": 6.9000000059604645
+      }
+    },
+    {
+      "elapsedMs": 29098,
+      "race": 1,
+      "attempt": 1,
+      "hud": {
+        "fps": 60,
+        "frameTimeMs": 2.1,
+        "drawCalls": 331,
+        "droppedSimulationMs": 0
+      },
+      "cumulativeDroppedSimulationMs": 0,
+      "heap": {
+        "available": true,
+        "usedBytes": 35552000,
+        "totalBytes": 57278464
+      },
+      "input": {
+        "dispatchDelayMs": 0.29999999701976776,
+        "keydownToFrameMs": 11.5
+      }
+    },
+    {
+      "elapsedMs": 38939,
+      "race": 1,
+      "attempt": 1,
+      "hud": {
+        "fps": 60,
+        "frameTimeMs": 2.07,
+        "drawCalls": 307,
+        "droppedSimulationMs": 0
+      },
+      "cumulativeDroppedSimulationMs": 0,
+      "heap": {
+        "available": true,
+        "usedBytes": 18680760,
+        "totalBytes": 69861376
+      },
+      "input": {
+        "dispatchDelayMs": 0.09999999403953552,
+        "keydownToFrameMs": 6.4000000059604645
+      }
+    },
+    {
+      "elapsedMs": 49033,
+      "race": 1,
+      "attempt": 1,
+      "hud": {
+        "fps": 60,
+        "frameTimeMs": 1.98,
+        "drawCalls": 270,
+        "droppedSimulationMs": 0
+      },
+      "cumulativeDroppedSimulationMs": 0,
+      "heap": {
+        "available": true,
+        "usedBytes": 22007356,
+        "totalBytes": 77201408
+      },
+      "input": {
+        "dispatchDelayMs": 0.29999999701976776,
+        "keydownToFrameMs": 10.400000005960464
+      }
+    },
+    {
+      "elapsedMs": 59129,
+      "race": 1,
+      "attempt": 1,
+      "hud": {
+        "fps": 60,
+        "frameTimeMs": 1.94,
+        "drawCalls": 226,
+        "droppedSimulationMs": 0
+      },
+      "cumulativeDroppedSimulationMs": 0,
+      "heap": {
+        "available": true,
+        "usedBytes": 23245076,
+        "totalBytes": 77201408
+      },
+      "input": {
+        "dispatchDelayMs": 0.20000000298023224,
+        "keydownToFrameMs": 14.399999991059303
+      }
+    },
+    {
+      "elapsedMs": 68963,
+      "race": 1,
+      "attempt": 1,
+      "hud": {
+        "fps": 60,
+        "frameTimeMs": 1.86,
+        "drawCalls": 229,
+        "droppedSimulationMs": 0
+      },
+      "cumulativeDroppedSimulationMs": 0,
+      "heap": {
+        "available": true,
+        "usedBytes": 34733336,
+        "totalBytes": 77463552
+      },
+      "input": {
+        "dispatchDelayMs": 0.20000000298023224,
+        "keydownToFrameMs": 14.599999994039536
+      }
+    },
+    {
+      "elapsedMs": 79092,
+      "race": 1,
+      "attempt": 1,
+      "hud": {
+        "fps": 60,
+        "frameTimeMs": 1.87,
+        "drawCalls": 247,
+        "droppedSimulationMs": 0
+      },
+      "cumulativeDroppedSimulationMs": 0,
+      "heap": {
+        "available": true,
+        "usedBytes": 43631116,
+        "totalBytes": 77463552
+      },
+      "input": {
+        "dispatchDelayMs": 0.29999999701976776,
+        "keydownToFrameMs": 2
+      }
+    },
+    {
+      "elapsedMs": 88932,
+      "race": 1,
+      "attempt": 1,
+      "hud": {
+        "fps": 60,
+        "frameTimeMs": 2.05,
+        "drawCalls": 316,
+        "droppedSimulationMs": 0
+      },
+      "cumulativeDroppedSimulationMs": 0,
+      "heap": {
+        "available": true,
+        "usedBytes": 37137704,
+        "totalBytes": 77725696
+      },
+      "input": {
+        "dispatchDelayMs": 0.29999999701976776,
+        "keydownToFrameMs": 11.599999994039536
+      }
+    },
+    {
+      "elapsedMs": 99018,
+      "race": 1,
+      "attempt": 1,
+      "hud": {
+        "fps": 60,
+        "frameTimeMs": 2.11,
+        "drawCalls": 246,
+        "droppedSimulationMs": 0
+      },
+      "cumulativeDroppedSimulationMs": 0,
+      "heap": {
+        "available": true,
+        "usedBytes": 31911932,
+        "totalBytes": 77725696
+      },
+      "input": {
+        "dispatchDelayMs": 0.20000000298023224,
+        "keydownToFrameMs": 10.099999994039536
+      }
+    },
+    {
+      "elapsedMs": 109111,
+      "race": 1,
+      "attempt": 1,
+      "hud": {
+        "fps": 60,
+        "frameTimeMs": 1.82,
+        "drawCalls": 216,
+        "droppedSimulationMs": 0
+      },
+      "cumulativeDroppedSimulationMs": 0,
+      "heap": {
+        "available": true,
+        "usedBytes": 24766444,
+        "totalBytes": 77725696
+      },
+      "input": {
+        "dispatchDelayMs": 0.29999999701976776,
+        "keydownToFrameMs": 15.900000005960464
+      }
+    },
+    {
+      "elapsedMs": 118952,
+      "race": 1,
+      "attempt": 1,
+      "hud": {
+        "fps": 60,
+        "frameTimeMs": 2.07,
+        "drawCalls": 234,
+        "droppedSimulationMs": 0
+      },
+      "cumulativeDroppedSimulationMs": 0,
+      "heap": {
+        "available": true,
+        "usedBytes": 27842312,
+        "totalBytes": 77725696
+      },
+      "input": {
+        "dispatchDelayMs": 0.09999999403953552,
+        "keydownToFrameMs": 7.600000008940697
+      }
+    },
+    {
+      "elapsedMs": 129044,
+      "race": 1,
+      "attempt": 1,
+      "hud": {
+        "fps": 60,
+        "frameTimeMs": 2.01,
+        "drawCalls": 199,
+        "droppedSimulationMs": 0
+      },
+      "cumulativeDroppedSimulationMs": 0,
+      "heap": {
+        "available": true,
+        "usedBytes": 33059560,
+        "totalBytes": 77987840
+      },
+      "input": {
+        "dispatchDelayMs": 2.4000000059604645,
+        "keydownToFrameMs": 16.400000005960464
+      }
+    },
+    {
+      "elapsedMs": 139148,
+      "race": 1,
+      "attempt": 1,
+      "hud": {
+        "fps": 60,
+        "frameTimeMs": 1.57,
+        "drawCalls": 189,
+        "droppedSimulationMs": 0
+      },
+      "cumulativeDroppedSimulationMs": 0,
+      "heap": {
+        "available": true,
+        "usedBytes": 35466304,
+        "totalBytes": 78249984
+      },
+      "input": {
+        "dispatchDelayMs": 0.20000000298023224,
+        "keydownToFrameMs": 12.799999997019768
+      }
+    },
+    {
+      "elapsedMs": 148983,
+      "race": 1,
+      "attempt": 1,
+      "hud": {
+        "fps": 60,
+        "frameTimeMs": 1.83,
+        "drawCalls": 169,
+        "droppedSimulationMs": 0
+      },
+      "cumulativeDroppedSimulationMs": 0,
+      "heap": {
+        "available": true,
+        "usedBytes": 19294724,
+        "totalBytes": 78249984
+      },
+      "input": {
+        "dispatchDelayMs": 0.29999999701976776,
+        "keydownToFrameMs": 11.600000008940697
+      }
+    },
+    {
+      "elapsedMs": 159080,
+      "race": 1,
+      "attempt": 1,
+      "hud": {
+        "fps": 60,
+        "frameTimeMs": 1.81,
+        "drawCalls": 157,
+        "droppedSimulationMs": 0
+      },
+      "cumulativeDroppedSimulationMs": 0,
+      "heap": {
+        "available": true,
+        "usedBytes": 21975836,
+        "totalBytes": 78512128
+      },
+      "input": {
+        "dispatchDelayMs": 0.20000000298023224,
+        "keydownToFrameMs": 13.299999997019768
+      }
+    },
+    {
+      "elapsedMs": 170275,
+      "race": 2,
+      "attempt": 2,
+      "hud": {
+        "fps": 60,
+        "frameTimeMs": 2.26,
+        "drawCalls": 414,
+        "droppedSimulationMs": 0
+      },
+      "cumulativeDroppedSimulationMs": 0,
+      "heap": {
+        "available": true,
+        "usedBytes": 21475492,
+        "totalBytes": 87949312
+      },
+      "input": {
+        "dispatchDelayMs": 0.20000000298023224,
+        "keydownToFrameMs": 4.799999997019768
+      }
+    },
+    {
+      "elapsedMs": 180371,
+      "race": 2,
+      "attempt": 2,
+      "hud": {
+        "fps": 60,
+        "frameTimeMs": 2.22,
+        "drawCalls": 367,
+        "droppedSimulationMs": 0
+      },
+      "cumulativeDroppedSimulationMs": 0,
+      "heap": {
+        "available": true,
+        "usedBytes": 42173616,
+        "totalBytes": 87949312
+      },
+      "input": {
+        "dispatchDelayMs": 0.09999999403953552,
+        "keydownToFrameMs": 8.700000002980232
+      }
+    },
+    {
+      "elapsedMs": 190475,
+      "race": 2,
+      "attempt": 2,
+      "hud": {
+        "fps": 60,
+        "frameTimeMs": 2.18,
+        "drawCalls": 336,
+        "droppedSimulationMs": 0
+      },
+      "cumulativeDroppedSimulationMs": 0,
+      "heap": {
+        "available": true,
+        "usedBytes": 38157012,
+        "totalBytes": 88473600
+      },
+      "input": {
+        "dispatchDelayMs": 0.20000000298023224,
+        "keydownToFrameMs": 2.9000000059604645
+      }
+    },
+    {
+      "elapsedMs": 200329,
+      "race": 2,
+      "attempt": 2,
+      "hud": {
+        "fps": 60,
+        "frameTimeMs": 2.13,
+        "drawCalls": 318,
+        "droppedSimulationMs": 0
+      },
+      "cumulativeDroppedSimulationMs": 0,
+      "heap": {
+        "available": true,
+        "usedBytes": 40160120,
+        "totalBytes": 88473600
+      },
+      "input": {
+        "dispatchDelayMs": 0.20000000298023224,
+        "keydownToFrameMs": 15
+      }
+    },
+    {
+      "elapsedMs": 210415,
+      "race": 2,
+      "attempt": 2,
+      "hud": {
+        "fps": 60,
+        "frameTimeMs": 2.05,
+        "drawCalls": 267,
+        "droppedSimulationMs": 0
+      },
+      "cumulativeDroppedSimulationMs": 0,
+      "heap": {
+        "available": true,
+        "usedBytes": 34512424,
+        "totalBytes": 88473600
+      },
+      "input": {
+        "dispatchDelayMs": 0.20000000298023224,
+        "keydownToFrameMs": 10.900000005960464
+      }
+    },
+    {
+      "elapsedMs": 220501,
+      "race": 2,
+      "attempt": 2,
+      "hud": {
+        "fps": 60,
+        "frameTimeMs": 1.97,
+        "drawCalls": 227,
+        "droppedSimulationMs": 0
+      },
+      "cumulativeDroppedSimulationMs": 0,
+      "heap": {
+        "available": true,
+        "usedBytes": 31599912,
+        "totalBytes": 88473600
+      },
+      "input": {
+        "dispatchDelayMs": 0.30000001192092896,
+        "keydownToFrameMs": 9.599999994039536
+      }
+    },
+    {
+      "elapsedMs": 230344,
+      "race": 2,
+      "attempt": 2,
+      "hud": {
+        "fps": 60,
+        "frameTimeMs": 1.88,
+        "drawCalls": 229,
+        "droppedSimulationMs": 0
+      },
+      "cumulativeDroppedSimulationMs": 0,
+      "heap": {
+        "available": true,
+        "usedBytes": 43750300,
+        "totalBytes": 88473600
+      },
+      "input": {
+        "dispatchDelayMs": 1.8999999910593033,
+        "keydownToFrameMs": 17.100000008940697
+      }
+    },
+    {
+      "elapsedMs": 240450,
+      "race": 2,
+      "attempt": 2,
+      "hud": {
+        "fps": 60,
+        "frameTimeMs": 1.99,
+        "drawCalls": 247,
+        "droppedSimulationMs": 0
+      },
+      "cumulativeDroppedSimulationMs": 0,
+      "heap": {
+        "available": true,
+        "usedBytes": 42619404,
+        "totalBytes": 88473600
+      },
+      "input": {
+        "dispatchDelayMs": 0.10000000894069672,
+        "keydownToFrameMs": 10.399999991059303
+      }
+    },
+    {
+      "elapsedMs": 250293,
+      "race": 2,
+      "attempt": 2,
+      "hud": {
+        "fps": 60,
+        "frameTimeMs": 2.16,
+        "drawCalls": 316,
+        "droppedSimulationMs": 0
+      },
+      "cumulativeDroppedSimulationMs": 0,
+      "heap": {
+        "available": true,
+        "usedBytes": 40918624,
+        "totalBytes": 88473600
+      },
+      "input": {
+        "dispatchDelayMs": 0.20000000298023224,
+        "keydownToFrameMs": 6.799999997019768
+      }
+    },
+    {
+      "elapsedMs": 260389,
+      "race": 2,
+      "attempt": 2,
+      "hud": {
+        "fps": 60,
+        "frameTimeMs": 2.06,
+        "drawCalls": 248,
+        "droppedSimulationMs": 0
+      },
+      "cumulativeDroppedSimulationMs": 0,
+      "heap": {
+        "available": true,
+        "usedBytes": 35192580,
+        "totalBytes": 88735744
+      },
+      "input": {
+        "dispatchDelayMs": 0.09999999403953552,
+        "keydownToFrameMs": 5.800000011920929
+      }
+    },
+    {
+      "elapsedMs": 270480,
+      "race": 2,
+      "attempt": 2,
+      "hud": {
+        "fps": 60,
+        "frameTimeMs": 1.97,
+        "drawCalls": 216,
+        "droppedSimulationMs": 0
+      },
+      "cumulativeDroppedSimulationMs": 0,
+      "heap": {
+        "available": true,
+        "usedBytes": 36971760,
+        "totalBytes": 88735744
+      },
+      "input": {
+        "dispatchDelayMs": 0.20000000298023224,
+        "keydownToFrameMs": 12.599999994039536
+      }
+    },
+    {
+      "elapsedMs": 280326,
+      "race": 2,
+      "attempt": 2,
+      "hud": {
+        "fps": 60,
+        "frameTimeMs": 2.03,
+        "drawCalls": 234,
+        "droppedSimulationMs": 0
+      },
+      "cumulativeDroppedSimulationMs": 0,
+      "heap": {
+        "available": true,
+        "usedBytes": 44778632,
+        "totalBytes": 88735744
+      },
+      "input": {
+        "dispatchDelayMs": 0.29999999701976776,
+        "keydownToFrameMs": 17.200000002980232
+      }
+    },
+    {
+      "elapsedMs": 290419,
+      "race": 2,
+      "attempt": 2,
+      "hud": {
+        "fps": 60,
+        "frameTimeMs": 2.1,
+        "drawCalls": 199,
+        "droppedSimulationMs": 0
+      },
+      "cumulativeDroppedSimulationMs": 0,
+      "heap": {
+        "available": true,
+        "usedBytes": 37894288,
+        "totalBytes": 88735744
+      },
+      "input": {
+        "dispatchDelayMs": 0.29999999701976776,
+        "keydownToFrameMs": 7.700000002980232
+      }
+    },
+    {
+      "elapsedMs": 300514,
+      "race": 2,
+      "attempt": 2,
+      "hud": {
+        "fps": 60,
+        "frameTimeMs": 2.17,
+        "drawCalls": 188,
+        "droppedSimulationMs": 0
+      },
+      "cumulativeDroppedSimulationMs": 0,
+      "heap": {
+        "available": true,
+        "usedBytes": 25862168,
+        "totalBytes": 88997888
+      },
+      "input": {
+        "dispatchDelayMs": 0.20000000298023224,
+        "keydownToFrameMs": 13.399999991059303
+      }
+    },
+    {
+      "elapsedMs": 310374,
+      "race": 2,
+      "attempt": 2,
+      "hud": {
+        "fps": 60,
+        "frameTimeMs": 1.95,
+        "drawCalls": 171,
+        "droppedSimulationMs": 0
+      },
+      "cumulativeDroppedSimulationMs": 0,
+      "heap": {
+        "available": true,
+        "usedBytes": 26987792,
+        "totalBytes": 88997888
+      },
+      "input": {
+        "dispatchDelayMs": 0.10000000894069672,
+        "keydownToFrameMs": 5.5999999940395355
+      }
+    },
+    {
+      "elapsedMs": 320475,
+      "race": 2,
+      "attempt": 2,
+      "hud": {
+        "fps": 60,
+        "frameTimeMs": 1.93,
+        "drawCalls": 153,
+        "droppedSimulationMs": 0
+      },
+      "cumulativeDroppedSimulationMs": 0,
+      "heap": {
+        "available": true,
+        "usedBytes": 24051688,
+        "totalBytes": 88997888
+      },
+      "input": {
+        "dispatchDelayMs": 0.20000000298023224,
+        "keydownToFrameMs": 4.5
+      }
+    },
+    {
+      "elapsedMs": 331649,
+      "race": 3,
+      "attempt": 3,
+      "hud": {
+        "fps": 60,
+        "frameTimeMs": 2.15,
+        "drawCalls": 414,
+        "droppedSimulationMs": 0
+      },
+      "cumulativeDroppedSimulationMs": 0,
+      "heap": {
+        "available": true,
+        "usedBytes": 45959076,
+        "totalBytes": 93978624
+      },
+      "input": {
+        "dispatchDelayMs": 0.20000000298023224,
+        "keydownToFrameMs": 11.799999997019768
+      }
+    },
+    {
+      "elapsedMs": 341750,
+      "race": 3,
+      "attempt": 3,
+      "hud": {
+        "fps": 60,
+        "frameTimeMs": 2.26,
+        "drawCalls": 367,
+        "droppedSimulationMs": 0
+      },
+      "cumulativeDroppedSimulationMs": 0,
+      "heap": {
+        "available": true,
+        "usedBytes": 28696164,
+        "totalBytes": 92930048
+      },
+      "input": {
+        "dispatchDelayMs": 0.20000000298023224,
+        "keydownToFrameMs": 12.799999997019768
+      }
+    },
+    {
+      "elapsedMs": 351847,
+      "race": 3,
+      "attempt": 3,
+      "hud": {
+        "fps": 60,
+        "frameTimeMs": 2.2,
+        "drawCalls": 336,
+        "droppedSimulationMs": 0
+      },
+      "cumulativeDroppedSimulationMs": 0,
+      "heap": {
+        "available": true,
+        "usedBytes": 26359808,
+        "totalBytes": 92930048
+      },
+      "input": {
+        "dispatchDelayMs": 0.20000000298023224,
+        "keydownToFrameMs": 13.799999997019768
+      }
+    },
+    {
+      "elapsedMs": 361685,
+      "race": 3,
+      "attempt": 3,
+      "hud": {
+        "fps": 60,
+        "frameTimeMs": 2.25,
+        "drawCalls": 320,
+        "droppedSimulationMs": 0
+      },
+      "cumulativeDroppedSimulationMs": 0,
+      "heap": {
+        "available": true,
+        "usedBytes": 25613364,
+        "totalBytes": 92930048
+      },
+      "input": {
+        "dispatchDelayMs": 0.29999999701976776,
+        "keydownToFrameMs": 8.100000008940697
+      }
+    },
+    {
+      "elapsedMs": 371789,
+      "race": 3,
+      "attempt": 3,
+      "hud": {
+        "fps": 60,
+        "frameTimeMs": 2.09,
+        "drawCalls": 271,
+        "droppedSimulationMs": 0
+      },
+      "cumulativeDroppedSimulationMs": 0,
+      "heap": {
+        "available": true,
+        "usedBytes": 45656840,
+        "totalBytes": 90570752
+      },
+      "input": {
+        "dispatchDelayMs": 0.20000000298023224,
+        "keydownToFrameMs": 8.099999994039536
+      }
+    },
+    {
+      "elapsedMs": 381885,
+      "race": 3,
+      "attempt": 3,
+      "hud": {
+        "fps": 60,
+        "frameTimeMs": 2.02,
+        "drawCalls": 227,
+        "droppedSimulationMs": 0
+      },
+      "cumulativeDroppedSimulationMs": 0,
+      "heap": {
+        "available": true,
+        "usedBytes": 41310540,
+        "totalBytes": 90570752
+      },
+      "input": {
+        "dispatchDelayMs": 0.29999999701976776,
+        "keydownToFrameMs": 9.100000008940697
+      }
+    },
+    {
+      "elapsedMs": 391730,
+      "race": 3,
+      "attempt": 3,
+      "hud": {
+        "fps": 60,
+        "frameTimeMs": 1.9,
+        "drawCalls": 229,
+        "droppedSimulationMs": 0
+      },
+      "cumulativeDroppedSimulationMs": 0,
+      "heap": {
+        "available": true,
+        "usedBytes": 22100296,
+        "totalBytes": 90570752
+      },
+      "input": {
+        "dispatchDelayMs": 0.20000000298023224,
+        "keydownToFrameMs": 13.5
+      }
+    },
+    {
+      "elapsedMs": 401828,
+      "race": 3,
+      "attempt": 3,
+      "hud": {
+        "fps": 60,
+        "frameTimeMs": 2.01,
+        "drawCalls": 245,
+        "droppedSimulationMs": 0
+      },
+      "cumulativeDroppedSimulationMs": 0,
+      "heap": {
+        "available": true,
+        "usedBytes": 47369356,
+        "totalBytes": 90570752
+      },
+      "input": {
+        "dispatchDelayMs": 2.300000011920929,
+        "keydownToFrameMs": 17.099999994039536
+      }
+    },
+    {
+      "elapsedMs": 411676,
+      "race": 3,
+      "attempt": 3,
+      "hud": {
+        "fps": 60,
+        "frameTimeMs": 2.15,
+        "drawCalls": 316,
+        "droppedSimulationMs": 0
+      },
+      "cumulativeDroppedSimulationMs": 0,
+      "heap": {
+        "available": true,
+        "usedBytes": 23762356,
+        "totalBytes": 90570752
+      },
+      "input": {
+        "dispatchDelayMs": 0.29999999701976776,
+        "keydownToFrameMs": 4.200000002980232
+      }
+    },
+    {
+      "elapsedMs": 421765,
+      "race": 3,
+      "attempt": 3,
+      "hud": {
+        "fps": 60,
+        "frameTimeMs": 1.96,
+        "drawCalls": 250,
+        "droppedSimulationMs": 0
+      },
+      "cumulativeDroppedSimulationMs": 0,
+      "heap": {
+        "available": true,
+        "usedBytes": 46794736,
+        "totalBytes": 90570752
+      },
+      "input": {
+        "dispatchDelayMs": 0.20000000298023224,
+        "keydownToFrameMs": 11.700000002980232
+      }
+    },
+    {
+      "elapsedMs": 431859,
+      "race": 3,
+      "attempt": 3,
+      "hud": {
+        "fps": 60,
+        "frameTimeMs": 2.16,
+        "drawCalls": 216,
+        "droppedSimulationMs": 0
+      },
+      "cumulativeDroppedSimulationMs": 0,
+      "heap": {
+        "available": true,
+        "usedBytes": 25598300,
+        "totalBytes": 90570752
+      },
+      "input": {
+        "dispatchDelayMs": 0.29999999701976776,
+        "keydownToFrameMs": 3.2000000029802322
+      }
+    },
+    {
+      "elapsedMs": 441699,
+      "race": 3,
+      "attempt": 3,
+      "hud": {
+        "fps": 60,
+        "frameTimeMs": 2.2,
+        "drawCalls": 232,
+        "droppedSimulationMs": 0
+      },
+      "cumulativeDroppedSimulationMs": 0,
+      "heap": {
+        "available": true,
+        "usedBytes": 23664416,
+        "totalBytes": 90570752
+      },
+      "input": {
+        "dispatchDelayMs": 0.3999999910593033,
+        "keydownToFrameMs": 12.100000008940697
+      }
+    },
+    {
+      "elapsedMs": 451794,
+      "race": 3,
+      "attempt": 3,
+      "hud": {
+        "fps": 60,
+        "frameTimeMs": 2.01,
+        "drawCalls": 199,
+        "droppedSimulationMs": 0
+      },
+      "cumulativeDroppedSimulationMs": 0,
+      "heap": {
+        "available": true,
+        "usedBytes": 42865592,
+        "totalBytes": 91095040
+      },
+      "input": {
+        "dispatchDelayMs": 0.3999999910593033,
+        "keydownToFrameMs": 2.4000000059604645
+      }
+    },
+    {
+      "elapsedMs": 461891,
+      "race": 3,
+      "attempt": 3,
+      "hud": {
+        "fps": 60,
+        "frameTimeMs": 2,
+        "drawCalls": 193,
+        "droppedSimulationMs": 0
+      },
+      "cumulativeDroppedSimulationMs": 0,
+      "heap": {
+        "available": true,
+        "usedBytes": 49655300,
+        "totalBytes": 91095040
+      },
+      "input": {
+        "dispatchDelayMs": 0.20000000298023224,
+        "keydownToFrameMs": 5.699999988079071
+      }
+    },
+    {
+      "elapsedMs": 471731,
+      "race": 3,
+      "attempt": 3,
+      "hud": {
+        "fps": 60,
+        "frameTimeMs": 1.73,
+        "drawCalls": 171,
+        "droppedSimulationMs": 0
+      },
+      "cumulativeDroppedSimulationMs": 0,
+      "heap": {
+        "available": true,
+        "usedBytes": 21084448,
+        "totalBytes": 91095040
+      },
+      "input": {
+        "dispatchDelayMs": 0.20000000298023224,
+        "keydownToFrameMs": 13.099999994039536
+      }
+    },
+    {
+      "elapsedMs": 481814,
+      "race": 3,
+      "attempt": 3,
+      "hud": {
+        "fps": 60,
+        "frameTimeMs": 1.88,
+        "drawCalls": 153,
+        "droppedSimulationMs": 0
+      },
+      "cumulativeDroppedSimulationMs": 0,
+      "heap": {
+        "available": true,
+        "usedBytes": 47934184,
+        "totalBytes": 91095040
+      },
+      "input": {
+        "dispatchDelayMs": 0.20000000298023224,
+        "keydownToFrameMs": 12.400000005960464
+      }
+    },
+    {
+      "elapsedMs": 492965,
+      "race": 4,
+      "attempt": 4,
+      "hud": {
+        "fps": 60,
+        "frameTimeMs": 2.36,
+        "drawCalls": 414,
+        "droppedSimulationMs": 0
+      },
+      "cumulativeDroppedSimulationMs": 0,
+      "heap": {
+        "available": true,
+        "usedBytes": 37643120,
+        "totalBytes": 96600064
+      },
+      "input": {
+        "dispatchDelayMs": 0.29999999701976776,
+        "keydownToFrameMs": 13.5
+      }
+    },
+    {
+      "elapsedMs": 503058,
+      "race": 4,
+      "attempt": 4,
+      "hud": {
+        "fps": 60,
+        "frameTimeMs": 2.2,
+        "drawCalls": 347,
+        "droppedSimulationMs": 0
+      },
+      "cumulativeDroppedSimulationMs": 0,
+      "heap": {
+        "available": true,
+        "usedBytes": 28200500,
+        "totalBytes": 96600064
+      },
+      "input": {
+        "dispatchDelayMs": 0.10000000894069672,
+        "keydownToFrameMs": 6
+      }
+    },
+    {
+      "elapsedMs": 513152,
+      "race": 4,
+      "attempt": 4,
+      "hud": {
+        "fps": 60,
+        "frameTimeMs": 2.23,
+        "drawCalls": 336,
+        "droppedSimulationMs": 0
+      },
+      "cumulativeDroppedSimulationMs": 0,
+      "heap": {
+        "available": true,
+        "usedBytes": 28403736,
+        "totalBytes": 91357184
+      },
+      "input": {
+        "dispatchDelayMs": 0.20000000298023224,
+        "keydownToFrameMs": 9.799999997019768
+      }
+    },
+    {
+      "elapsedMs": 522992,
+      "race": 4,
+      "attempt": 4,
+      "hud": {
+        "fps": 60,
+        "frameTimeMs": 2.2,
+        "drawCalls": 313,
+        "droppedSimulationMs": 0
+      },
+      "cumulativeDroppedSimulationMs": 0,
+      "heap": {
+        "available": true,
+        "usedBytes": 27127784,
+        "totalBytes": 91357184
+      },
+      "input": {
+        "dispatchDelayMs": 0.20000000298023224,
+        "keydownToFrameMs": 5.600000008940697
+      }
+    },
+    {
+      "elapsedMs": 533077,
+      "race": 4,
+      "attempt": 4,
+      "hud": {
+        "fps": 60,
+        "frameTimeMs": 2.23,
+        "drawCalls": 271,
+        "droppedSimulationMs": 0
+      },
+      "cumulativeDroppedSimulationMs": 0,
+      "heap": {
+        "available": true,
+        "usedBytes": 33809192,
+        "totalBytes": 91357184
+      },
+      "input": {
+        "dispatchDelayMs": 0.30000001192092896,
+        "keydownToFrameMs": 16.19999998807907
+      }
+    },
+    {
+      "elapsedMs": 543189,
+      "race": 4,
+      "attempt": 4,
+      "hud": {
+        "fps": 60,
+        "frameTimeMs": 2.12,
+        "drawCalls": 225,
+        "droppedSimulationMs": 0
+      },
+      "cumulativeDroppedSimulationMs": 0,
+      "heap": {
+        "available": true,
+        "usedBytes": 21966508,
+        "totalBytes": 91357184
+      },
+      "input": {
+        "dispatchDelayMs": 0.20000000298023224,
+        "keydownToFrameMs": 8.299999997019768
+      }
+    },
+    {
+      "elapsedMs": 553057,
+      "race": 4,
+      "attempt": 4,
+      "hud": {
+        "fps": 60,
+        "frameTimeMs": 1.93,
+        "drawCalls": 225,
+        "droppedSimulationMs": 0
+      },
+      "cumulativeDroppedSimulationMs": 0,
+      "heap": {
+        "available": true,
+        "usedBytes": 48004492,
+        "totalBytes": 91357184
+      },
+      "input": {
+        "dispatchDelayMs": 0.20000000298023224,
+        "keydownToFrameMs": 7
+      }
+    },
+    {
+      "elapsedMs": 563191,
+      "race": 4,
+      "attempt": 4,
+      "hud": {
+        "fps": 60,
+        "frameTimeMs": 2.17,
+        "drawCalls": 244,
+        "droppedSimulationMs": 0
+      },
+      "cumulativeDroppedSimulationMs": 0,
+      "heap": {
+        "available": true,
+        "usedBytes": 46405420,
+        "totalBytes": 91357184
+      },
+      "input": {
+        "dispatchDelayMs": 0.09999999403953552,
+        "keydownToFrameMs": 7.700000002980232
+      }
+    },
+    {
+      "elapsedMs": 573074,
+      "race": 4,
+      "attempt": 4,
+      "hud": {
+        "fps": 60,
+        "frameTimeMs": 2.11,
+        "drawCalls": 316,
+        "droppedSimulationMs": 0
+      },
+      "cumulativeDroppedSimulationMs": 0,
+      "heap": {
+        "available": true,
+        "usedBytes": 38618292,
+        "totalBytes": 91357184
+      },
+      "input": {
+        "dispatchDelayMs": 0.09999999403953552,
+        "keydownToFrameMs": 9.400000005960464
+      }
+    },
+    {
+      "elapsedMs": 583198,
+      "race": 4,
+      "attempt": 4,
+      "hud": {
+        "fps": 60,
+        "frameTimeMs": 2.22,
+        "drawCalls": 258,
+        "droppedSimulationMs": 0
+      },
+      "cumulativeDroppedSimulationMs": 0,
+      "heap": {
+        "available": true,
+        "usedBytes": 44745984,
+        "totalBytes": 91357184
+      },
+      "input": {
+        "dispatchDelayMs": 0.09999999403953552,
+        "keydownToFrameMs": 14.900000005960464
+      }
+    },
+    {
+      "elapsedMs": 593065,
+      "race": 4,
+      "attempt": 4,
+      "hud": {
+        "fps": 60,
+        "frameTimeMs": 1.96,
+        "drawCalls": 213,
+        "droppedSimulationMs": 0
+      },
+      "cumulativeDroppedSimulationMs": 0,
+      "heap": {
+        "available": true,
+        "usedBytes": 39311340,
+        "totalBytes": 91357184
+      },
+      "input": {
+        "dispatchDelayMs": 0.29999999701976776,
+        "keydownToFrameMs": 15.5
+      }
+    },
+    {
+      "elapsedMs": 603191,
+      "race": 4,
+      "attempt": 4,
+      "hud": {
+        "fps": 60,
+        "frameTimeMs": 1.89,
+        "drawCalls": 240,
+        "droppedSimulationMs": 0
+      },
+      "cumulativeDroppedSimulationMs": 0,
+      "heap": {
+        "available": true,
+        "usedBytes": 28863868,
+        "totalBytes": 91357184
+      },
+      "input": {
+        "dispatchDelayMs": 0.29999999701976776,
+        "keydownToFrameMs": 6.4000000059604645
+      }
+    },
+    {
+      "elapsedMs": 613056,
+      "race": 4,
+      "attempt": 4,
+      "hud": {
+        "fps": 60,
+        "frameTimeMs": 1.86,
+        "drawCalls": 205,
+        "droppedSimulationMs": 0
+      },
+      "cumulativeDroppedSimulationMs": 0,
+      "heap": {
+        "available": true,
+        "usedBytes": 45357092,
+        "totalBytes": 91357184
+      },
+      "input": {
+        "dispatchDelayMs": 0.29999999701976776,
+        "keydownToFrameMs": 5.4000000059604645
+      }
+    },
+    {
+      "elapsedMs": 623186,
+      "race": 4,
+      "attempt": 4,
+      "hud": {
+        "fps": 60,
+        "frameTimeMs": 1.99,
+        "drawCalls": 193,
+        "droppedSimulationMs": 0
+      },
+      "cumulativeDroppedSimulationMs": 0,
+      "heap": {
+        "available": true,
+        "usedBytes": 25318600,
+        "totalBytes": 91357184
+      },
+      "input": {
+        "dispatchDelayMs": 0.20000000298023224,
+        "keydownToFrameMs": 11.799999997019768
+      }
+    },
+    {
+      "elapsedMs": 633075,
+      "race": 4,
+      "attempt": 4,
+      "hud": {
+        "fps": 60,
+        "frameTimeMs": 1.95,
+        "drawCalls": 162,
+        "droppedSimulationMs": 0
+      },
+      "cumulativeDroppedSimulationMs": 0,
+      "heap": {
+        "available": true,
+        "usedBytes": 24570052,
+        "totalBytes": 91357184
+      },
+      "input": {
+        "dispatchDelayMs": 0.20000000298023224,
+        "keydownToFrameMs": 6.100000008940697
+      }
+    },
+    {
+      "elapsedMs": 643201,
+      "race": 4,
+      "attempt": 4,
+      "hud": {
+        "fps": 60,
+        "frameTimeMs": 2.32,
+        "drawCalls": 154,
+        "droppedSimulationMs": 0
+      },
+      "cumulativeDroppedSimulationMs": 0,
+      "heap": {
+        "available": true,
+        "usedBytes": 39891760,
+        "totalBytes": 91357184
+      },
+      "input": {
+        "dispatchDelayMs": 0.19999998807907104,
+        "keydownToFrameMs": 12.800000011920929
+      }
+    },
+    {
+      "elapsedMs": 653123,
+      "race": 5,
+      "attempt": 5,
+      "hud": {
+        "fps": 59,
+        "frameTimeMs": 2.32,
+        "drawCalls": 414,
+        "droppedSimulationMs": 0
+      },
+      "cumulativeDroppedSimulationMs": 0,
+      "heap": {
+        "available": true,
+        "usedBytes": 42491848,
+        "totalBytes": 98172928
+      },
+      "input": {
+        "dispatchDelayMs": 0.10000000894069672,
+        "keydownToFrameMs": 9.899999991059303
+      }
+    },
+    {
+      "elapsedMs": 663241,
+      "race": 5,
+      "attempt": 5,
+      "hud": {
+        "fps": 60,
+        "frameTimeMs": 2.38,
+        "drawCalls": 376,
+        "droppedSimulationMs": 0
+      },
+      "cumulativeDroppedSimulationMs": 0,
+      "heap": {
+        "available": true,
+        "usedBytes": 43973012,
+        "totalBytes": 98172928
+      },
+      "input": {
+        "dispatchDelayMs": 0.29999999701976776,
+        "keydownToFrameMs": 7.5
+      }
+    },
+    {
+      "elapsedMs": 673353,
+      "race": 5,
+      "attempt": 5,
+      "hud": {
+        "fps": 60,
+        "frameTimeMs": 2.46,
+        "drawCalls": 359,
+        "droppedSimulationMs": 0
+      },
+      "cumulativeDroppedSimulationMs": 0,
+      "heap": {
+        "available": true,
+        "usedBytes": 54200956,
+        "totalBytes": 98172928
+      },
+      "input": {
+        "dispatchDelayMs": 0.20000000298023224,
+        "keydownToFrameMs": 9.799999997019768
+      }
+    },
+    {
+      "elapsedMs": 683229,
+      "race": 5,
+      "attempt": 5,
+      "hud": {
+        "fps": 60,
+        "frameTimeMs": 2.41,
+        "drawCalls": 352,
+        "droppedSimulationMs": 0
+      },
+      "cumulativeDroppedSimulationMs": 0,
+      "heap": {
+        "available": true,
+        "usedBytes": 47410680,
+        "totalBytes": 98435072
+      },
+      "input": {
+        "dispatchDelayMs": 0.29999999701976776,
+        "keydownToFrameMs": 5
+      }
+    },
+    {
+      "elapsedMs": 693362,
+      "race": 5,
+      "attempt": 5,
+      "hud": {
+        "fps": 60,
+        "frameTimeMs": 2.32,
+        "drawCalls": 323,
+        "droppedSimulationMs": 0
+      },
+      "cumulativeDroppedSimulationMs": 0,
+      "heap": {
+        "available": true,
+        "usedBytes": 34015460,
+        "totalBytes": 100532224
+      },
+      "input": {
+        "dispatchDelayMs": 0.29999999701976776,
+        "keydownToFrameMs": 5.299999997019768
+      }
+    },
+    {
+      "elapsedMs": 703227,
+      "race": 5,
+      "attempt": 5,
+      "hud": {
+        "fps": 60,
+        "frameTimeMs": 2.2,
+        "drawCalls": 329,
+        "droppedSimulationMs": 0
+      },
+      "cumulativeDroppedSimulationMs": 0,
+      "heap": {
+        "available": true,
+        "usedBytes": 43681168,
+        "totalBytes": 97648640
+      },
+      "input": {
+        "dispatchDelayMs": 0.10000000894069672,
+        "keydownToFrameMs": 5.0999999940395355
+      }
+    },
+    {
+      "elapsedMs": 713353,
+      "race": 5,
+      "attempt": 5,
+      "hud": {
+        "fps": 60,
+        "frameTimeMs": 1.94,
+        "drawCalls": 278,
+        "droppedSimulationMs": 0
+      },
+      "cumulativeDroppedSimulationMs": 0,
+      "heap": {
+        "available": true,
+        "usedBytes": 42341592,
+        "totalBytes": 97648640
+      },
+      "input": {
+        "dispatchDelayMs": 0.09999999403953552,
+        "keydownToFrameMs": 8.5
+      }
+    },
+    {
+      "elapsedMs": 723222,
+      "race": 5,
+      "attempt": 5,
+      "hud": {
+        "fps": 60,
+        "frameTimeMs": 2.11,
+        "drawCalls": 310,
+        "droppedSimulationMs": 0
+      },
+      "cumulativeDroppedSimulationMs": 0,
+      "heap": {
+        "available": true,
+        "usedBytes": 45774880,
+        "totalBytes": 97648640
+      },
+      "input": {
+        "dispatchDelayMs": 0.09999999403953552,
+        "keydownToFrameMs": 7.100000008940697
+      }
+    },
+    {
+      "elapsedMs": 733353,
+      "race": 5,
+      "attempt": 5,
+      "hud": {
+        "fps": 60,
+        "frameTimeMs": 2.2,
+        "drawCalls": 306,
+        "droppedSimulationMs": 0
+      },
+      "cumulativeDroppedSimulationMs": 0,
+      "heap": {
+        "available": true,
+        "usedBytes": 36781764,
+        "totalBytes": 97648640
+      },
+      "input": {
+        "dispatchDelayMs": 0.29999999701976776,
+        "keydownToFrameMs": 11
+      }
+    },
+    {
+      "elapsedMs": 743228,
+      "race": 5,
+      "attempt": 5,
+      "hud": {
+        "fps": 60,
+        "frameTimeMs": 2.04,
+        "drawCalls": 283,
+        "droppedSimulationMs": 0
+      },
+      "cumulativeDroppedSimulationMs": 0,
+      "heap": {
+        "available": true,
+        "usedBytes": 24284496,
+        "totalBytes": 96337920
+      },
+      "input": {
+        "dispatchDelayMs": 0.20000000298023224,
+        "keydownToFrameMs": 5.5999999940395355
+      }
+    },
+    {
+      "elapsedMs": 753350,
+      "race": 5,
+      "attempt": 5,
+      "hud": {
+        "fps": 60,
+        "frameTimeMs": 2.14,
+        "drawCalls": 226,
+        "droppedSimulationMs": 0
+      },
+      "cumulativeDroppedSimulationMs": 0,
+      "heap": {
+        "available": true,
+        "usedBytes": 30222532,
+        "totalBytes": 96337920
+      },
+      "input": {
+        "dispatchDelayMs": 0.20000000298023224,
+        "keydownToFrameMs": 13
+      }
+    },
+    {
+      "elapsedMs": 763244,
+      "race": 5,
+      "attempt": 5,
+      "hud": {
+        "fps": 60,
+        "frameTimeMs": 2.29,
+        "drawCalls": 232,
+        "droppedSimulationMs": 0
+      },
+      "cumulativeDroppedSimulationMs": 0,
+      "heap": {
+        "available": true,
+        "usedBytes": 24838420,
+        "totalBytes": 96337920
+      },
+      "input": {
+        "dispatchDelayMs": 0.19999998807907104,
+        "keydownToFrameMs": 5.800000011920929
+      }
+    },
+    {
+      "elapsedMs": 773123,
+      "race": 5,
+      "attempt": 5,
+      "hud": {
+        "fps": 60,
+        "frameTimeMs": 2.13,
+        "drawCalls": 205,
+        "droppedSimulationMs": 0
+      },
+      "cumulativeDroppedSimulationMs": 0,
+      "heap": {
+        "available": true,
+        "usedBytes": 40475776,
+        "totalBytes": 96337920
+      },
+      "input": {
+        "dispatchDelayMs": 0.29999999701976776,
+        "keydownToFrameMs": 7.0999999940395355
+      }
+    },
+    {
+      "elapsedMs": 783251,
+      "race": 5,
+      "attempt": 5,
+      "hud": {
+        "fps": 60,
+        "frameTimeMs": 1.98,
+        "drawCalls": 195,
+        "droppedSimulationMs": 0
+      },
+      "cumulativeDroppedSimulationMs": 0,
+      "heap": {
+        "available": true,
+        "usedBytes": 44644600,
+        "totalBytes": 95813632
+      },
+      "input": {
+        "dispatchDelayMs": 0.19999998807907104,
+        "keydownToFrameMs": 11.900000005960464
+      }
+    },
+    {
+      "elapsedMs": 793136,
+      "race": 5,
+      "attempt": 5,
+      "hud": {
+        "fps": 60,
+        "frameTimeMs": 2.16,
+        "drawCalls": 177,
+        "droppedSimulationMs": 0
+      },
+      "cumulativeDroppedSimulationMs": 0,
+      "heap": {
+        "available": true,
+        "usedBytes": 43714756,
+        "totalBytes": 95813632
+      },
+      "input": {
+        "dispatchDelayMs": 0.19999998807907104,
+        "keydownToFrameMs": 11.700000002980232
+      }
+    },
+    {
+      "elapsedMs": 803271,
+      "race": 5,
+      "attempt": 5,
+      "hud": {
+        "fps": 60,
+        "frameTimeMs": 2.05,
+        "drawCalls": 165,
+        "droppedSimulationMs": 0
+      },
+      "cumulativeDroppedSimulationMs": 0,
+      "heap": {
+        "available": true,
+        "usedBytes": 27190792,
+        "totalBytes": 95813632
+      },
+      "input": {
+        "dispatchDelayMs": 0.20000000298023224,
+        "keydownToFrameMs": 9.600000008940697
+      }
+    },
+    {
+      "elapsedMs": 813150,
+      "race": 5,
+      "attempt": 5,
+      "hud": {
+        "fps": 60,
+        "frameTimeMs": 1.95,
+        "drawCalls": 150,
+        "droppedSimulationMs": 0
+      },
+      "cumulativeDroppedSimulationMs": 0,
+      "heap": {
+        "available": true,
+        "usedBytes": 30667192,
+        "totalBytes": 95813632
+      },
+      "input": {
+        "dispatchDelayMs": 0.20000000298023224,
+        "keydownToFrameMs": 14.899999991059303
+      }
+    },
+    {
+      "elapsedMs": 819762,
+      "race": 6,
+      "attempt": 6,
+      "hud": {
+        "fps": 60,
+        "frameTimeMs": 2.39,
+        "drawCalls": 414,
+        "droppedSimulationMs": 0
+      },
+      "cumulativeDroppedSimulationMs": 0,
+      "heap": {
+        "available": true,
+        "usedBytes": 38556272,
+        "totalBytes": 99221504
+      },
+      "input": {
+        "dispatchDelayMs": 0.20000000298023224,
+        "keydownToFrameMs": 3.4000000059604645
+      }
+    },
+    {
+      "elapsedMs": 829887,
+      "race": 6,
+      "attempt": 6,
+      "hud": {
+        "fps": 60,
+        "frameTimeMs": 2.45,
+        "drawCalls": 376,
+        "droppedSimulationMs": 0
+      },
+      "cumulativeDroppedSimulationMs": 0,
+      "heap": {
+        "available": true,
+        "usedBytes": 38981056,
+        "totalBytes": 99221504
+      },
+      "input": {
+        "dispatchDelayMs": 0.19999998807907104,
+        "keydownToFrameMs": 8.5
+      }
+    },
+    {
+      "elapsedMs": 839998,
+      "race": 6,
+      "attempt": 6,
+      "hud": {
+        "fps": 60,
+        "frameTimeMs": 2.5,
+        "drawCalls": 359,
+        "droppedSimulationMs": 0
+      },
+      "cumulativeDroppedSimulationMs": 0,
+      "heap": {
+        "available": true,
+        "usedBytes": 47862948,
+        "totalBytes": 99221504
+      },
+      "input": {
+        "dispatchDelayMs": 0.09999999403953552,
+        "keydownToFrameMs": 2.9000000059604645
+      }
+    },
+    {
+      "elapsedMs": 849863,
+      "race": 6,
+      "attempt": 6,
+      "hud": {
+        "fps": 60,
+        "frameTimeMs": 2.14,
+        "drawCalls": 350,
+        "droppedSimulationMs": 0
+      },
+      "cumulativeDroppedSimulationMs": 0,
+      "heap": {
+        "available": true,
+        "usedBytes": 23246868,
+        "totalBytes": 92930048
+      },
+      "input": {
+        "dispatchDelayMs": 0.10000000894069672,
+        "keydownToFrameMs": 4.299999997019768
+      }
+    },
+    {
+      "elapsedMs": 860002,
+      "race": 6,
+      "attempt": 6,
+      "hud": {
+        "fps": 60,
+        "frameTimeMs": 2.28,
+        "drawCalls": 323,
+        "droppedSimulationMs": 0
+      },
+      "cumulativeDroppedSimulationMs": 0,
+      "heap": {
+        "available": true,
+        "usedBytes": 36678776,
+        "totalBytes": 92930048
+      },
+      "input": {
+        "dispatchDelayMs": 0.29999999701976776,
+        "keydownToFrameMs": 12.5
+      }
+    },
+    {
+      "elapsedMs": 869880,
+      "race": 6,
+      "attempt": 6,
+      "hud": {
+        "fps": 60,
+        "frameTimeMs": 2.41,
+        "drawCalls": 328,
+        "droppedSimulationMs": 0
+      },
+      "cumulativeDroppedSimulationMs": 0,
+      "heap": {
+        "available": true,
+        "usedBytes": 27899780,
+        "totalBytes": 92930048
+      },
+      "input": {
+        "dispatchDelayMs": 0.19999998807907104,
+        "keydownToFrameMs": 2.6000000089406967
+      }
+    },
+    {
+      "elapsedMs": 880008,
+      "race": 6,
+      "attempt": 6,
+      "hud": {
+        "fps": 60,
+        "frameTimeMs": 2.19,
+        "drawCalls": 282,
+        "droppedSimulationMs": 0
+      },
+      "cumulativeDroppedSimulationMs": 0,
+      "heap": {
+        "available": true,
+        "usedBytes": 26403156,
+        "totalBytes": 92930048
+      },
+      "input": {
+        "dispatchDelayMs": 0.30000001192092896,
+        "keydownToFrameMs": 10.099999994039536
+      }
+    },
+    {
+      "elapsedMs": 889886,
+      "race": 6,
+      "attempt": 6,
+      "hud": {
+        "fps": 60,
+        "frameTimeMs": 2.08,
+        "drawCalls": 314,
+        "droppedSimulationMs": 0
+      },
+      "cumulativeDroppedSimulationMs": 0,
+      "heap": {
+        "available": true,
+        "usedBytes": 47164176,
+        "totalBytes": 92930048
+      },
+      "input": {
+        "dispatchDelayMs": 0.29999999701976776,
+        "keydownToFrameMs": 12.600000008940697
+      }
+    },
+    {
+      "elapsedMs": 900001,
+      "race": 6,
+      "attempt": 6,
+      "hud": {
+        "fps": 60,
+        "frameTimeMs": 2.39,
+        "drawCalls": 308,
+        "droppedSimulationMs": 0
+      },
+      "cumulativeDroppedSimulationMs": 0,
+      "heap": {
+        "available": true,
+        "usedBytes": 38794184,
+        "totalBytes": 92930048
+      },
+      "input": {
+        "dispatchDelayMs": 0.20000000298023224,
+        "keydownToFrameMs": 15.5
+      }
+    },
+    {
+      "elapsedMs": 909888,
+      "race": 6,
+      "attempt": 6,
+      "hud": {
+        "fps": 60,
+        "frameTimeMs": 2.39,
+        "drawCalls": 283,
+        "droppedSimulationMs": 0
+      },
+      "cumulativeDroppedSimulationMs": 0,
+      "heap": {
+        "available": true,
+        "usedBytes": 48047036,
+        "totalBytes": 92930048
+      },
+      "input": {
+        "dispatchDelayMs": 0.29999999701976776,
+        "keydownToFrameMs": 10.599999994039536
+      }
+    },
+    {
+      "elapsedMs": 919764,
+      "race": 6,
+      "attempt": 6,
+      "hud": {
+        "fps": 60,
+        "frameTimeMs": 1.94,
+        "drawCalls": 232,
+        "droppedSimulationMs": 0
+      },
+      "cumulativeDroppedSimulationMs": 0,
+      "heap": {
+        "available": true,
+        "usedBytes": 49083276,
+        "totalBytes": 92930048
+      },
+      "input": {
+        "dispatchDelayMs": 0.30000001192092896,
+        "keydownToFrameMs": 2.7999999970197678
+      }
+    },
+    {
+      "elapsedMs": 929886,
+      "race": 6,
+      "attempt": 6,
+      "hud": {
+        "fps": 60,
+        "frameTimeMs": 2.19,
+        "drawCalls": 232,
+        "droppedSimulationMs": 0
+      },
+      "cumulativeDroppedSimulationMs": 0,
+      "heap": {
+        "available": true,
+        "usedBytes": 47847444,
+        "totalBytes": 92930048
+      },
+      "input": {
+        "dispatchDelayMs": 0.29999999701976776,
+        "keydownToFrameMs": 11.700000002980232
+      }
+    },
+    {
+      "elapsedMs": 939768,
+      "race": 6,
+      "attempt": 6,
+      "hud": {
+        "fps": 60,
+        "frameTimeMs": 2.04,
+        "drawCalls": 203,
+        "droppedSimulationMs": 0
+      },
+      "cumulativeDroppedSimulationMs": 0,
+      "heap": {
+        "available": true,
+        "usedBytes": 25501364,
+        "totalBytes": 92930048
+      },
+      "input": {
+        "dispatchDelayMs": 0.19999998807907104,
+        "keydownToFrameMs": 13.700000002980232
+      }
+    },
+    {
+      "elapsedMs": 949894,
+      "race": 6,
+      "attempt": 6,
+      "hud": {
+        "fps": 60,
+        "frameTimeMs": 2.31,
+        "drawCalls": 194,
+        "droppedSimulationMs": 0
+      },
+      "cumulativeDroppedSimulationMs": 0,
+      "heap": {
+        "available": true,
+        "usedBytes": 31526924,
+        "totalBytes": 92930048
+      },
+      "input": {
+        "dispatchDelayMs": 0.10000000894069672,
+        "keydownToFrameMs": 7.399999991059303
+      }
+    },
+    {
+      "elapsedMs": 959768,
+      "race": 6,
+      "attempt": 6,
+      "hud": {
+        "fps": 60,
+        "frameTimeMs": 1.9,
+        "drawCalls": 175,
+        "droppedSimulationMs": 0
+      },
+      "cumulativeDroppedSimulationMs": 0,
+      "heap": {
+        "available": true,
+        "usedBytes": 30326084,
+        "totalBytes": 92930048
+      },
+      "input": {
+        "dispatchDelayMs": 0.29999999701976776,
+        "keydownToFrameMs": 13.799999997019768
+      }
+    },
+    {
+      "elapsedMs": 969904,
+      "race": 6,
+      "attempt": 6,
+      "hud": {
+        "fps": 60,
+        "frameTimeMs": 2.22,
+        "drawCalls": 161,
+        "droppedSimulationMs": 0
+      },
+      "cumulativeDroppedSimulationMs": 0,
+      "heap": {
+        "available": true,
+        "usedBytes": 40552644,
+        "totalBytes": 92930048
+      },
+      "input": {
+        "dispatchDelayMs": 0.19999998807907104,
+        "keydownToFrameMs": 11.700000002980232
+      }
+    },
+    {
+      "elapsedMs": 979783,
+      "race": 6,
+      "attempt": 6,
+      "hud": {
+        "fps": 60,
+        "frameTimeMs": 1.93,
+        "drawCalls": 146,
+        "droppedSimulationMs": 0
+      },
+      "cumulativeDroppedSimulationMs": 0,
+      "heap": {
+        "available": true,
+        "usedBytes": 44013972,
+        "totalBytes": 92930048
+      },
+      "input": {
+        "dispatchDelayMs": 0.20000000298023224,
+        "keydownToFrameMs": 15.099999994039536
+      }
+    },
+    {
+      "elapsedMs": 986662,
+      "race": 7,
+      "attempt": 7,
+      "hud": {
+        "fps": 60,
+        "frameTimeMs": 2.57,
+        "drawCalls": 412,
+        "droppedSimulationMs": 0
+      },
+      "cumulativeDroppedSimulationMs": 0,
+      "heap": {
+        "available": true,
+        "usedBytes": 41742992,
+        "totalBytes": 101318656
+      },
+      "input": {
+        "dispatchDelayMs": 0.20000000298023224,
+        "keydownToFrameMs": 5
+      }
+    },
+    {
+      "elapsedMs": 996784,
+      "race": 7,
+      "attempt": 7,
+      "hud": {
+        "fps": 60,
+        "frameTimeMs": 2.31,
+        "drawCalls": 374,
+        "droppedSimulationMs": 0
+      },
+      "cumulativeDroppedSimulationMs": 0,
+      "heap": {
+        "available": true,
+        "usedBytes": 42374980,
+        "totalBytes": 101318656
+      },
+      "input": {
+        "dispatchDelayMs": 0.29999999701976776,
+        "keydownToFrameMs": 12.899999991059303
+      }
+    },
+    {
+      "elapsedMs": 1006666,
+      "race": 7,
+      "attempt": 7,
+      "hud": {
+        "fps": 60,
+        "frameTimeMs": 2.38,
+        "drawCalls": 359,
+        "droppedSimulationMs": 0
+      },
+      "cumulativeDroppedSimulationMs": 0,
+      "heap": {
+        "available": true,
+        "usedBytes": 47601144,
+        "totalBytes": 101318656
+      },
+      "input": {
+        "dispatchDelayMs": 0.5999999940395355,
+        "keydownToFrameMs": 14.100000008940697
+      }
+    },
+    {
+      "elapsedMs": 1016797,
+      "race": 7,
+      "attempt": 7,
+      "hud": {
+        "fps": 60,
+        "frameTimeMs": 2.34,
+        "drawCalls": 352,
+        "droppedSimulationMs": 0
+      },
+      "cumulativeDroppedSimulationMs": 0,
+      "heap": {
+        "available": true,
+        "usedBytes": 40367916,
+        "totalBytes": 96337920
+      },
+      "input": {
+        "dispatchDelayMs": 0.19999998807907104,
+        "keydownToFrameMs": 16
+      }
+    },
+    {
+      "elapsedMs": 1026905,
+      "race": 7,
+      "attempt": 7,
+      "hud": {
+        "fps": 60,
+        "frameTimeMs": 2.19,
+        "drawCalls": 323,
+        "droppedSimulationMs": 0
+      },
+      "cumulativeDroppedSimulationMs": 0,
+      "heap": {
+        "available": true,
+        "usedBytes": 27049308,
+        "totalBytes": 96337920
+      },
+      "input": {
+        "dispatchDelayMs": 0.29999999701976776,
+        "keydownToFrameMs": 8.400000005960464
+      }
+    },
+    {
+      "elapsedMs": 1036777,
+      "race": 7,
+      "attempt": 7,
+      "hud": {
+        "fps": 60,
+        "frameTimeMs": 2.15,
+        "drawCalls": 266,
+        "droppedSimulationMs": 0
+      },
+      "cumulativeDroppedSimulationMs": 0,
+      "heap": {
+        "available": true,
+        "usedBytes": 28064644,
+        "totalBytes": 96337920
+      },
+      "input": {
+        "dispatchDelayMs": 0.29999999701976776,
+        "keydownToFrameMs": 8.700000002980232
+      }
+    },
+    {
+      "elapsedMs": 1046900,
+      "race": 7,
+      "attempt": 7,
+      "hud": {
+        "fps": 60,
+        "frameTimeMs": 2.01,
+        "drawCalls": 250,
+        "droppedSimulationMs": 0
+      },
+      "cumulativeDroppedSimulationMs": 0,
+      "heap": {
+        "available": true,
+        "usedBytes": 37470792,
+        "totalBytes": 96337920
+      },
+      "input": {
+        "dispatchDelayMs": 0.19999998807907104,
+        "keydownToFrameMs": 13.100000008940697
+      }
+    },
+    {
+      "elapsedMs": 1056767,
+      "race": 7,
+      "attempt": 7,
+      "hud": {
+        "fps": 60,
+        "frameTimeMs": 2.44,
+        "drawCalls": 258,
+        "droppedSimulationMs": 0
+      },
+      "cumulativeDroppedSimulationMs": 0,
+      "heap": {
+        "available": true,
+        "usedBytes": 36416060,
+        "totalBytes": 96337920
+      },
+      "input": {
+        "dispatchDelayMs": 0.20000000298023224,
+        "keydownToFrameMs": 16
+      }
+    },
+    {
+      "elapsedMs": 1066901,
+      "race": 7,
+      "attempt": 7,
+      "hud": {
+        "fps": 60,
+        "frameTimeMs": 2.36,
+        "drawCalls": 295,
+        "droppedSimulationMs": 0
+      },
+      "cumulativeDroppedSimulationMs": 0,
+      "heap": {
+        "available": true,
+        "usedBytes": 26087864,
+        "totalBytes": 94240768
+      },
+      "input": {
+        "dispatchDelayMs": 0.20000000298023224,
+        "keydownToFrameMs": 14.399999991059303
+      }
+    },
+    {
+      "elapsedMs": 1076762,
+      "race": 7,
+      "attempt": 7,
+      "hud": {
+        "fps": 60,
+        "frameTimeMs": 2.3,
+        "drawCalls": 259,
+        "droppedSimulationMs": 0
+      },
+      "cumulativeDroppedSimulationMs": 0,
+      "heap": {
+        "available": true,
+        "usedBytes": 28001172,
+        "totalBytes": 94240768
+      },
+      "input": {
+        "dispatchDelayMs": 0.19999998807907104,
+        "keydownToFrameMs": 2.9000000059604645
+      }
+    },
+    {
+      "elapsedMs": 1086881,
+      "race": 7,
+      "attempt": 7,
+      "hud": {
+        "fps": 60,
+        "frameTimeMs": 2.28,
+        "drawCalls": 232,
+        "droppedSimulationMs": 0
+      },
+      "cumulativeDroppedSimulationMs": 0,
+      "heap": {
+        "available": true,
+        "usedBytes": 39553024,
+        "totalBytes": 94240768
+      },
+      "input": {
+        "dispatchDelayMs": 0.20000000298023224,
+        "keydownToFrameMs": 4.0999999940395355
+      }
+    },
+    {
+      "elapsedMs": 1096762,
+      "race": 7,
+      "attempt": 7,
+      "hud": {
+        "fps": 60,
+        "frameTimeMs": 1.95,
+        "drawCalls": 233,
+        "droppedSimulationMs": 0
+      },
+      "cumulativeDroppedSimulationMs": 0,
+      "heap": {
+        "available": true,
+        "usedBytes": 46721908,
+        "totalBytes": 94240768
+      },
+      "input": {
+        "dispatchDelayMs": 0.09999999403953552,
+        "keydownToFrameMs": 6.9000000059604645
+      }
+    },
+    {
+      "elapsedMs": 1106877,
+      "race": 7,
+      "attempt": 7,
+      "hud": {
+        "fps": 60,
+        "frameTimeMs": 1.96,
+        "drawCalls": 196,
+        "droppedSimulationMs": 0
+      },
+      "cumulativeDroppedSimulationMs": 0,
+      "heap": {
+        "available": true,
+        "usedBytes": 39205940,
+        "totalBytes": 94240768
+      },
+      "input": {
+        "dispatchDelayMs": 0.20000000298023224,
+        "keydownToFrameMs": 3.5
+      }
+    },
+    {
+      "elapsedMs": 1116742,
+      "race": 7,
+      "attempt": 7,
+      "hud": {
+        "fps": 60,
+        "frameTimeMs": 1.96,
+        "drawCalls": 171,
+        "droppedSimulationMs": 0
+      },
+      "cumulativeDroppedSimulationMs": 0,
+      "heap": {
+        "available": true,
+        "usedBytes": 47342452,
+        "totalBytes": 94240768
+      },
+      "input": {
+        "dispatchDelayMs": 0.20000000298023224,
+        "keydownToFrameMs": 9
+      }
+    },
+    {
+      "elapsedMs": 1126874,
+      "race": 7,
+      "attempt": 7,
+      "hud": {
+        "fps": 60,
+        "frameTimeMs": 2.03,
+        "drawCalls": 169,
+        "droppedSimulationMs": 0
+      },
+      "cumulativeDroppedSimulationMs": 0,
+      "heap": {
+        "available": true,
+        "usedBytes": 39524384,
+        "totalBytes": 94502912
+      },
+      "input": {
+        "dispatchDelayMs": 0.29999999701976776,
+        "keydownToFrameMs": 10.299999997019768
+      }
+    },
+    {
+      "elapsedMs": 1136763,
+      "race": 7,
+      "attempt": 7,
+      "hud": {
+        "fps": 60,
+        "frameTimeMs": 1.84,
+        "drawCalls": 152,
+        "droppedSimulationMs": 0
+      },
+      "cumulativeDroppedSimulationMs": 0,
+      "heap": {
+        "available": true,
+        "usedBytes": 37505980,
+        "totalBytes": 94502912
+      },
+      "input": {
+        "dispatchDelayMs": 1.6000000089406967,
+        "keydownToFrameMs": 18.299999997019768
+      }
+    },
+    {
+      "elapsedMs": 1149730,
+      "race": 8,
+      "attempt": 8,
+      "hud": {
+        "fps": 60,
+        "frameTimeMs": 2.49,
+        "drawCalls": 412,
+        "droppedSimulationMs": 0
+      },
+      "cumulativeDroppedSimulationMs": 0,
+      "heap": {
+        "available": true,
+        "usedBytes": 42549120,
+        "totalBytes": 100532224
+      },
+      "input": {
+        "dispatchDelayMs": 0.09999999403953552,
+        "keydownToFrameMs": 6.4000000059604645
+      }
+    },
+    {
+      "elapsedMs": 1159846,
+      "race": 8,
+      "attempt": 8,
+      "hud": {
+        "fps": 60,
+        "frameTimeMs": 2.36,
+        "drawCalls": 347,
+        "droppedSimulationMs": 0
+      },
+      "cumulativeDroppedSimulationMs": 0,
+      "heap": {
+        "available": true,
+        "usedBytes": 33806352,
+        "totalBytes": 100532224
+      },
+      "input": {
+        "dispatchDelayMs": 0.20000000298023224,
+        "keydownToFrameMs": 17.200000002980232
+      }
+    },
+    {
+      "elapsedMs": 1169964,
+      "race": 8,
+      "attempt": 8,
+      "hud": {
+        "fps": 60,
+        "frameTimeMs": 2.3,
+        "drawCalls": 336,
+        "droppedSimulationMs": 0
+      },
+      "cumulativeDroppedSimulationMs": 0,
+      "heap": {
+        "available": true,
+        "usedBytes": 30744396,
+        "totalBytes": 100532224
+      },
+      "input": {
+        "dispatchDelayMs": 0.29999999701976776,
+        "keydownToFrameMs": 2.7000000029802322
+      }
+    },
+    {
+      "elapsedMs": 1179829,
+      "race": 8,
+      "attempt": 8,
+      "hud": {
+        "fps": 60,
+        "frameTimeMs": 2.43,
+        "drawCalls": 321,
+        "droppedSimulationMs": 0
+      },
+      "cumulativeDroppedSimulationMs": 0,
+      "heap": {
+        "available": true,
+        "usedBytes": 30869128,
+        "totalBytes": 100532224
+      },
+      "input": {
+        "dispatchDelayMs": 0.29999999701976776,
+        "keydownToFrameMs": 4.200000002980232
+      }
+    },
+    {
+      "elapsedMs": 1189967,
+      "race": 8,
+      "attempt": 8,
+      "hud": {
+        "fps": 60,
+        "frameTimeMs": 2.32,
+        "drawCalls": 267,
+        "droppedSimulationMs": 0
+      },
+      "cumulativeDroppedSimulationMs": 0,
+      "heap": {
+        "available": true,
+        "usedBytes": 38816456,
+        "totalBytes": 101056512
+      },
+      "input": {
+        "dispatchDelayMs": 0.10000000894069672,
+        "keydownToFrameMs": 16.19999998807907
+      }
+    },
+    {
+      "elapsedMs": 1199830,
+      "race": 8,
+      "attempt": 8,
+      "hud": {
+        "fps": 60,
+        "frameTimeMs": 2.02,
+        "drawCalls": 228,
+        "droppedSimulationMs": 0
+      },
+      "cumulativeDroppedSimulationMs": 0,
+      "heap": {
+        "available": true,
+        "usedBytes": 41445324,
+        "totalBytes": 100007936
+      },
+      "input": {
+        "dispatchDelayMs": 0.20000000298023224,
+        "keydownToFrameMs": 4.799999997019768
+      }
+    },
+    {
+      "elapsedMs": 1209949,
+      "race": 8,
+      "attempt": 8,
+      "hud": {
+        "fps": 60,
+        "frameTimeMs": 1.97,
+        "drawCalls": 229,
+        "droppedSimulationMs": 0
+      },
+      "cumulativeDroppedSimulationMs": 0,
+      "heap": {
+        "available": true,
+        "usedBytes": 44956176,
+        "totalBytes": 100007936
+      },
+      "input": {
+        "dispatchDelayMs": 0.30000001192092896,
+        "keydownToFrameMs": 15.699999988079071
+      }
+    },
+    {
+      "elapsedMs": 1219818,
+      "race": 8,
+      "attempt": 8,
+      "hud": {
+        "fps": 60,
+        "frameTimeMs": 2.12,
+        "drawCalls": 244,
+        "droppedSimulationMs": 0
+      },
+      "cumulativeDroppedSimulationMs": 0,
+      "heap": {
+        "available": true,
+        "usedBytes": 39675100,
+        "totalBytes": 100007936
+      },
+      "input": {
+        "dispatchDelayMs": 0.29999999701976776,
+        "keydownToFrameMs": 14.099999994039536
+      }
+    },
+    {
+      "elapsedMs": 1229938,
+      "race": 8,
+      "attempt": 8,
+      "hud": {
+        "fps": 60,
+        "frameTimeMs": 2.36,
+        "drawCalls": 316,
+        "droppedSimulationMs": 0
+      },
+      "cumulativeDroppedSimulationMs": 0,
+      "heap": {
+        "available": true,
+        "usedBytes": 46601976,
+        "totalBytes": 100007936
+      },
+      "input": {
+        "dispatchDelayMs": 0.09999999403953552,
+        "keydownToFrameMs": 9.799999997019768
+      }
+    },
+    {
+      "elapsedMs": 1239814,
+      "race": 8,
+      "attempt": 8,
+      "hud": {
+        "fps": 60,
+        "frameTimeMs": 2.01,
+        "drawCalls": 248,
+        "droppedSimulationMs": 0
+      },
+      "cumulativeDroppedSimulationMs": 0,
+      "heap": {
+        "available": true,
+        "usedBytes": 47041492,
+        "totalBytes": 100007936
+      },
+      "input": {
+        "dispatchDelayMs": 0.20000000298023224,
+        "keydownToFrameMs": 3.0999999940395355
+      }
+    },
+    {
+      "elapsedMs": 1249929,
+      "race": 8,
+      "attempt": 8,
+      "hud": {
+        "fps": 60,
+        "frameTimeMs": 2.3,
+        "drawCalls": 216,
+        "droppedSimulationMs": 0
+      },
+      "cumulativeDroppedSimulationMs": 0,
+      "heap": {
+        "available": true,
+        "usedBytes": 49470936,
+        "totalBytes": 100007936
+      },
+      "input": {
+        "dispatchDelayMs": 0.19999998807907104,
+        "keydownToFrameMs": 2.7000000029802322
+      }
+    },
+    {
+      "elapsedMs": 1259800,
+      "race": 8,
+      "attempt": 8,
+      "hud": {
+        "fps": 60,
+        "frameTimeMs": 2.13,
+        "drawCalls": 230,
+        "droppedSimulationMs": 0
+      },
+      "cumulativeDroppedSimulationMs": 0,
+      "heap": {
+        "available": true,
+        "usedBytes": 25517676,
+        "totalBytes": 98959360
+      },
+      "input": {
+        "dispatchDelayMs": 0.29999999701976776,
+        "keydownToFrameMs": 16.400000005960464
+      }
+    },
+    {
+      "elapsedMs": 1269934,
+      "race": 8,
+      "attempt": 8,
+      "hud": {
+        "fps": 60,
+        "frameTimeMs": 2.07,
+        "drawCalls": 201,
+        "droppedSimulationMs": 0
+      },
+      "cumulativeDroppedSimulationMs": 0,
+      "heap": {
+        "available": true,
+        "usedBytes": 44538332,
+        "totalBytes": 98959360
+      },
+      "input": {
+        "dispatchDelayMs": 0.29999999701976776,
+        "keydownToFrameMs": 13.800000011920929
+      }
+    },
+    {
+      "elapsedMs": 1279814,
+      "race": 8,
+      "attempt": 8,
+      "hud": {
+        "fps": 60,
+        "frameTimeMs": 1.86,
+        "drawCalls": 187,
+        "droppedSimulationMs": 0
+      },
+      "cumulativeDroppedSimulationMs": 0,
+      "heap": {
+        "available": true,
+        "usedBytes": 47612656,
+        "totalBytes": 98959360
+      },
+      "input": {
+        "dispatchDelayMs": 0.20000000298023224,
+        "keydownToFrameMs": 5.200000002980232
+      }
+    },
+    {
+      "elapsedMs": 1289922,
+      "race": 8,
+      "attempt": 8,
+      "hud": {
+        "fps": 60,
+        "frameTimeMs": 2.11,
+        "drawCalls": 171,
+        "droppedSimulationMs": 0
+      },
+      "cumulativeDroppedSimulationMs": 0,
+      "heap": {
+        "available": true,
+        "usedBytes": 51810112,
+        "totalBytes": 98959360
+      },
+      "input": {
+        "dispatchDelayMs": 0.20000000298023224,
+        "keydownToFrameMs": 9
+      }
+    },
+    {
+      "elapsedMs": 1299801,
+      "race": 8,
+      "attempt": 8,
+      "hud": {
+        "fps": 60,
+        "frameTimeMs": 1.84,
+        "drawCalls": 152,
+        "droppedSimulationMs": 0
+      },
+      "cumulativeDroppedSimulationMs": 0,
+      "heap": {
+        "available": true,
+        "usedBytes": 48566040,
+        "totalBytes": 98959360
+      },
+      "input": {
+        "dispatchDelayMs": 0.19999998807907104,
+        "keydownToFrameMs": 4.100000008940697
+      }
+    },
+    {
+      "elapsedMs": 1311222,
+      "race": 9,
+      "attempt": 9,
+      "hud": {
+        "fps": 60,
+        "frameTimeMs": 2.55,
+        "drawCalls": 412,
+        "droppedSimulationMs": 0
+      },
+      "cumulativeDroppedSimulationMs": 0,
+      "heap": {
+        "available": true,
+        "usedBytes": 43530240,
+        "totalBytes": 103677952
+      },
+      "input": {
+        "dispatchDelayMs": 0.20000000298023224,
+        "keydownToFrameMs": 11.700000002980232
+      }
+    },
+    {
+      "elapsedMs": 1321334,
+      "race": 9,
+      "attempt": 9,
+      "hud": {
+        "fps": 60,
+        "frameTimeMs": 2.16,
+        "drawCalls": 348,
+        "droppedSimulationMs": 0
+      },
+      "cumulativeDroppedSimulationMs": 0,
+      "heap": {
+        "available": true,
+        "usedBytes": 33148200,
+        "totalBytes": 103677952
+      },
+      "input": {
+        "dispatchDelayMs": 0.3999999910593033,
+        "keydownToFrameMs": 16.200000002980232
+      }
+    },
+    {
+      "elapsedMs": 1331450,
+      "race": 9,
+      "attempt": 9,
+      "hud": {
+        "fps": 60,
+        "frameTimeMs": 2.19,
+        "drawCalls": 336,
+        "droppedSimulationMs": 0
+      },
+      "cumulativeDroppedSimulationMs": 0,
+      "heap": {
+        "available": true,
+        "usedBytes": 30079780,
+        "totalBytes": 103677952
+      },
+      "input": {
+        "dispatchDelayMs": 0.5,
+        "keydownToFrameMs": 17
+      }
+    },
+    {
+      "elapsedMs": 1341318,
+      "race": 9,
+      "attempt": 9,
+      "hud": {
+        "fps": 60,
+        "frameTimeMs": 2.21,
+        "drawCalls": 312,
+        "droppedSimulationMs": 0
+      },
+      "cumulativeDroppedSimulationMs": 0,
+      "heap": {
+        "available": true,
+        "usedBytes": 56351672,
+        "totalBytes": 103677952
+      },
+      "input": {
+        "dispatchDelayMs": 0.20000000298023224,
+        "keydownToFrameMs": 14.299999997019768
+      }
+    },
+    {
+      "elapsedMs": 1351461,
+      "race": 9,
+      "attempt": 9,
+      "hud": {
+        "fps": 60,
+        "frameTimeMs": 2.23,
+        "drawCalls": 268,
+        "droppedSimulationMs": 0
+      },
+      "cumulativeDroppedSimulationMs": 0,
+      "heap": {
+        "available": true,
+        "usedBytes": 36912680,
+        "totalBytes": 103677952
+      },
+      "input": {
+        "dispatchDelayMs": 0.20000000298023224,
+        "keydownToFrameMs": 7.9000000059604645
+      }
+    },
+    {
+      "elapsedMs": 1361339,
+      "race": 9,
+      "attempt": 9,
+      "hud": {
+        "fps": 60,
+        "frameTimeMs": 1.99,
+        "drawCalls": 228,
+        "droppedSimulationMs": 0
+      },
+      "cumulativeDroppedSimulationMs": 0,
+      "heap": {
+        "available": true,
+        "usedBytes": 48324740,
+        "totalBytes": 100794368
+      },
+      "input": {
+        "dispatchDelayMs": 0.19999998807907104,
+        "keydownToFrameMs": 11
+      }
+    },
+    {
+      "elapsedMs": 1371473,
+      "race": 9,
+      "attempt": 9,
+      "hud": {
+        "fps": 60,
+        "frameTimeMs": 2.24,
+        "drawCalls": 233,
+        "droppedSimulationMs": 0
+      },
+      "cumulativeDroppedSimulationMs": 0,
+      "heap": {
+        "available": true,
+        "usedBytes": 24913904,
+        "totalBytes": 100794368
+      },
+      "input": {
+        "dispatchDelayMs": 0.29999999701976776,
+        "keydownToFrameMs": 10.5
+      }
+    },
+    {
+      "elapsedMs": 1381331,
+      "race": 9,
+      "attempt": 9,
+      "hud": {
+        "fps": 60,
+        "frameTimeMs": 2.37,
+        "drawCalls": 245,
+        "droppedSimulationMs": 0
+      },
+      "cumulativeDroppedSimulationMs": 0,
+      "heap": {
+        "available": true,
+        "usedBytes": 45394176,
+        "totalBytes": 100794368
+      },
+      "input": {
+        "dispatchDelayMs": 0.29999999701976776,
+        "keydownToFrameMs": 17.700000002980232
+      }
+    },
+    {
+      "elapsedMs": 1391462,
+      "race": 9,
+      "attempt": 9,
+      "hud": {
+        "fps": 60,
+        "frameTimeMs": 2.09,
+        "drawCalls": 316,
+        "droppedSimulationMs": 0
+      },
+      "cumulativeDroppedSimulationMs": 0,
+      "heap": {
+        "available": true,
+        "usedBytes": 52946144,
+        "totalBytes": 100794368
+      },
+      "input": {
+        "dispatchDelayMs": 0.20000000298023224,
+        "keydownToFrameMs": 7.299999997019768
+      }
+    },
+    {
+      "elapsedMs": 1401332,
+      "race": 9,
+      "attempt": 9,
+      "hud": {
+        "fps": 60,
+        "frameTimeMs": 2.16,
+        "drawCalls": 258,
+        "droppedSimulationMs": 0
+      },
+      "cumulativeDroppedSimulationMs": 0,
+      "heap": {
+        "available": true,
+        "usedBytes": 53431252,
+        "totalBytes": 100794368
+      },
+      "input": {
+        "dispatchDelayMs": 0.29999999701976776,
+        "keydownToFrameMs": 15.600000008940697
+      }
+    },
+    {
+      "elapsedMs": 1411461,
+      "race": 9,
+      "attempt": 9,
+      "hud": {
+        "fps": 60,
+        "frameTimeMs": 2.02,
+        "drawCalls": 216,
+        "droppedSimulationMs": 0
+      },
+      "cumulativeDroppedSimulationMs": 0,
+      "heap": {
+        "available": true,
+        "usedBytes": 54810416,
+        "totalBytes": 100794368
+      },
+      "input": {
+        "dispatchDelayMs": 0.20000000298023224,
+        "keydownToFrameMs": 5.700000002980232
+      }
+    },
+    {
+      "elapsedMs": 1421320,
+      "race": 9,
+      "attempt": 9,
+      "hud": {
+        "fps": 60,
+        "frameTimeMs": 1.83,
+        "drawCalls": 234,
+        "droppedSimulationMs": 0
+      },
+      "cumulativeDroppedSimulationMs": 0,
+      "heap": {
+        "available": true,
+        "usedBytes": 37466496,
+        "totalBytes": 100007936
+      },
+      "input": {
+        "dispatchDelayMs": 0.20000000298023224,
+        "keydownToFrameMs": 13.900000005960464
+      }
+    },
+    {
+      "elapsedMs": 1431446,
+      "race": 9,
+      "attempt": 9,
+      "hud": {
+        "fps": 60,
+        "frameTimeMs": 2.12,
+        "drawCalls": 199,
+        "droppedSimulationMs": 0
+      },
+      "cumulativeDroppedSimulationMs": 0,
+      "heap": {
+        "available": true,
+        "usedBytes": 29045152,
+        "totalBytes": 100007936
+      },
+      "input": {
+        "dispatchDelayMs": 0.20000000298023224,
+        "keydownToFrameMs": 6.399999991059303
+      }
+    },
+    {
+      "elapsedMs": 1441436,
+      "race": 9,
+      "attempt": 9,
+      "hud": {
+        "fps": 60,
+        "frameTimeMs": 2.07,
+        "drawCalls": 188,
+        "droppedSimulationMs": 0
+      },
+      "cumulativeDroppedSimulationMs": 0,
+      "heap": {
+        "available": true,
+        "usedBytes": 33709708,
+        "totalBytes": 100007936
+      },
+      "input": {
+        "dispatchDelayMs": 0.7999999970197678,
+        "keydownToFrameMs": 16.200000002980232
+      }
+    },
+    {
+      "elapsedMs": 1451322,
+      "race": 9,
+      "attempt": 9,
+      "hud": {
+        "fps": 60,
+        "frameTimeMs": 1.94,
+        "drawCalls": 171,
+        "droppedSimulationMs": 0
+      },
+      "cumulativeDroppedSimulationMs": 0,
+      "heap": {
+        "available": true,
+        "usedBytes": 34795624,
+        "totalBytes": 100007936
+      },
+      "input": {
+        "dispatchDelayMs": 0.29999999701976776,
+        "keydownToFrameMs": 12.700000002980232
+      }
+    },
+    {
+      "elapsedMs": 1461453,
+      "race": 9,
+      "attempt": 9,
+      "hud": {
+        "fps": 60,
+        "frameTimeMs": 1.92,
+        "drawCalls": 153,
+        "droppedSimulationMs": 0
+      },
+      "cumulativeDroppedSimulationMs": 0,
+      "heap": {
+        "available": true,
+        "usedBytes": 35472488,
+        "totalBytes": 100007936
+      },
+      "input": {
+        "dispatchDelayMs": 0.29999999701976776,
+        "keydownToFrameMs": 12.299999997019768
+      }
+    },
+    {
+      "elapsedMs": 1472676,
+      "race": 10,
+      "attempt": 10,
+      "hud": {
+        "fps": 60,
+        "frameTimeMs": 2.41,
+        "drawCalls": 417,
+        "droppedSimulationMs": 0
+      },
+      "cumulativeDroppedSimulationMs": 0,
+      "heap": {
+        "available": true,
+        "usedBytes": 44901900,
+        "totalBytes": 104202240
+      },
+      "input": {
+        "dispatchDelayMs": 0.20000000298023224,
+        "keydownToFrameMs": 8.799999997019768
+      }
+    },
+    {
+      "elapsedMs": 1482819,
+      "race": 10,
+      "attempt": 10,
+      "hud": {
+        "fps": 60,
+        "frameTimeMs": 2.44,
+        "drawCalls": 367,
+        "droppedSimulationMs": 0
+      },
+      "cumulativeDroppedSimulationMs": 0,
+      "heap": {
+        "available": true,
+        "usedBytes": 36838208,
+        "totalBytes": 104202240
+      },
+      "input": {
+        "dispatchDelayMs": 0.20000000298023224,
+        "keydownToFrameMs": 13.799999997019768
+      }
+    },
+    {
+      "elapsedMs": 1492705,
+      "race": 10,
+      "attempt": 10,
+      "hud": {
+        "fps": 60,
+        "frameTimeMs": 2.5,
+        "drawCalls": 336,
+        "droppedSimulationMs": 0
+      },
+      "cumulativeDroppedSimulationMs": 0,
+      "heap": {
+        "available": true,
+        "usedBytes": 30882240,
+        "totalBytes": 104202240
+      },
+      "input": {
+        "dispatchDelayMs": 0.29999999701976776,
+        "keydownToFrameMs": 11
+      }
+    },
+    {
+      "elapsedMs": 1502834,
+      "race": 10,
+      "attempt": 10,
+      "hud": {
+        "fps": 60,
+        "frameTimeMs": 2.25,
+        "drawCalls": 321,
+        "droppedSimulationMs": 0
+      },
+      "cumulativeDroppedSimulationMs": 0,
+      "heap": {
+        "available": true,
+        "usedBytes": 35234460,
+        "totalBytes": 104202240
+      },
+      "input": {
+        "dispatchDelayMs": 2.7999999970197678,
+        "keydownToFrameMs": 15.100000008940697
+      }
+    },
+    {
+      "elapsedMs": 1512719,
+      "race": 10,
+      "attempt": 10,
+      "hud": {
+        "fps": 60,
+        "frameTimeMs": 2.28,
+        "drawCalls": 271,
+        "droppedSimulationMs": 0
+      },
+      "cumulativeDroppedSimulationMs": 0,
+      "heap": {
+        "available": true,
+        "usedBytes": 39118048,
+        "totalBytes": 104202240
+      },
+      "input": {
+        "dispatchDelayMs": 0.20000000298023224,
+        "keydownToFrameMs": 13.5
+      }
+    },
+    {
+      "elapsedMs": 1522852,
+      "race": 10,
+      "attempt": 10,
+      "hud": {
+        "fps": 60,
+        "frameTimeMs": 2.2,
+        "drawCalls": 226,
+        "droppedSimulationMs": 0
+      },
+      "cumulativeDroppedSimulationMs": 0,
+      "heap": {
+        "available": true,
+        "usedBytes": 44874880,
+        "totalBytes": 101318656
+      },
+      "input": {
+        "dispatchDelayMs": 0.20000000298023224,
+        "keydownToFrameMs": 17.400000005960464
+      }
+    },
+    {
+      "elapsedMs": 1532720,
+      "race": 10,
+      "attempt": 10,
+      "hud": {
+        "fps": 60,
+        "frameTimeMs": 2.22,
+        "drawCalls": 298,
+        "droppedSimulationMs": 0
+      },
+      "cumulativeDroppedSimulationMs": 0,
+      "heap": {
+        "available": true,
+        "usedBytes": 44143592,
+        "totalBytes": 101318656
+      },
+      "input": {
+        "dispatchDelayMs": 0.30000001192092896,
+        "keydownToFrameMs": 13.699999988079071
+      }
+    },
+    {
+      "elapsedMs": 1542855,
+      "race": 10,
+      "attempt": 10,
+      "hud": {
+        "fps": 60,
+        "frameTimeMs": 2.38,
+        "drawCalls": 377,
+        "droppedSimulationMs": 0
+      },
+      "cumulativeDroppedSimulationMs": 0,
+      "heap": {
+        "available": true,
+        "usedBytes": 26145964,
+        "totalBytes": 101318656
+      },
+      "input": {
+        "dispatchDelayMs": 0.19999998807907104,
+        "keydownToFrameMs": 10
+      }
+    },
+    {
+      "elapsedMs": 1552739,
+      "race": 10,
+      "attempt": 10,
+      "hud": {
+        "fps": 60,
+        "frameTimeMs": 2.43,
+        "drawCalls": 369,
+        "droppedSimulationMs": 0
+      },
+      "cumulativeDroppedSimulationMs": 0,
+      "heap": {
+        "available": true,
+        "usedBytes": 41849780,
+        "totalBytes": 101318656
+      },
+      "input": {
+        "dispatchDelayMs": 0.30000001192092896,
+        "keydownToFrameMs": 12.099999994039536
+      }
+    },
+    {
+      "elapsedMs": 1562883,
+      "race": 10,
+      "attempt": 10,
+      "hud": {
+        "fps": 60,
+        "frameTimeMs": 2.72,
+        "drawCalls": 423,
+        "droppedSimulationMs": 0
+      },
+      "cumulativeDroppedSimulationMs": 0,
+      "heap": {
+        "available": true,
+        "usedBytes": 52857256,
+        "totalBytes": 101318656
+      },
+      "input": {
+        "dispatchDelayMs": 0.20000000298023224,
+        "keydownToFrameMs": 3.199999988079071
+      }
+    },
+    {
+      "elapsedMs": 1572771,
+      "race": 10,
+      "attempt": 10,
+      "hud": {
+        "fps": 60,
+        "frameTimeMs": 2.57,
+        "drawCalls": 361,
+        "droppedSimulationMs": 0
+      },
+      "cumulativeDroppedSimulationMs": 0,
+      "heap": {
+        "available": true,
+        "usedBytes": 28398804,
+        "totalBytes": 101318656
+      },
+      "input": {
+        "dispatchDelayMs": 0.29999999701976776,
+        "keydownToFrameMs": 14
+      }
+    },
+    {
+      "elapsedMs": 1582903,
+      "race": 10,
+      "attempt": 10,
+      "hud": {
+        "fps": 60,
+        "frameTimeMs": 2.46,
+        "drawCalls": 327,
+        "droppedSimulationMs": 0
+      },
+      "cumulativeDroppedSimulationMs": 0,
+      "heap": {
+        "available": true,
+        "usedBytes": 24278568,
+        "totalBytes": 101318656
+      },
+      "input": {
+        "dispatchDelayMs": 0.5999999940395355,
+        "keydownToFrameMs": 13.799999997019768
+      }
+    },
+    {
+      "elapsedMs": 1592772,
+      "race": 10,
+      "attempt": 10,
+      "hud": {
+        "fps": 60,
+        "frameTimeMs": 2.2,
+        "drawCalls": 308,
+        "droppedSimulationMs": 0
+      },
+      "cumulativeDroppedSimulationMs": 0,
+      "heap": {
+        "available": true,
+        "usedBytes": 48376652,
+        "totalBytes": 101318656
+      },
+      "input": {
+        "dispatchDelayMs": 0.29999999701976776,
+        "keydownToFrameMs": 9.700000002980232
+      }
+    },
+    {
+      "elapsedMs": 1602901,
+      "race": 10,
+      "attempt": 10,
+      "hud": {
+        "fps": 60,
+        "frameTimeMs": 2.14,
+        "drawCalls": 249,
+        "droppedSimulationMs": 0
+      },
+      "cumulativeDroppedSimulationMs": 0,
+      "heap": {
+        "available": true,
+        "usedBytes": 53247840,
+        "totalBytes": 101318656
+      },
+      "input": {
+        "dispatchDelayMs": 0.7000000029802322,
+        "keydownToFrameMs": 16.700000002980232
+      }
+    },
+    {
+      "elapsedMs": 1612780,
+      "race": 10,
+      "attempt": 10,
+      "hud": {
+        "fps": 60,
+        "frameTimeMs": 2.3,
+        "drawCalls": 254,
+        "droppedSimulationMs": 0
+      },
+      "cumulativeDroppedSimulationMs": 0,
+      "heap": {
+        "available": true,
+        "usedBytes": 51923296,
+        "totalBytes": 101318656
+      },
+      "input": {
+        "dispatchDelayMs": 0.10000000894069672,
+        "keydownToFrameMs": 4.5999999940395355
+      }
+    },
+    {
+      "elapsedMs": 1622917,
+      "race": 10,
+      "attempt": 10,
+      "hud": {
+        "fps": 60,
+        "frameTimeMs": 2.23,
+        "drawCalls": 231,
+        "droppedSimulationMs": 0
+      },
+      "cumulativeDroppedSimulationMs": 0,
+      "heap": {
+        "available": true,
+        "usedBytes": 43281448,
+        "totalBytes": 101318656
+      },
+      "input": {
+        "dispatchDelayMs": 0.20000000298023224,
+        "keydownToFrameMs": 2.5999999940395355
+      }
+    },
+    {
+      "elapsedMs": 1632805,
+      "race": 10,
+      "attempt": 10,
+      "hud": {
+        "fps": 60,
+        "frameTimeMs": 2.05,
+        "drawCalls": 237,
+        "droppedSimulationMs": 0
+      },
+      "cumulativeDroppedSimulationMs": 0,
+      "heap": {
+        "available": true,
+        "usedBytes": 27084648,
+        "totalBytes": 101318656
+      },
+      "input": {
+        "dispatchDelayMs": 0.29999999701976776,
+        "keydownToFrameMs": 10.900000005960464
+      }
+    },
+    {
+      "elapsedMs": 1642695,
+      "race": 10,
+      "attempt": 10,
+      "hud": {
+        "fps": 60,
+        "frameTimeMs": 2.05,
+        "drawCalls": 208,
+        "droppedSimulationMs": 0
+      },
+      "cumulativeDroppedSimulationMs": 0,
+      "heap": {
+        "available": true,
+        "usedBytes": 36998452,
+        "totalBytes": 101318656
+      },
+      "input": {
+        "dispatchDelayMs": 0.20000000298023224,
+        "keydownToFrameMs": 2.3999999910593033
+      }
+    },
+    {
+      "elapsedMs": 1650553,
+      "race": 11,
+      "attempt": 11,
+      "hud": {
+        "fps": 60,
+        "frameTimeMs": 2.5,
+        "drawCalls": 414,
+        "droppedSimulationMs": 0
+      },
+      "cumulativeDroppedSimulationMs": 0,
+      "heap": {
+        "available": true,
+        "usedBytes": 34530160,
+        "totalBytes": 101580800
+      },
+      "input": {
+        "dispatchDelayMs": 0.20000000298023224,
+        "keydownToFrameMs": 14.900000005960464
+      }
+    },
+    {
+      "elapsedMs": 1660693,
+      "race": 11,
+      "attempt": 11,
+      "hud": {
+        "fps": 60,
+        "frameTimeMs": 2.6,
+        "drawCalls": 347,
+        "droppedSimulationMs": 0
+      },
+      "cumulativeDroppedSimulationMs": 0,
+      "heap": {
+        "available": true,
+        "usedBytes": 27526016,
+        "totalBytes": 101580800
+      },
+      "input": {
+        "dispatchDelayMs": 0.19999998807907104,
+        "keydownToFrameMs": 11
+      }
+    },
+    {
+      "elapsedMs": 1670580,
+      "race": 11,
+      "attempt": 11,
+      "hud": {
+        "fps": 60,
+        "frameTimeMs": 2.58,
+        "drawCalls": 336,
+        "droppedSimulationMs": 0
+      },
+      "cumulativeDroppedSimulationMs": 0,
+      "heap": {
+        "available": true,
+        "usedBytes": 49384836,
+        "totalBytes": 101580800
+      },
+      "input": {
+        "dispatchDelayMs": 0.20000000298023224,
+        "keydownToFrameMs": 4.299999997019768
+      }
+    },
+    {
+      "elapsedMs": 1680703,
+      "race": 11,
+      "attempt": 11,
+      "hud": {
+        "fps": 60,
+        "frameTimeMs": 2.31,
+        "drawCalls": 320,
+        "droppedSimulationMs": 0
+      },
+      "cumulativeDroppedSimulationMs": 0,
+      "heap": {
+        "available": true,
+        "usedBytes": 27985336,
+        "totalBytes": 101580800
+      },
+      "input": {
+        "dispatchDelayMs": 0.09999999403953552,
+        "keydownToFrameMs": 13.700000002980232
+      }
+    },
+    {
+      "elapsedMs": 1690581,
+      "race": 11,
+      "attempt": 11,
+      "hud": {
+        "fps": 60,
+        "frameTimeMs": 2.49,
+        "drawCalls": 271,
+        "droppedSimulationMs": 0
+      },
+      "cumulativeDroppedSimulationMs": 0,
+      "heap": {
+        "available": true,
+        "usedBytes": 31463592,
+        "totalBytes": 101580800
+      },
+      "input": {
+        "dispatchDelayMs": 0.29999999701976776,
+        "keydownToFrameMs": 5.300000011920929
+      }
+    },
+    {
+      "elapsedMs": 1700708,
+      "race": 11,
+      "attempt": 11,
+      "hud": {
+        "fps": 60,
+        "frameTimeMs": 2.42,
+        "drawCalls": 228,
+        "droppedSimulationMs": 0
+      },
+      "cumulativeDroppedSimulationMs": 0,
+      "heap": {
+        "available": true,
+        "usedBytes": 55035272,
+        "totalBytes": 101580800
+      },
+      "input": {
+        "dispatchDelayMs": 0.29999999701976776,
+        "keydownToFrameMs": 11.599999994039536
+      }
+    },
+    {
+      "elapsedMs": 1710571,
+      "race": 11,
+      "attempt": 11,
+      "hud": {
+        "fps": 60,
+        "frameTimeMs": 2.21,
+        "drawCalls": 229,
+        "droppedSimulationMs": 0
+      },
+      "cumulativeDroppedSimulationMs": 0,
+      "heap": {
+        "available": true,
+        "usedBytes": 55245784,
+        "totalBytes": 101580800
+      },
+      "input": {
+        "dispatchDelayMs": 0.20000000298023224,
+        "keydownToFrameMs": 12.5
+      }
+    },
+    {
+      "elapsedMs": 1720714,
+      "race": 11,
+      "attempt": 11,
+      "hud": {
+        "fps": 60,
+        "frameTimeMs": 2.19,
+        "drawCalls": 245,
+        "droppedSimulationMs": 0
+      },
+      "cumulativeDroppedSimulationMs": 0,
+      "heap": {
+        "available": true,
+        "usedBytes": 54316208,
+        "totalBytes": 101580800
+      },
+      "input": {
+        "dispatchDelayMs": 0.09999999403953552,
+        "keydownToFrameMs": 4.100000008940697
+      }
+    },
+    {
+      "elapsedMs": 1730593,
+      "race": 11,
+      "attempt": 11,
+      "hud": {
+        "fps": 60,
+        "frameTimeMs": 2.49,
+        "drawCalls": 316,
+        "droppedSimulationMs": 0
+      },
+      "cumulativeDroppedSimulationMs": 0,
+      "heap": {
+        "available": true,
+        "usedBytes": 58315268,
+        "totalBytes": 101580800
+      },
+      "input": {
+        "dispatchDelayMs": 0.20000000298023224,
+        "keydownToFrameMs": 8.799999997019768
+      }
+    },
+    {
+      "elapsedMs": 1740714,
+      "race": 11,
+      "attempt": 11,
+      "hud": {
+        "fps": 60,
+        "frameTimeMs": 2.23,
+        "drawCalls": 248,
+        "droppedSimulationMs": 0
+      },
+      "cumulativeDroppedSimulationMs": 0,
+      "heap": {
+        "available": true,
+        "usedBytes": 36926724,
+        "totalBytes": 101842944
+      },
+      "input": {
+        "dispatchDelayMs": 0.20000000298023224,
+        "keydownToFrameMs": 6.799999997019768
+      }
+    },
+    {
+      "elapsedMs": 1750615,
+      "race": 11,
+      "attempt": 11,
+      "hud": {
+        "fps": 60,
+        "frameTimeMs": 2.09,
+        "drawCalls": 216,
+        "droppedSimulationMs": 0
+      },
+      "cumulativeDroppedSimulationMs": 0,
+      "heap": {
+        "available": true,
+        "usedBytes": 43780580,
+        "totalBytes": 101842944
+      },
+      "input": {
+        "dispatchDelayMs": 0.20000000298023224,
+        "keydownToFrameMs": 4.5
+      }
+    },
+    {
+      "elapsedMs": 1760745,
+      "race": 11,
+      "attempt": 11,
+      "hud": {
+        "fps": 60,
+        "frameTimeMs": 2.02,
+        "drawCalls": 234,
+        "droppedSimulationMs": 0
+      },
+      "cumulativeDroppedSimulationMs": 0,
+      "heap": {
+        "available": true,
+        "usedBytes": 28993000,
+        "totalBytes": 101842944
+      },
+      "input": {
+        "dispatchDelayMs": 0.20000000298023224,
+        "keydownToFrameMs": 8.700000002980232
+      }
+    },
+    {
+      "elapsedMs": 1770605,
+      "race": 11,
+      "attempt": 11,
+      "hud": {
+        "fps": 60,
+        "frameTimeMs": 2.19,
+        "drawCalls": 199,
+        "droppedSimulationMs": 0
+      },
+      "cumulativeDroppedSimulationMs": 0,
+      "heap": {
+        "available": true,
+        "usedBytes": 44059520,
+        "totalBytes": 101842944
+      },
+      "input": {
+        "dispatchDelayMs": 0.20000000298023224,
+        "keydownToFrameMs": 12.299999997019768
+      }
+    },
+    {
+      "elapsedMs": 1780738,
+      "race": 11,
+      "attempt": 11,
+      "hud": {
+        "fps": 60,
+        "frameTimeMs": 2.1,
+        "drawCalls": 188,
+        "droppedSimulationMs": 0
+      },
+      "cumulativeDroppedSimulationMs": 0,
+      "heap": {
+        "available": true,
+        "usedBytes": 51068392,
+        "totalBytes": 101842944
+      },
+      "input": {
+        "dispatchDelayMs": 0.29999999701976776,
+        "keydownToFrameMs": 12.100000008940697
+      }
+    },
+    {
+      "elapsedMs": 1790605,
+      "race": 11,
+      "attempt": 11,
+      "hud": {
+        "fps": 60,
+        "frameTimeMs": 1.95,
+        "drawCalls": 171,
+        "droppedSimulationMs": 0
+      },
+      "cumulativeDroppedSimulationMs": 0,
+      "heap": {
+        "available": true,
+        "usedBytes": 51650296,
+        "totalBytes": 101842944
+      },
+      "input": {
+        "dispatchDelayMs": 0.19999998807907104,
+        "keydownToFrameMs": 12
+      }
+    },
+    {
+      "elapsedMs": 1800741,
+      "race": 11,
+      "attempt": 11,
+      "hud": {
+        "fps": 60,
+        "frameTimeMs": 2.01,
+        "drawCalls": 153,
+        "droppedSimulationMs": 0
+      },
+      "cumulativeDroppedSimulationMs": 0,
+      "heap": {
+        "available": true,
+        "usedBytes": 51907760,
+        "totalBytes": 101842944
+      },
+      "input": {
+        "dispatchDelayMs": 0.20000000298023224,
+        "keydownToFrameMs": 10.799999997019768
+      }
+    },
+    {
+      "elapsedMs": 1811951,
+      "race": 12,
+      "attempt": 12,
+      "hud": {
+        "fps": 60,
+        "frameTimeMs": 2.52,
+        "drawCalls": 412,
+        "droppedSimulationMs": 0
+      },
+      "cumulativeDroppedSimulationMs": 0,
+      "heap": {
+        "available": true,
+        "usedBytes": 34025468,
+        "totalBytes": 96862208
+      },
+      "input": {
+        "dispatchDelayMs": 0.3999999910593033,
+        "keydownToFrameMs": 15.799999997019768
+      }
+    },
+    {
+      "elapsedMs": 1822072,
+      "race": 12,
+      "attempt": 12,
+      "hud": {
+        "fps": 60,
+        "frameTimeMs": 2.53,
+        "drawCalls": 374,
+        "droppedSimulationMs": 0
+      },
+      "cumulativeDroppedSimulationMs": 0,
+      "heap": {
+        "available": true,
+        "usedBytes": 34771464,
+        "totalBytes": 96862208
+      },
+      "input": {
+        "dispatchDelayMs": 0.19999998807907104,
+        "keydownToFrameMs": 13.400000005960464
+      }
+    },
+    {
+      "elapsedMs": 1832189,
+      "race": 12,
+      "attempt": 12,
+      "hud": {
+        "fps": 60,
+        "frameTimeMs": 2.52,
+        "drawCalls": 359,
+        "droppedSimulationMs": 0
+      },
+      "cumulativeDroppedSimulationMs": 0,
+      "heap": {
+        "available": true,
+        "usedBytes": 43768896,
+        "totalBytes": 96862208
+      },
+      "input": {
+        "dispatchDelayMs": 0.09999999403953552,
+        "keydownToFrameMs": 11.100000008940697
+      }
+    },
+    {
+      "elapsedMs": 1842071,
+      "race": 12,
+      "attempt": 12,
+      "hud": {
+        "fps": 60,
+        "frameTimeMs": 2.44,
+        "drawCalls": 350,
+        "droppedSimulationMs": 0
+      },
+      "cumulativeDroppedSimulationMs": 0,
+      "heap": {
+        "available": true,
+        "usedBytes": 36794372,
+        "totalBytes": 96862208
+      },
+      "input": {
+        "dispatchDelayMs": 0.29999999701976776,
+        "keydownToFrameMs": 12
+      }
+    },
+    {
+      "elapsedMs": 1851956,
+      "race": 12,
+      "attempt": 12,
+      "hud": {
+        "fps": 60,
+        "frameTimeMs": 2.37,
+        "drawCalls": 323,
+        "droppedSimulationMs": 0
+      },
+      "cumulativeDroppedSimulationMs": 0,
+      "heap": {
+        "available": true,
+        "usedBytes": 45819652,
+        "totalBytes": 97124352
+      },
+      "input": {
+        "dispatchDelayMs": 0.20000000298023224,
+        "keydownToFrameMs": 13.700000002980232
+      }
+    },
+    {
+      "elapsedMs": 1862087,
+      "race": 12,
+      "attempt": 12,
+      "hud": {
+        "fps": 60,
+        "frameTimeMs": 2.3,
+        "drawCalls": 331,
+        "droppedSimulationMs": 0
+      },
+      "cumulativeDroppedSimulationMs": 0,
+      "heap": {
+        "available": true,
+        "usedBytes": 31589564,
+        "totalBytes": 97386496
+      },
+      "input": {
+        "dispatchDelayMs": 0.09999999403953552,
+        "keydownToFrameMs": 13.5
+      }
+    }
+  ],
+  "consoleMessages": []
+}

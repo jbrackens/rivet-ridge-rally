@@ -82,6 +82,18 @@ export interface RaceClassificationEntry {
   isPlayer: boolean;
 }
 
+export type RaceReplayFailureReason = "capacity" | "cadence" | "incomplete";
+
+export type RaceReplayHandoff =
+  | {
+      readonly status: "complete";
+      readonly samples: Uint8Array;
+    }
+  | {
+      readonly status: "unavailable";
+      readonly reason: RaceReplayFailureReason;
+    };
+
 export interface RaceResult {
   mode: RaceMode;
   trackId: TrackId;

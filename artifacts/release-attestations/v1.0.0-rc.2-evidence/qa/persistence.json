@@ -1,0 +1,38 @@
+{
+  "schemaVersion": 1,
+  "kind": "release-qa-check",
+  "product": "RIVET RIDGE RALLY",
+  "version": "1.0.0-rc.2",
+  "productTag": "v1.0.0-rc.2",
+  "productCommit": "2b4069538c242da37c8c43d6581e097149fa1994",
+  "manifestAggregateSha256": "e7af57d55db8df4d4c16b008c7cccfa2769b370ff845262c8eb9cb1eff3114d0",
+  "check": "persistence",
+  "status": "PASS",
+  "createdAt": "2026-07-19T13:03:03.777Z",
+  "commands": [
+    {
+      "command": "npx vitest run src/game/persistence",
+      "status": "PASS",
+      "exitCode": 0,
+      "startedAt": "2026-07-19T13:02:20.183Z",
+      "completedAt": "2026-07-19T13:02:21.320Z",
+      "output": {
+        "path": "artifacts/release-attestations/v1.0.0-rc.2-evidence/qa/logs/persistence-1.txt",
+        "bytes": 348,
+        "sha256": "7e38dd6cc39bc431f8b5fadbc93fd827fa4607b1d45d94fde8c4a541267a20c4"
+      }
+    },
+    {
+      "command": "npx playwright test e2e/migrations.spec.ts",
+      "status": "PASS",
+      "exitCode": 0,
+      "startedAt": "2026-07-19T13:02:21.321Z",
+      "completedAt": "2026-07-19T13:03:03.776Z",
+      "output": {
+        "path": "artifacts/release-attestations/v1.0.0-rc.2-evidence/qa/logs/persistence-2.txt",
+        "bytes": 8840,
+        "sha256": "25828ad2adf75e1cd0a94ac886b005226c7aaca45a47b3d2f26a1371665e2a11"
+      }
+    }
+  ]
+}

@@ -1,6 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
 
-const BASE_URL = "http://127.0.0.1:4173";
+const BASE_URL = `http://127.0.0.1:${process.env.RRR_PLAYWRIGHT_PORT ?? "4173"}`;
 const DATABASE_NAME = "rivet-ridge-rally";
 const PROFILE_ID = "rider-01";
 
@@ -321,7 +321,7 @@ async function readDatabase(page: Page): Promise<DatabaseSnapshot> {
   });
 }
 
-test("a fresh v5 profile stores and labels arrow lane defaults", async ({ page }) => {
+test("a fresh v6 profile stores and labels arrow lane defaults", async ({ page }) => {
   await page.goto("/");
   await expect(page.getByRole("button", { name: "Skip training" })).toBeVisible({ timeout: 15_000 });
   await page.getByRole("button", { name: "Skip training" }).click();
@@ -333,13 +333,13 @@ test("a fresh v5 profile stores and labels arrow lane defaults", async ({ page }
   await expect(bindings.locator("div").filter({ hasText: /^lane Right/ }).getByRole("button")).toHaveText("→ Right");
 
   const snapshot = await readDatabase(page);
-  expect(snapshot.nativeVersion).toBe(50);
+  expect(snapshot.nativeVersion).toBe(60);
   expect(snapshot.settings).toMatchObject({
     value: { controls: { keyBindings: { laneLeft: "ArrowLeft", laneRight: "ArrowRight" } } },
   });
 });
 
-test("a native v1 profile runs through the v5 migration and preserves custom controls", async ({ page }) => {
+test("a native v1 profile runs through the v6 migration and preserves custom controls", async ({ page }) => {
   const before = await seedLegacyDatabase(page, {
     logicalVersion: 1,
     settingsRecord: { id: PROFILE_ID, value: LEGACY_SETTINGS },
@@ -360,13 +360,13 @@ test("a native v1 profile runs through the v5 migration and preserves custom con
   await expect(page.getByRole("heading", { name: "Coastline Clash" })).toBeVisible();
 
   const after = await readDatabase(page);
-  expect(after.nativeVersion).toBe(50);
+  expect(after.nativeVersion).toBe(60);
   expect(after.stores).toEqual(["customTracks", "progress", "quarantine", "replays", "settings"]);
   expect(after.indexes).toEqual({
     customTracks: ["name", "schemaVersion", "updatedAt"],
     progress: ["schemaVersion", "updatedAt"],
     quarantine: ["createdAt", "kind"],
-    replays: ["createdAt", "schemaVersion", "trackId"],
+    replays: ["courseKey", "createdAt", "schemaVersion", "trackId"],
     settings: ["schemaVersion", "updatedAt"],
   });
   expect(after.settings).toMatchObject({ id: PROFILE_ID, schemaVersion: 1, value: LEGACY_SETTINGS });
@@ -378,7 +378,7 @@ test("a native v1 profile runs through the v5 migration and preserves custom con
   expect(after.quarantineCount).toBe(0);
 });
 
-test("a native v2 profile upgrades to v5 without losing its track, replay, or custom controls", async ({ page }) => {
+test("a native v2 profile upgrades to v6 without losing its track, replay, or custom controls", async ({ page }) => {
   const before = await seedLegacyDatabase(page, {
     logicalVersion: 2,
     settingsRecord: { id: PROFILE_ID, value: LEGACY_SETTINGS, updatedAt: V2_UPDATED_AT },
@@ -399,7 +399,7 @@ test("a native v2 profile upgrades to v5 without losing its track, replay, or cu
   await expect(page.getByText(LEGACY_CUSTOM_TRACK.name, { exact: true })).toBeVisible();
 
   const after = await readDatabase(page);
-  expect(after.nativeVersion).toBe(50);
+  expect(after.nativeVersion).toBe(60);
   expect(after.stores).toEqual(["customTracks", "progress", "quarantine", "replays", "settings"]);
   expect(after.settings).toEqual({
     id: PROFILE_ID,
@@ -449,7 +449,7 @@ test("a native v4 profile upgrades a valid version-1 custom track in place", asy
   await expect(page.getByText(LEGACY_CUSTOM_TRACK.name, { exact: true })).toBeVisible();
 
   const after = await readDatabase(page);
-  expect(after.nativeVersion).toBe(50);
+  expect(after.nativeVersion).toBe(60);
   expect(after.customTrack).toEqual({ ...versionOneTrack, schemaVersion: 2 });
   expect(after.customTrackCount).toBe(1);
   expect(after.quarantineCount).toBe(0);
@@ -491,7 +491,7 @@ test("a native v4 center-contained track remains editable until its v2 footprint
   await expect(page.getByText(versionOneTrack.name, { exact: true })).toBeVisible();
 
   const after = await readDatabase(page);
-  expect(after.nativeVersion).toBe(50);
+  expect(after.nativeVersion).toBe(60);
   expect(after.customTrack).toEqual(versionOneTrack);
   expect(after.customTrackCount).toBe(1);
   expect(after.quarantineCount).toBe(0);
@@ -525,7 +525,7 @@ test("a native v4 profile leaves a future custom-track schema untouched and fail
   );
 
   const after = await readDatabase(page);
-  expect(after.nativeVersion).toBe(50);
+  expect(after.nativeVersion).toBe(60);
   expect(after.customTrack).toEqual(futureTrack);
   expect(after.customTrackCount).toBe(1);
   expect(after.quarantineCount).toBe(0);
@@ -556,7 +556,7 @@ test("a native v3 profile migrates only the exact legacy A and D lane pair", asy
   await expect(page.getByRole("button", { name: "Ride", exact: true })).toBeVisible({ timeout: 15_000 });
 
   const after = await readDatabase(page);
-  expect(after.nativeVersion).toBe(50);
+  expect(after.nativeVersion).toBe(60);
   expect(after.settings).toEqual({
     id: PROFILE_ID,
     schemaVersion: 1,

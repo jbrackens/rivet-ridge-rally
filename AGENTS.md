@@ -1,5 +1,8 @@
 # RIVET RIDGE RALLY — Contributor and Agent Instructions
 
+> **STATUS 2026-09-06 — STALE IN PART.** This file was last updated 2026-07-15, 143 commits ago; its §2 source-of-truth list omitted `docs/design/` entirely, even though `docs/design/GRAPHICS_EVOLUTION_PLAN.md` is the approved art direction and holds the only record of the current real blocker (§10, the load-sensitive render flicker). That file has been added to the list.
+> Read it alongside `QA_REPORT.md`; the §1 state description and the rest of §2 have not been re-verified against the 2026-08-30 → 2026-09-05 render overhaul.
+
 These instructions apply to the repository root and all descendants unless a more specific `AGENTS.md` is added later. They guide implementation work; they do not override direct user instructions.
 
 ## 1. Current state
@@ -20,6 +23,7 @@ Read these files before substantial work:
 6. `LAUNCH_READINESS.md` for release gates.
 7. `ASSET_LICENSES.md` before adding or modifying assets.
 8. `docs/OPERATIONS.md` before changing build/deploy behavior.
+9. `docs/design/GRAPHICS_EVOLUTION_PLAN.md` for the approved art direction and the current render blocker (§10).
 
 When documents disagree, do not silently choose a convenient interpretation. Preserve the strict commercial/QA requirement, record the conflict, and request an owner decision if it materially changes scope.
 

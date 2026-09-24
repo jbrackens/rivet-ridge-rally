@@ -1,0 +1,26 @@
+{
+  "kind": "release-qa-check",
+  "schemaVersion": 1,
+  "product": "RIVET RIDGE RALLY",
+  "version": "1.0.0-rc.2",
+  "productTag": "v1.0.0-rc.2",
+  "productCommit": "2b4069538c242da37c8c43d6581e097149fa1994",
+  "manifestAggregateSha256": "e7af57d55db8df4d4c16b008c7cccfa2769b370ff845262c8eb9cb1eff3114d0",
+  "check": "assets",
+  "status": "PASS",
+  "createdAt": "2026-07-19T12:58:07.386Z",
+  "commands": [
+    {
+      "command": "npm run assets:verify",
+      "startedAt": "2026-07-19T12:58:06.385Z",
+      "completedAt": "2026-07-19T12:58:07.386Z",
+      "exitCode": 0,
+      "status": "PASS",
+      "output": {
+        "path": "artifacts/release-attestations/v1.0.0-rc.2-evidence/qa/logs/assets-1.txt",
+        "bytes": 9170,
+        "sha256": "0f70393d9d68a3d8b37efbf7affbc2557aa8bb54d8d0c7f5b680a02c157c261c"
+      }
+    }
+  ]
+}

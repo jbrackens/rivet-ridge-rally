@@ -1,0 +1,281 @@
+{
+  "product": "RIVET RIDGE RALLY",
+  "version": "1.0.0-rc.2",
+  "format": 2,
+  "source": {
+    "commit": "2b4069538c242da37c8c43d6581e097149fa1994",
+    "tag": "v1.0.0-rc.2",
+    "tagObject": "19d9fd992bac6e3e356a7ff871fea966dbfb456b",
+    "tagObjectType": "tag"
+  },
+  "toolchain": {
+    "node": "26.4.0",
+    "nodeExecutableSha256": "59cd4fb59cf5bc239f43d5db8c0cd8c23c22db79419612b92da3b7cf34de8553",
+    "npm": "11.17.0",
+    "npmCliSha256": "8e5f6f3429f8cdbe693cdc29904e9d5a7b127a494bd15c804bd54c7403bfcbe7",
+    "npmPackage": {
+      "treeFormat": 1,
+      "name": "npm",
+      "version": "11.17.0",
+      "cliRelativePath": "bin/npm-cli.js",
+      "packageJsonSha256": "a4f04ad50219f82e0e8f262d3e1acbdbd678040198ea36fca10fe7bbb38da726",
+      "directoryCount": 461,
+      "regularFileCount": 1939,
+      "symlinkCount": 9,
+      "totalRegularFileBytes": 12097688,
+      "treeSha256": "48f4d34073955271f7fafeb109b9335dcbfac5ec0bf0a8d966a566c723e314bf"
+    },
+    "platform": "darwin",
+    "arch": "arm64",
+    "packageLockSha256": "feb9ea63b5d77087798df8ba84446a8500c841877e2b86f5896ecb12a63cd94e"
+  },
+  "build": {
+    "source": "detached-clean-git-worktree",
+    "installCommand": "npm ci --no-audit --no-fund",
+    "buildCommand": "npm run build",
+    "viteQaMode": "0",
+    "npmConfig": "isolated-empty-user-and-global",
+    "installScripts": "enabled"
+  },
+  "compression": {
+    "algorithm": "gzip",
+    "level": 9
+  },
+  "totalBytes": 8011146,
+  "totalGzipBytes": 5466253,
+  "fileCount": 33,
+  "aggregateSha256": "e7af57d55db8df4d4c16b008c7cccfa2769b370ff845262c8eb9cb1eff3114d0",
+  "files": [
+    {
+      "path": "THIRD_PARTY_NOTICES.txt",
+      "bytes": 43872,
+      "gzipBytes": 8449,
+      "gzipSha256": "634c7e56b6407f5d0f65bf956ac13bb28df123f71de707c2c667951a9cd56975",
+      "sha256": "f837ed705667d0f3976bbd419f42d8c63844a3eb4b52f76db88ed3a1d6e270c2"
+    },
+    {
+      "path": "assets/3d/asset-manifest.json",
+      "bytes": 15165,
+      "gzipBytes": 4250,
+      "gzipSha256": "b70835d43816645c90eb48e47768c5376719bf50bf270ee193845f98ac2a207b",
+      "sha256": "005ed98f7c4e365abb104da79352eb78b3bc3d7340f9dc074a3e84c772918918"
+    },
+    {
+      "path": "assets/3d/hero-bike-rider.glb",
+      "bytes": 517664,
+      "gzipBytes": 241430,
+      "gzipSha256": "c4097605fde517b7963d1d99d5fd13c0cf0b991c145a7c81c3cf31e02be0eefa",
+      "sha256": "538be4269927544fa91cfc405742523a60422d77d546ce9c8859f407deb2e6e8"
+    },
+    {
+      "path": "assets/CoursePresentationRoute-BrMJ3DCB.js",
+      "bytes": 17403,
+      "gzipBytes": 5652,
+      "gzipSha256": "b3279b1e07cf909f2991f1f4cb3b3560c70a8ac33e7a2706c20a2956901efe2a",
+      "sha256": "a81e4b27c0ddaec991f1f599c89576a9e611108ea4429b4ee97959591dd21eac"
+    },
+    {
+      "path": "assets/GameView-BTqB6Yt0.js",
+      "bytes": 217703,
+      "gzipBytes": 64139,
+      "gzipSha256": "bd2ba754a8333b49134a53c3742ffe360092a91f6554ec4b2ede66856ee839f6",
+      "sha256": "2831329f20fcd6e117f32b88ae49d37fd29ad43bcb30252514a878230b17f672"
+    },
+    {
+      "path": "assets/TrackEditorScreen-Dcx-OE-u.js",
+      "bytes": 70271,
+      "gzipBytes": 20820,
+      "gzipSha256": "6ce6416cbe4a70961cfb3fe641f168887b36d983180087525ec5ff6a50f6804f",
+      "sha256": "d1bbc97657d9cb64c6b2c3c49cae9f3ecf0d451e6ddfe71b11c15ffb252434ec"
+    },
+    {
+      "path": "assets/art/canyon-festival-panorama.png",
+      "bytes": 1801764,
+      "gzipBytes": 1787783,
+      "gzipSha256": "fe8fbdbd99b9163c7040a76524e57988a1199732520bb3567c723f260b005069",
+      "sha256": "43b39c9075428e9bc081b3d8f216fae0027e889f89caa59586aa6097080b26a5"
+    },
+    {
+      "path": "assets/art/title-background.png",
+      "bytes": 2129759,
+      "gzipBytes": 2115848,
+      "gzipSha256": "562bbe419f018f6c4686069f68c2e5b4157cd230b585daa62b60e25686e5b17c",
+      "sha256": "292ffdf20edcb4c483b30a5a4f6882f3ecbaf8ff1f28815d8fe28a9aeb6e3e78"
+    },
+    {
+      "path": "assets/basis_transcoder-VXdx5NbI.wasm",
+      "bytes": 527333,
+      "gzipBytes": 244553,
+      "gzipSha256": "222ff2aa9a44fc3f8b88c04813c0fb2049dc95e270d0a6787c5f4d467e5d5ca4",
+      "sha256": "6cf17dc889352c42e9acf8897107978d127005fe3386c36a0e3845e27967630a"
+    },
+    {
+      "path": "assets/basis_transcoder-o4Hde_L7.js",
+      "bytes": 57529,
+      "gzipBytes": 15063,
+      "gzipSha256": "7a86d3f9835fdcc6467dd3b40a18fd6d4d7d5d73a81bfcf52660e395b2958df7",
+      "sha256": "8478b5b6d6b74e7d3082b89f6417321d8d1dc0307f2b30d4484bb11b441696a1"
+    },
+    {
+      "path": "assets/canyon/asset-manifest.json",
+      "bytes": 4909,
+      "gzipBytes": 1959,
+      "gzipSha256": "8524577dd1fa95a3a509e1f583aaf20e2b7654aa4f38bba2e291590f89a59450",
+      "sha256": "7bc99fdaa7d8ce99fb3f20ebac94910261bc74344b23fa42fcb2e93e98f448ad"
+    },
+    {
+      "path": "assets/canyon/canyon-kit.glb",
+      "bytes": 427028,
+      "gzipBytes": 138204,
+      "gzipSha256": "357783d0a79e7c1917cf8773147d3d0cb30c7c06363d05f594cebc21dfef78cf",
+      "sha256": "283be67d91cce4b0dc7b0f7e291811c62c77384f5e3f226cca71d41ce890ff7d"
+    },
+    {
+      "path": "assets/fonts/barlow-condensed-700-latin.woff2",
+      "bytes": 14888,
+      "gzipBytes": 14911,
+      "gzipSha256": "2f2c1b422e44fd130af0f2b07658adffc4b69dc5c1db8b7883c41680475418e4",
+      "sha256": "e3e520cb7468f2efd60bc2ce96694567c3312f4ef414fffbe605e3ad146b24e6"
+    },
+    {
+      "path": "assets/fonts/barlow-condensed-900-latin.woff2",
+      "bytes": 13940,
+      "gzipBytes": 13963,
+      "gzipSha256": "1028bfe4366a70e06b01dc586a5a9542ebdf7ab7f8221da55b07c1cbac90e0d5",
+      "sha256": "2036f7f4aacc7759dcf8c6be2bd5bbde873c25a860f24dca0530ad14d4937723"
+    },
+    {
+      "path": "assets/icons/app-icon-192.png",
+      "bytes": 8560,
+      "gzipBytes": 8580,
+      "gzipSha256": "5ac58adb3d5e883546733cd75beb0e15a6a78b24207b9d11befe2eda80c361f6",
+      "sha256": "b45e0ac35c9a1eb45a06d2487a75c5ae977854a95bb48f669d668ce0219b5a7e"
+    },
+    {
+      "path": "assets/icons/app-icon-512.png",
+      "bytes": 27595,
+      "gzipBytes": 26667,
+      "gzipSha256": "ab8bb39d4e935eaafc34918c5cf2ae922b0d38b077a1f95c37df8ffa5c471f1a",
+      "sha256": "9a1666c7fe34cc2c79270f6498dcbf948a4febda0ef04576dd5f38dd3875ad4e"
+    },
+    {
+      "path": "assets/icons/app-icon-maskable-512.png",
+      "bytes": 19855,
+      "gzipBytes": 16781,
+      "gzipSha256": "2975f2903edd8346f323d00478a70ff8bd3096408e86a773f4d331ad20768d5e",
+      "sha256": "214cafc22adfcb95d013b4ed7b0843db64cd32e21756096d44cd010e6fcccff8"
+    },
+    {
+      "path": "assets/icons/app-icon.svg",
+      "bytes": 477,
+      "gzipBytes": 318,
+      "gzipSha256": "f94207b33fb90458c8d39c428f975fb1d47b978b35362a91f87ad19f2895e958",
+      "sha256": "7d55e5fe2392a4d091f962e01e2a09dc6a21def5c1e9886a2bb39bb478f395a5"
+    },
+    {
+      "path": "assets/icons/apple-touch-icon-180.png",
+      "bytes": 5426,
+      "gzipBytes": 5087,
+      "gzipSha256": "50a69f3d3b5f4ad207b4570b597b612110b439dcf754bdeaeb01057fc9de2369",
+      "sha256": "b82b791567ecc66dec30f9e3c6d5b7d8d146e9476198e8a8cebf2ae9ec7b9bd0"
+    },
+    {
+      "path": "assets/index-74KsKi0H.css",
+      "bytes": 72880,
+      "gzipBytes": 16653,
+      "gzipSha256": "d31133ec7163111b567dc671cb5b38316d7e609da3479d43c19cb505c050776b",
+      "sha256": "4cab749ee7bef959a392fd9aef2c84035cd1cf750dc2022f1203e51242ac0e19"
+    },
+    {
+      "path": "assets/index-CP0Fy9ck.js",
+      "bytes": 474703,
+      "gzipBytes": 142615,
+      "gzipSha256": "37d1d059bb468d5f94ed723cd040be432923a7ade7eeee04138003927f90599b",
+      "sha256": "a740c1efba44dd0368532d150fc6b6c8e46b97f4b3004b312e9968d90e65c9fc"
+    },
+    {
+      "path": "assets/rivals/asset-manifest.json",
+      "bytes": 6661,
+      "gzipBytes": 2342,
+      "gzipSha256": "87a0f49f19326e28bc6a6c51951a9dda0b09cad7bb8bd2697d836748bee5e08d",
+      "sha256": "11afda3c61870315c41dc769c777a6b712427d939946b10ee6ca4b0240c44bc8"
+    },
+    {
+      "path": "assets/rivals/rival-pack.glb",
+      "bytes": 193884,
+      "gzipBytes": 107697,
+      "gzipSha256": "3e4e64c0cb16b0f68f369a6ac760cefa5075dfe2399b32e16b8766c64050e33e",
+      "sha256": "09043547981c80d66fca23aa208971b6b2f457890cafabeed4258dbc0fdbb805"
+    },
+    {
+      "path": "assets/transcoders/basis/LICENSE.txt",
+      "bytes": 9197,
+      "gzipBytes": 3331,
+      "gzipSha256": "34d10b98cc3af69712eb6464f6ca626610f931ede48e60c99eba5bf8be4ccf24",
+      "sha256": "a7d00bfd54525bc694b6e32f64c7ebcf5e6b7ae3657be5cc12767bce74654a47"
+    },
+    {
+      "path": "assets/transcoders/basis/NOTICE.txt",
+      "bytes": 917,
+      "gzipBytes": 514,
+      "gzipSha256": "d86eb757ee07b944fb4beeeed898defc16df44cecee6a85f69363770d7c3743d",
+      "sha256": "42beeb6710c933778e30f62886e0790ebba120debbb0545ab46c7292d3e5a061"
+    },
+    {
+      "path": "assets/transcoders/basis/README.md",
+      "bytes": 1388,
+      "gzipBytes": 702,
+      "gzipSha256": "0e048bde542cd2af7435b2a728d6da65e588212aadac772010f2cd647b012abe",
+      "sha256": "a578df416c1e0852e9c36a1cf91b4d28d91a251294f87ce610a3bc7ca4df15e0"
+    },
+    {
+      "path": "assets/transcoders/basis/basis_transcoder.js",
+      "bytes": 57529,
+      "gzipBytes": 15063,
+      "gzipSha256": "7a86d3f9835fdcc6467dd3b40a18fd6d4d7d5d73a81bfcf52660e395b2958df7",
+      "sha256": "8478b5b6d6b74e7d3082b89f6417321d8d1dc0307f2b30d4484bb11b441696a1"
+    },
+    {
+      "path": "assets/transcoders/basis/basis_transcoder.wasm",
+      "bytes": 527333,
+      "gzipBytes": 244553,
+      "gzipSha256": "222ff2aa9a44fc3f8b88c04813c0fb2049dc95e270d0a6787c5f4d467e5d5ca4",
+      "sha256": "6cf17dc889352c42e9acf8897107978d127005fe3386c36a0e3845e27967630a"
+    },
+    {
+      "path": "assets/vendor-three-_L_YAsy5.js",
+      "bytes": 598505,
+      "gzipBytes": 148836,
+      "gzipSha256": "4dc6d7538762d902d1fc9c6a23f3184178e816e273ccb25d46c5f92cea4ed42f",
+      "sha256": "ad793e90e46ee2c215ce5a818f9d7ebc7ac608fa5c8dde2723c2fd9cf975d5bd"
+    },
+    {
+      "path": "assets/vendor-three-addons-kpozWyf3.js",
+      "bytes": 135491,
+      "gzipBytes": 45815,
+      "gzipSha256": "95072bc958775095885f8b832e2e0fac6d268762ef692fe7ef0faac17e719ea0",
+      "sha256": "115007f768b8376d80164d66e8edce7559b3729e3809cf2911785c5193258301"
+    },
+    {
+      "path": "index.html",
+      "bytes": 1632,
+      "gzipBytes": 690,
+      "gzipSha256": "6584c2441381ccde06cdbe665dda9e57d62e583f0de233103d929707dd79c0cd",
+      "sha256": "21fd4e3f7e5e33d5c2fc46057665226f001e780998160b19258c1d9a45bbffaa"
+    },
+    {
+      "path": "manifest.webmanifest",
+      "bytes": 856,
+      "gzipBytes": 309,
+      "gzipSha256": "fbef3032f37477db0dc3242bd5b6c55bf7e6593f2cd38428a543ed9dab73503b",
+      "sha256": "04d309ebb9d9488686d273cee253c72d57a81f8499edc9940dc40594b4e04f24"
+    },
+    {
+      "path": "sw.js",
+      "bytes": 9029,
+      "gzipBytes": 2676,
+      "gzipSha256": "9830760b1beb6726ae883ffe14d266b6eaa10e7f155af2a32375ab6728172c8f",
+      "sha256": "424803d26c443c0b4ad7c1337220e68a6f4806e3206afc5f8e2e7a17dd6d36c2"
+    }
+  ]
+}

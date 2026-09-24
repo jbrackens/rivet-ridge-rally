@@ -44,7 +44,6 @@ describe("obstacle contact resolution", () => {
     ["medium-ramp", "ramp-medium"],
     ["medium-ramp", "ramp-tabletop"],
     ["bump", "bump-single"],
-    ["barrier", "barrier-short"],
   ] as const)("preserves one contact for %s / %s", (kind, moduleId) => {
     const parent = obstacle({
       kind,
@@ -59,6 +58,36 @@ describe("obstacle contact resolution", () => {
       length: 10,
       lanes: [1],
     }]);
+  });
+
+  it("matches short-barrier contact depth to the visible rail instead of its placement footprint", () => {
+    for (const parent of [
+      obstacle({ kind: "barrier", moduleId: "barrier-short", length: 10 }),
+      obstacle({ kind: "barrier", length: 6 }),
+      { id: "generic-barrier", kind: "barrier", distance: 100, lanes: [1] } as TrackObstacle,
+    ]) {
+      expect(resolveObstacleContacts(parent)).toEqual([{
+        key: parent.id,
+        parent,
+        kind: "barrier",
+        distance: 100,
+        length: 0.5,
+        lanes: [1],
+      }]);
+    }
+  });
+
+  it("uses the rotated visible rail width as a sideways short-barrier route depth", () => {
+    const parent = obstacle({
+      kind: "barrier",
+      moduleId: "barrier-short",
+      length: 2.75,
+      unrotatedWidth: 2.75,
+      unrotatedLength: 1.76,
+      rotation: 90,
+    });
+
+    expect(resolveObstacleContacts(parent)[0]?.length).toBeCloseTo(2.75 * 0.92, 8);
   });
 
   it("uses one bounded fallback contact when a generic obstacle omits length", () => {
@@ -152,7 +181,7 @@ describe("obstacle contact resolution", () => {
     }));
 
     expect(contacts).toHaveLength(1);
-    expect(contacts[0]?.key).toBe("obstacle");
+    expect(contacts[0]?.key).toBe("contact-fixture");
     expect(contacts[0]?.length).toBe(5.5);
   });
 

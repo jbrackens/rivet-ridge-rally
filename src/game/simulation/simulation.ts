@@ -15,23 +15,38 @@ import {
   type SurfaceKind,
 } from "./types";
 
-const PHYSICS = Object.freeze({
+export const BIKE_PERFORMANCE_LIMITS = Object.freeze({
   standardSpeed: 14,
   turboSpeed: 20,
-  acceleration: 18,
+  standardAcceleration: 18,
   turboAcceleration: 23,
+});
+
+/**
+ * An overheat stalls the engine for exactly this long on the fixed clock. A
+ * cooling gate still drops heat during the stall but cannot shorten it.
+ */
+export const OVERHEAT_STALL_SECONDS = 3.5;
+const OVERHEAT_STALL_STEPS = Math.round(OVERHEAT_STALL_SECONDS / FIXED_DT);
+
+const PHYSICS = Object.freeze({
+  standardSpeed: BIKE_PERFORMANCE_LIMITS.standardSpeed,
+  turboSpeed: BIKE_PERFORMANCE_LIMITS.turboSpeed,
+  acceleration: BIKE_PERFORMANCE_LIMITS.standardAcceleration,
+  turboAcceleration: BIKE_PERFORMANCE_LIMITS.turboAcceleration,
   coastDeceleration: 10,
   surfaceDeceleration: 24,
   laneTransitionSpeed: 12,
   standardHeatPerSecond: 8,
   standardHeatCeiling: 62,
-  turboHeatPerSecond: 42,
+  turboHeatPerSecond: 8,
+  turboWarningHeat: 78,
+  turboCriticalHeatPerSecond: 4,
   passiveCoolingPerSecond: 14,
   overheatCoolingPerSecond: 20,
   coolingZonePerSecond: 80,
   coolingZoneEntryDrop: 18,
   maximumHeat: 100,
-  overheatRecoveryHeat: 35,
   gravity: 9.8,
   defaultRampImpulse: 8,
   minimumRampSpeed: 4,
@@ -122,13 +137,14 @@ export class RaceSimulation {
   private readonly initialHeat: number;
   private readonly initialLane: LaneIndex;
   private readonly initialForwardPosition: number;
-  private readonly retroRecovery: boolean;
+  private retroRecovery: boolean;
   private readonly wheelieCrashSeconds: number;
   private stateValue: SimulationState;
   private accumulatorSeconds = 0;
   private laneLatch: LaneChange = 0;
   private previousSurface: SurfaceKind = "dirt";
   private wheelieSeconds = 0;
+  private overheatSteps = 0;
   private recoverLatch = false;
 
   constructor(options: SimulationOptions = {}) {
@@ -181,12 +197,18 @@ export class RaceSimulation {
     return this.accumulatorSeconds / FIXED_DT;
   }
 
+  setRetroRecovery(enabled: boolean): void {
+    this.retroRecovery = enabled;
+    if (!enabled) this.recoverLatch = false;
+  }
+
   reset(): void {
     this.stateValue = this.createInitialState();
     this.accumulatorSeconds = 0;
     this.laneLatch = 0;
     this.previousSurface = "dirt";
     this.wheelieSeconds = 0;
+    this.overheatSteps = 0;
     this.recoverLatch = false;
   }
 
@@ -352,7 +374,10 @@ export class RaceSimulation {
       !bike.overheated && bike.phase !== "crashed" && bike.phase !== "recovering";
 
     if (input.turbo && canUseTurbo) {
-      bike.heat += PHYSICS.turboHeatPerSecond * FIXED_DT;
+      const turboHeatRate = bike.heat >= PHYSICS.turboWarningHeat
+        ? PHYSICS.turboCriticalHeatPerSecond
+        : PHYSICS.turboHeatPerSecond;
+      bike.heat += turboHeatRate * FIXED_DT;
     } else if (input.throttle && canUseTurbo && surface !== "cooling") {
       const standardHeatRate = bike.heat < PHYSICS.standardHeatCeiling
         ? PHYSICS.standardHeatPerSecond
@@ -378,10 +403,17 @@ export class RaceSimulation {
 
     bike.heat = clamp(bike.heat, 0, PHYSICS.maximumHeat);
 
+    // The step that reaches maximum heat is the first stalled step; control
+    // returns on the step after OVERHEAT_STALL_STEPS stalled steps.
     if (!bike.overheated && bike.heat >= PHYSICS.maximumHeat) {
       bike.overheated = true;
-    } else if (bike.overheated && bike.heat <= PHYSICS.overheatRecoveryHeat) {
-      bike.overheated = false;
+      this.overheatSteps = 0;
+    } else if (bike.overheated) {
+      this.overheatSteps += 1;
+      if (this.overheatSteps >= OVERHEAT_STALL_STEPS) {
+        bike.overheated = false;
+        this.overheatSteps = 0;
+      }
     }
   }
 

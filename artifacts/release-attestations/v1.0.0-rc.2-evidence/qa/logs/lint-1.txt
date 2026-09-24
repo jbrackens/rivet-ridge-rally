@@ -1,0 +1,9 @@
+$ npm run lint
+startedAt=2026-07-19T12:58:01.879Z
+completedAt=2026-07-19T12:58:06.383Z
+exitCode=0
+
+
+> rivet-ridge-rally@1.0.0-rc.2 lint
+> eslint .
+

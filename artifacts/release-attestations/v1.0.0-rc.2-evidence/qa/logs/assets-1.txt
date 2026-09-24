@@ -1,0 +1,378 @@
+$ npm run assets:verify
+startedAt=2026-07-19T12:58:06.385Z
+completedAt=2026-07-19T12:58:07.386Z
+exitCode=0
+
+
+> rivet-ridge-rally@1.0.0-rc.2 assets:verify
+> node scripts/verify-hero-bike-rider-assets.mjs && node scripts/verify-rival-pack-assets.mjs && node scripts/verify-canyon-assets.mjs && node scripts/verify-production-art.mjs
+
+Verified hero bike/rider: 49,780 triangles, 28 mesh-bearing nodes, 28 render primitives, 517,664 bytes.
+Rival pack asset verification passed.
+Verified Canyon modular kit: 32,008 triangles, 62 meshes, 20 materials, 427,028 bytes.
+{
+  "path": "public/assets/art/canyon-festival-panorama.png",
+  "bytes": 1801764,
+  "sha256": "43b39c9075428e9bc081b3d8f216fae0027e889f89caa59586aa6097080b26a5",
+  "png": {
+    "width": 1774,
+    "height": 887,
+    "bitDepth": 8,
+    "colorType": 2,
+    "compression": 0,
+    "filter": 0,
+    "interlace": 0,
+    "chunks": [
+      "IHDR",
+      "caBX",
+      "IDAT",
+      "IDAT",
+      "IDAT",
+      "IDAT",
+      "IDAT",
+      "IDAT",
+      "IDAT",
+      "IDAT",
+      "IDAT",
+      "IDAT",
+      "IDAT",
+      "IDAT",
+      "IDAT",
+      "IDAT",
+      "IDAT",
+      "IDAT",
+      "IDAT",
+      "IDAT",
+      "IDAT",
+      "IDAT",
+      "IDAT",
+      "IDAT",
+      "IDAT",
+      "IDAT",
+      "IDAT",
+      "IDAT",
+      "IDAT",
+      "IDAT",
+      "IEND"
+    ]
+  },
+  "provenanceMarkers": [
+    "c2pa",
+    "gpt-image",
+    "OpenAI Media Service API",
+    "trainedAlgorithmicMedia"
+  ],
+  "modelingReferences": [
+    {
+      "path": "docs/design/concepts/canyon-production-asset-reference.png",
+      "bytes": 2013293,
+      "sha256": "eb987cbaf9ca501141d88eab25cb0233217a5b1642b022b86ae623c3ea0ea677",
+      "png": {
+        "width": 1672,
+        "height": 941,
+        "bitDepth": 8,
+        "colorType": 2,
+        "compression": 0,
+        "filter": 0,
+        "interlace": 0,
+        "chunks": [
+          "IHDR",
+          "caBX",
+          "IDAT",
+          "IDAT",
+          "IDAT",
+          "IDAT",
+          "IDAT",
+          "IDAT",
+          "IDAT",
+          "IDAT",
+          "IDAT",
+          "IDAT",
+          "IDAT",
+          "IDAT",
+          "IDAT",
+          "IDAT",
+          "IDAT",
+          "IDAT",
+          "IDAT",
+          "IDAT",
+          "IDAT",
+          "IDAT",
+          "IDAT",
+          "IDAT",
+          "IDAT",
+          "IDAT",
+          "IDAT",
+          "IDAT",
+          "IDAT",
+          "IDAT",
+          "IDAT",
+          "IDAT",
+          "IDAT",
+          "IEND"
+        ]
+      },
+      "usage": "Source-only modeling/material reference; not shipped as a runtime texture"
+    },
+    {
+      "path": "docs/design/concepts/hero-bike-rider-production-reference.png",
+      "bytes": 2144981,
+      "sha256": "343bf010c320dcd64ccb9bb81ca70e0996337a31a97752ce802fa0d92d5aad96",
+      "png": {
+        "width": 1672,
+        "height": 941,
+        "bitDepth": 8,
+        "colorType": 2,
+        "compression": 0,
+        "filter": 0,
+        "interlace": 0,
+        "chunks": [
+          "IHDR",
+          "caBX",
+          "IDAT",
+          "IDAT",
+          "IDAT",
+          "IDAT",
+          "IDAT",
+          "IDAT",
+          "IDAT",
+          "IDAT",
+          "IDAT",
+          "IDAT",
+          "IDAT",
+          "IDAT",
+          "IDAT",
+          "IDAT",
+          "IDAT",
+          "IDAT",
+          "IDAT",
+          "IDAT",
+          "IDAT",
+          "IDAT",
+          "IDAT",
+          "IDAT",
+          "IDAT",
+          "IDAT",
+          "IDAT",
+          "IDAT",
+          "IDAT",
+          "IDAT",
+          "IDAT",
+          "IDAT",
+          "IDAT",
+          "IDAT",
+          "IDAT",
+          "IEND"
+        ]
+      },
+      "usage": "Source-only modeling/material reference; not shipped as a runtime texture"
+    },
+    {
+      "path": "docs/design/concepts/hero-bike-rider-modeling-reference-v2.png",
+      "bytes": 2330237,
+      "sha256": "9c07bff28ad737bfad0c17e68ca0329087d323b662004db04008ec9a9d0013c4",
+      "png": {
+        "width": 1672,
+        "height": 941,
+        "bitDepth": 8,
+        "colorType": 2,
+        "compression": 0,
+        "filter": 0,
+        "interlace": 0,
+        "chunks": [
+          "IHDR",
+          "caBX",
+          "IDAT",
+          "IDAT",
+          "IDAT",
+          "IDAT",
+          "IDAT",
+          "IDAT",
+          "IDAT",
+          "IDAT",
+          "IDAT",
+          "IDAT",
+          "IDAT",
+          "IDAT",
+          "IDAT",
+          "IDAT",
+          "IDAT",
+          "IDAT",
+          "IDAT",
+          "IDAT",
+          "IDAT",
+          "IDAT",
+          "IDAT",
+          "IDAT",
+          "IDAT",
+          "IDAT",
+          "IDAT",
+          "IDAT",
+          "IDAT",
+          "IDAT",
+          "IDAT",
+          "IDAT",
+          "IDAT",
+          "IDAT",
+          "IDAT",
+          "IDAT",
+          "IDAT",
+          "IDAT",
+          "IEND"
+        ]
+      },
+      "usage": "Supplementary source-only modeling/visual input for the 2026-07-17 hero geometry revision; not the canonical hero-manifest reference or a runtime texture"
+    },
+    {
+      "path": "docs/design/concepts/hero-bike-rider-action-states-v3.png",
+      "bytes": 2448063,
+      "sha256": "b7b24d220624add6759fb49c83141663a890004f3dd3d49bda29a8e125ccccb1",
+      "png": {
+        "width": 1672,
+        "height": 941,
+        "bitDepth": 8,
+        "colorType": 2,
+        "compression": 0,
+        "filter": 0,
+        "interlace": 0,
+        "chunks": [
+          "IHDR",
+          "caBX",
+          "IDAT",
+          "IDAT",
+          "IDAT",
+          "IDAT",
+          "IDAT",
+          "IDAT",
+          "IDAT",
+          "IDAT",
+          "IDAT",
+          "IDAT",
+          "IDAT",
+          "IDAT",
+          "IDAT",
+          "IDAT",
+          "IDAT",
+          "IDAT",
+          "IDAT",
+          "IDAT",
+          "IDAT",
+          "IDAT",
+          "IDAT",
+          "IDAT",
+          "IDAT",
+          "IDAT",
+          "IDAT",
+          "IDAT",
+          "IDAT",
+          "IDAT",
+          "IDAT",
+          "IDAT",
+          "IDAT",
+          "IDAT",
+          "IDAT",
+          "IDAT",
+          "IDAT",
+          "IDAT",
+          "IDAT",
+          "IEND"
+        ]
+      },
+      "usage": "Supplementary source-only action, crash, and recovery reference for the 2026-07-17 six-pivot presentation pass; not the canonical hero-manifest reference or a runtime texture"
+    }
+  ],
+  "titleArt": [
+    {
+      "path": "public/assets/art/title-background.png",
+      "bytes": 2129759,
+      "sha256": "292ffdf20edcb4c483b30a5a4f6882f3ecbaf8ff1f28815d8fe28a9aeb6e3e78"
+    },
+    {
+      "path": "docs/design/concepts/title-background-production.png",
+      "bytes": 2129759,
+      "sha256": "292ffdf20edcb4c483b30a5a4f6882f3ecbaf8ff1f28815d8fe28a9aeb6e3e78"
+    }
+  ],
+  "appIcon": {
+    "path": "public/assets/icons/app-icon.svg",
+    "bytes": 477,
+    "sha256": "7d55e5fe2392a4d091f962e01e2a09dc6a21def5c1e9886a2bb39bb478f395a5",
+    "format": "SVG"
+  },
+  "maskableAppIconSource": {
+    "path": "art-source/icons/app-icon-maskable.svg",
+    "bytes": 617,
+    "sha256": "a427fd09fefc80301a4de9a01965ae923ea425757cdb6363371b1bc19018f9aa",
+    "format": "SVG"
+  },
+  "appIconRasters": [
+    {
+      "path": "public/assets/icons/app-icon-192.png",
+      "bytes": 8560,
+      "sha256": "b45e0ac35c9a1eb45a06d2487a75c5ae977854a95bb48f669d668ce0219b5a7e",
+      "png": {
+        "width": 192,
+        "height": 192,
+        "bitDepth": 8,
+        "colorType": 6
+      },
+      "usage": "PWA any-purpose icon"
+    },
+    {
+      "path": "public/assets/icons/app-icon-512.png",
+      "bytes": 27595,
+      "sha256": "9a1666c7fe34cc2c79270f6498dcbf948a4febda0ef04576dd5f38dd3875ad4e",
+      "png": {
+        "width": 512,
+        "height": 512,
+        "bitDepth": 8,
+        "colorType": 6
+      },
+      "usage": "PWA any-purpose icon"
+    },
+    {
+      "path": "public/assets/icons/app-icon-maskable-512.png",
+      "bytes": 19855,
+      "sha256": "214cafc22adfcb95d013b4ed7b0843db64cd32e21756096d44cd010e6fcccff8",
+      "png": {
+        "width": 512,
+        "height": 512,
+        "bitDepth": 8,
+        "colorType": 6
+      },
+      "usage": "PWA maskable safe-zone icon"
+    },
+    {
+      "path": "public/assets/icons/apple-touch-icon-180.png",
+      "bytes": 5426,
+      "sha256": "b82b791567ecc66dec30f9e3c6d5b7d8d146e9476198e8a8cebf2ae9ec7b9bd0",
+      "png": {
+        "width": 180,
+        "height": 180,
+        "bitDepth": 8,
+        "colorType": 6
+      },
+      "usage": "Apple touch icon"
+    }
+  ],
+  "fonts": [
+    {
+      "path": "public/assets/fonts/barlow-condensed-700-latin.woff2",
+      "bytes": 14888,
+      "sha256": "e3e520cb7468f2efd60bc2ce96694567c3312f4ef414fffbe605e3ad146b24e6",
+      "format": "WOFF2"
+    },
+    {
+      "path": "public/assets/fonts/barlow-condensed-900-latin.woff2",
+      "bytes": 13940,
+      "sha256": "2036f7f4aacc7759dcf8c6be2bd5bbde873c25a860f24dca0530ad14d4937723",
+      "format": "WOFF2"
+    }
+  ],
+  "fontLicense": {
+    "path": "docs/licenses/barlow-condensed-OFL-1.1.txt",
+    "bytes": 4377,
+    "sha256": "186d750eb496a4c17a76385f82be6aea2ac1cf2de074a811d63786cf374ea73f",
+    "license": "SIL Open Font License 1.1"
+  }
+}

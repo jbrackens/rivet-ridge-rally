@@ -7,6 +7,7 @@ import {
   ModeScreen,
   ResultsScreen,
   SettingsScreen,
+  SupportScreen,
   TitleScreen,
 } from "../ui/screens/MenuScreens";
 
@@ -103,7 +104,7 @@ function PersistenceNotice() {
       : "The browser cannot currently open or write the local rider database.";
   const inEditor = screen === "editor" || screen === "custom-library";
   const guidance = failedTestRideSave
-    ? `The exact “${failedTestRideSave.name}” snapshot is still held in this tab. Retry to save it, or return to Track Builder and export it before closing the tab.`
+    ? `The exact “${failedTestRideSave.track.name}” snapshot is still held in this tab. Retry to save it, or return to Track Builder and export it before closing the tab.`
     : inEditor
       ? "Editing and test rides still work this session. Use Export for a valid draft before closing this tab or resetting site data."
       : screen === "settings"
@@ -180,16 +181,18 @@ export function App() {
     : screen === "race" || screen === "paused" || settingsOverRace
       ? "race-session"
       : screen;
+  const surfaceKey = boundaryKey;
   let surface;
   if (screen === "boot") surface = <BootScreen />;
   else if (screen === "title") surface = <TitleScreen />;
   else if (screen === "mode-select" || screen === "track-select") surface = <ModeScreen />;
   else if (screen === "settings" && !settingsOverRace && !settingsOverTutorial) surface = <SettingsScreen />;
+  else if (screen === "support") surface = <SupportScreen />;
   else if (screen === "results") surface = <ResultsScreen />;
-  else if (screen === "editor" || screen === "custom-library") surface = <Suspense fallback={<BootScreen />}><TrackEditorScreen /></Suspense>;
-  else if (screen === "tutorial" || settingsOverTutorial) surface = <><Suspense fallback={<BootScreen />}><GameView tutorial /></Suspense>{settingsOverTutorial ? <div className="race-settings-overlay"><SettingsScreen /></div> : null}</>;
-  else if (screen === "race" || screen === "paused" || settingsOverRace) surface = <><Suspense fallback={<BootScreen />}><GameView /></Suspense>{settingsOverRace ? <div className="race-settings-overlay"><SettingsScreen /></div> : null}</>;
+  else if (screen === "editor" || screen === "custom-library") surface = <Suspense fallback={<BootScreen message="Opening Track Builder…" />}><TrackEditorScreen /></Suspense>;
+  else if (screen === "tutorial" || settingsOverTutorial) surface = <><Suspense fallback={<BootScreen message="Opening Rider School…" />}><GameView tutorial /></Suspense>{settingsOverTutorial ? <div className="race-settings-overlay"><SettingsScreen /></div> : null}</>;
+  else if (screen === "race" || screen === "paused" || settingsOverRace) surface = <><Suspense fallback={<BootScreen message="Preparing the race…" />}><GameView /></Suspense>{settingsOverRace ? <div className="race-settings-overlay"><SettingsScreen /></div> : null}</>;
   else surface = <TitleScreen />;
 
-  return <><ConnectivityBanner /><LoadBoundary key={boundaryKey} onExit={() => navigate("title")}>{surface}</LoadBoundary><PersistenceNotice /></>;
+  return <><ConnectivityBanner /><LoadBoundary key={boundaryKey} onExit={() => navigate("title")}><div key={surfaceKey} className="screen-surface" data-screen-surface={surfaceKey}>{surface}</div></LoadBoundary><PersistenceNotice /></>;
 }

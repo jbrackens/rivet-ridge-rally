@@ -1,0 +1,203 @@
+{
+  "kind": "visual-qa-candidate-archive",
+  "format": 1,
+  "archivedAt": "2026-07-27T07:19:42.706Z",
+  "reason": "Preserve the frozen visual QA candidate before npm run visual:candidate destroys it.",
+  "candidate": {
+    "product": "RIVET RIDGE RALLY",
+    "version": "1.0.0-rc.2",
+    "kind": "visual-qa-candidate",
+    "aggregateSha256": "cd06b258cd4f0a4dc74bc7a823384ffd9a695c4d9dd5e1fd294cb78976f4c5a2",
+    "fileCount": 33,
+    "totalBytes": 7593929,
+    "manifestSha256": "7fbe353d74eaaa1e6baee81475320c4b7529ee4402ddba282ebc0c5db43b1593",
+    "manifestBytes": 11729
+  },
+  "archive": {
+    "path": "artifacts/candidate-evidence/visual/archive/visual-candidate-1.0.0-rc.2-cd06b258cd4f",
+    "fileCount": 34,
+    "totalBytes": 7605658,
+    "verifiedByteExact": true
+  },
+  "archivedFromRepositoryState": {
+    "commit": "f6ce072094170c879a703d89f5cfe02b10d4515b",
+    "dirty": true,
+    "note": "Repository had uncommitted changes when the archive was taken. The archive records candidate bytes, which are independent of the working tree, but this state is disclosed rather than hidden."
+  },
+  "durability": {
+    "committedToGit": false,
+    "note": "artifacts/candidate-evidence/ is git-ignored, so the archived bytes are NOT in version control. Only this record is. Off-machine durability remains an operator responsibility and is not satisfied by this script."
+  },
+  "files": [
+    {
+      "path": "dist/THIRD_PARTY_NOTICES.txt",
+      "bytes": 43872,
+      "sha256": "f837ed705667d0f3976bbd419f42d8c63844a3eb4b52f76db88ed3a1d6e270c2"
+    },
+    {
+      "path": "dist/assets/3d/asset-manifest.json",
+      "bytes": 15165,
+      "sha256": "fb74f9b9fe1a854cb6c040769317f6e9777701b7bd887773ee095a33aac63249"
+    },
+    {
+      "path": "dist/assets/3d/hero-bike-rider.glb",
+      "bytes": 317936,
+      "sha256": "e26ff81a3eb5a8236c7934bea41dba95eae6528d52cc3cf11f82975ac88e7b73"
+    },
+    {
+      "path": "dist/assets/CoursePresentationRoute-baXvrmUx.js",
+      "bytes": 17403,
+      "sha256": "0c3bc926fd66f5c20c163ab7e81be403b6b279d46849b341947c90f16545c3b6"
+    },
+    {
+      "path": "dist/assets/GameView-Dg17yXio.js",
+      "bytes": 220952,
+      "sha256": "c09f92d5dde50280750a5136bee70f2d4916fff7d122a43948123bd4ea84feea"
+    },
+    {
+      "path": "dist/assets/TrackEditorScreen-B9kEsub8.js",
+      "bytes": 70494,
+      "sha256": "8dceb3aa492a1892aac2e8c8f793d7cbae66db9ba47fbbb5fef97522cf8d3301"
+    },
+    {
+      "path": "dist/assets/art/canyon-festival-panorama.png",
+      "bytes": 1683944,
+      "sha256": "17c222c931e91b1dca3ceae29543acab351df93b01ced27aa8ddb9c8a0588c01"
+    },
+    {
+      "path": "dist/assets/art/title-background.png",
+      "bytes": 2049503,
+      "sha256": "bf5b8e9101b31f0d67a4ac3f48f1ccf4172f8bb92dfb0e8ba219f3126acfaaf8"
+    },
+    {
+      "path": "dist/assets/basis_transcoder-VXdx5NbI.wasm",
+      "bytes": 527333,
+      "sha256": "6cf17dc889352c42e9acf8897107978d127005fe3386c36a0e3845e27967630a"
+    },
+    {
+      "path": "dist/assets/basis_transcoder-o4Hde_L7.js",
+      "bytes": 57529,
+      "sha256": "8478b5b6d6b74e7d3082b89f6417321d8d1dc0307f2b30d4484bb11b441696a1"
+    },
+    {
+      "path": "dist/assets/canyon/asset-manifest.json",
+      "bytes": 4909,
+      "sha256": "b2a82a3cc3bba3c74962f16b4b723958fee0b70ff738b49d03fad76e60bcaa40"
+    },
+    {
+      "path": "dist/assets/canyon/canyon-kit.glb",
+      "bytes": 427028,
+      "sha256": "283be67d91cce4b0dc7b0f7e291811c62c77384f5e3f226cca71d41ce890ff7d"
+    },
+    {
+      "path": "dist/assets/fonts/barlow-condensed-700-latin.woff2",
+      "bytes": 14888,
+      "sha256": "e3e520cb7468f2efd60bc2ce96694567c3312f4ef414fffbe605e3ad146b24e6"
+    },
+    {
+      "path": "dist/assets/fonts/barlow-condensed-900-latin.woff2",
+      "bytes": 13940,
+      "sha256": "2036f7f4aacc7759dcf8c6be2bd5bbde873c25a860f24dca0530ad14d4937723"
+    },
+    {
+      "path": "dist/assets/icons/app-icon-192.png",
+      "bytes": 5485,
+      "sha256": "2e257fd4d8aa9a502e30fde6ed51323d670525b2dacf3e941b5bfc10c8c89340"
+    },
+    {
+      "path": "dist/assets/icons/app-icon-512.png",
+      "bytes": 16501,
+      "sha256": "4295f901592cb704c0f2d5e8081832dec3f3aa0450c61ebac3938e67f122a488"
+    },
+    {
+      "path": "dist/assets/icons/app-icon-maskable-512.png",
+      "bytes": 11287,
+      "sha256": "51830f92be1d8fc29467da1c69bf3c2e2a27def5390b4b1c7a6dc83cf4a6afd4"
+    },
+    {
+      "path": "dist/assets/icons/app-icon.svg",
+      "bytes": 477,
+      "sha256": "7d55e5fe2392a4d091f962e01e2a09dc6a21def5c1e9886a2bb39bb478f395a5"
+    },
+    {
+      "path": "dist/assets/icons/apple-touch-icon-180.png",
+      "bytes": 3434,
+      "sha256": "09b9c09f20ef36a9b80d9004a4f4f4ee73e3a4affc25cb416f0b2560f5edbd78"
+    },
+    {
+      "path": "dist/assets/index-BPP9FC06.css",
+      "bytes": 73201,
+      "sha256": "6677910e627b1c0cbbac1f797c3bfdf1f4b37cdbaddd88b02c7c71c895a5fc0b"
+    },
+    {
+      "path": "dist/assets/index-BfeI7PPC.js",
+      "bytes": 476045,
+      "sha256": "a4e98f8c13a97dc324c454debf9272abef1f3441a8f6df7146ef209b9a23f51f"
+    },
+    {
+      "path": "dist/assets/rivals/asset-manifest.json",
+      "bytes": 6661,
+      "sha256": "d5fb25c57d45c393c92c4e4dc43020fea88fce1ee6811bd9402bf0cf5f2424ca"
+    },
+    {
+      "path": "dist/assets/rivals/rival-pack.glb",
+      "bytes": 193884,
+      "sha256": "09043547981c80d66fca23aa208971b6b2f457890cafabeed4258dbc0fdbb805"
+    },
+    {
+      "path": "dist/assets/transcoders/basis/LICENSE.txt",
+      "bytes": 9197,
+      "sha256": "a7d00bfd54525bc694b6e32f64c7ebcf5e6b7ae3657be5cc12767bce74654a47"
+    },
+    {
+      "path": "dist/assets/transcoders/basis/NOTICE.txt",
+      "bytes": 917,
+      "sha256": "42beeb6710c933778e30f62886e0790ebba120debbb0545ab46c7292d3e5a061"
+    },
+    {
+      "path": "dist/assets/transcoders/basis/README.md",
+      "bytes": 1388,
+      "sha256": "a578df416c1e0852e9c36a1cf91b4d28d91a251294f87ce610a3bc7ca4df15e0"
+    },
+    {
+      "path": "dist/assets/transcoders/basis/basis_transcoder.js",
+      "bytes": 57529,
+      "sha256": "8478b5b6d6b74e7d3082b89f6417321d8d1dc0307f2b30d4484bb11b441696a1"
+    },
+    {
+      "path": "dist/assets/transcoders/basis/basis_transcoder.wasm",
+      "bytes": 527333,
+      "sha256": "6cf17dc889352c42e9acf8897107978d127005fe3386c36a0e3845e27967630a"
+    },
+    {
+      "path": "dist/assets/vendor-three-_L_YAsy5.js",
+      "bytes": 598505,
+      "sha256": "ad793e90e46ee2c215ce5a818f9d7ebc7ac608fa5c8dde2723c2fd9cf975d5bd"
+    },
+    {
+      "path": "dist/assets/vendor-three-addons-kpozWyf3.js",
+      "bytes": 135491,
+      "sha256": "115007f768b8376d80164d66e8edce7559b3729e3809cf2911785c5193258301"
+    },
+    {
+      "path": "dist/index.html",
+      "bytes": 1813,
+      "sha256": "6fe9252fbdadabeebf71c0af7a9edcf0420d39a4205f223176a24b6dc3d26316"
+    },
+    {
+      "path": "dist/manifest.webmanifest",
+      "bytes": 856,
+      "sha256": "04d309ebb9d9488686d273cee253c72d57a81f8499edc9940dc40594b4e04f24"
+    },
+    {
+      "path": "dist/sw.js",
+      "bytes": 9029,
+      "sha256": "424803d26c443c0b4ad7c1337220e68a6f4806e3206afc5f8e2e7a17dd6d36c2"
+    },
+    {
+      "path": "manifest.json",
+      "bytes": 11729,
+      "sha256": "7fbe353d74eaaa1e6baee81475320c4b7529ee4402ddba282ebc0c5db43b1593"
+    }
+  ]
+}

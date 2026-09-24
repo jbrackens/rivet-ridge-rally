@@ -1,0 +1,10 @@
+$ npm run audit
+startedAt=2026-07-19T12:58:07.387Z
+completedAt=2026-07-19T12:58:08.379Z
+exitCode=0
+
+
+> rivet-ridge-rally@1.0.0-rc.2 audit
+> npm audit --audit-level=high
+
+found 0 vulnerabilities

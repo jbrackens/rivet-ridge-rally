@@ -29,7 +29,19 @@ const TRANSCODER_DIR = path.join(ROOT, "public/assets/transcoders/basis");
 const MODEL_PATH = path.join(MODEL_DIR, "festival-trail-bike.glb");
 const TEXTURE_PATH = path.join(MODEL_DIR, "festival-bike-albedo.ktx2");
 const MANIFEST_PATH = path.join(MODEL_DIR, "asset-manifest.json");
+const BASIS_LICENSE_PATH = path.join(TRANSCODER_DIR, "LICENSE.txt");
+const BASIS_LICENSE_SHA256 = "a7d00bfd54525bc694b6e32f64c7ebcf5e6b7ae3657be5cc12767bce74654a47";
 const TEXTURE_SIZE = 128;
+const RETIRED_PUBLIC_WRITE_OPT_IN = "RRR_ALLOW_RETIRED_FESTIVAL_PUBLIC_WRITE";
+
+if (process.env[RETIRED_PUBLIC_WRITE_OPT_IN] !== "1") {
+  throw new Error(
+    "The Festival asset builder is retired because it overwrites the authoritative public/assets/3d output. "
+      + "Use scripts/build-hero-bike-rider-assets.mjs for current assets. "
+      + `Set ${RETIRED_PUBLIC_WRITE_OPT_IN}=1 only for explicit historical reproduction.`,
+  );
+}
+
 const BASIS_NOTICE = `NOTICE
 Basis Universal™ Supercompressed GPU Texture Compression Library
 Copyright © 2016–2026 Binomial LLC. All rights reserved except as granted under the Apache 2.0 license.
@@ -387,7 +399,11 @@ async function copyBasisRuntime() {
   for (const file of files) {
     await copyFile(path.join(threeBasis, file), path.join(TRANSCODER_DIR, file));
   }
-  await copyFile(path.join(ROOT, "node_modules/typescript/LICENSE.txt"), path.join(TRANSCODER_DIR, "LICENSE.txt"));
+  const license = await readFile(BASIS_LICENSE_PATH);
+  assert(
+    sha256(license) === BASIS_LICENSE_SHA256,
+    "The checked-in byte-stable Apache-2.0 license text for the Basis runtime is missing or changed",
+  );
   await writeFile(path.join(TRANSCODER_DIR, "NOTICE.txt"), BASIS_NOTICE);
 }
 

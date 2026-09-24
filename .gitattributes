@@ -2,3 +2,6 @@
 public/assets/transcoders/basis/LICENSE.txt -text -diff
 docs/licenses/barlow-condensed-OFL-1.1.txt -text -diff
 public/assets/fonts/*.woff2 -text -diff
+docs/design/concepts/*.png -text -diff
+art-source/blender/**/*.blend -text -diff
+art-source/blender/**/*.glb -text -diff

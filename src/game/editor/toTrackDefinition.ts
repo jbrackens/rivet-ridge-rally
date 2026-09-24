@@ -13,8 +13,9 @@ import {
 import type { CustomTrackData, CustomTrackModule } from "../persistence/database";
 import { EDITOR_MODULE_BY_ID } from "./modules";
 import { validateCustomTrackRouteShape } from "./validation";
+import { LANE_POSITIONS as LANE_CENTERS } from "../simulation";
 
-function obstacleKind(moduleId: string): ObstacleKind | null {
+export function obstacleKind(moduleId: string): ObstacleKind | null {
   if (moduleId === "ramp-small") return "small-ramp";
   if (["ramp-medium", "ramp-tabletop", "jump-double"].includes(moduleId)) return "medium-ramp";
   if (moduleId === "ramp-large") return "large-ramp";
@@ -28,14 +29,13 @@ function obstacleKind(moduleId: string): ObstacleKind | null {
   return null;
 }
 
-function trackPieceKind(moduleId: string): AuthoredTrackPieceKind | null {
+export function trackPieceKind(moduleId: string): AuthoredTrackPieceKind | null {
   if (moduleId.startsWith("straight-")) return "straight";
   if (moduleId === "curve-left" || moduleId === "curve-right") return moduleId;
   if (moduleId === "bank-left" || moduleId === "bank-right") return moduleId;
   return null;
 }
 
-const LANE_CENTERS = [-4.5, -1.5, 1.5, 4.5] as const;
 export const CUSTOM_TRACK_PRESENTATION_FALLBACK_LENGTH = 240;
 
 function rampImpulse(moduleId: string): number | undefined {
